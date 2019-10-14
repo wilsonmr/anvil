@@ -27,4 +27,4 @@ If the model successfully trains, then the ratio of the covariance matrix
 sampled from the trained model over the input covariance should be approximately
 1
 
-[ratio plot of sampled vs. target covariance](./example_output/ratio.png)
+![ratio plot of sampled vs. target covariance](./example_output/ratio.png)
