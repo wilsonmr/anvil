@@ -37,33 +37,38 @@ def target_distribution_s(phi):
     """
     return 0.5*((phi@INV)*phi).sum(axis=-1, keepdim=True)
 
-def split_transformation(length, a_left=True):
-    r"""Given a flattened 2D state, represented by a vector \phi, returns a
-    matrix transformation, M, which acting on the flattened state seperates
-    two halves of the matrix according to a checkerboard pattern into
-    \phi = (\phi_a, \phi_b) (by default even sites sent left, odd sites sent
-    right). This behaviour can be changed with `a_left` flag.
+def split_to_flat_index(length):
+    r"""Returns a 1D tensor of size length^2. If used to index a split state
+    such that \phi = (\phi_a, \phi_b) then \phi -> flattened state with \phi_a
+    and \phi_b interlaced in a checkerboard pattern
+
+    You only need to use this function if the action is defined to accept the
+    flattened state geometry. If the action is defined to act just on a split
+    geometry then states can be used directly from the model.
 
     """
-    if a_left:
-        condition = (1, 0)
-    else:
-        condition = (0, 1)
-    N = length**2
-    state = np.zeros((length, length)) # define a checkerboard
-    state[1::2, 1::2] = 1
-    state[::2, ::2] = 1 # even sites are = 1
-    flat = state.flatten()
-    left = np.zeros((N, N), dtype=np.float32)
-    right = np.zeros((N, N), dtype=np.float32)
-    # ceil lets this handle length odd, unneccesary for our project
-    left[np.arange(np.ceil(N/2), dtype=int), np.where(flat == condition[0])[0]] = 1.
-    right[np.arange(np.ceil(N/2), N, dtype=int), np.where(flat == condition[1])[0]] = 1.
-    return torch.from_numpy(left), torch.from_numpy(right)
+    checkerboard = torch.zeros((length, length), dtype=bool)
+    # set even sites to 1
+    checkerboard[1::2, 1::2] = True
+    checkerboard[::2, ::2] = True
+
+    # make 2d state-like matrix filled with corresponding indices in split-flat state
+    splitind_like_state = torch.zeros((length, length), dtype=torch.long)
+    splitind_like_state[checkerboard] = torch.arange(
+        int(length**2/2),
+        dtype=torch.long,
+    )
+    splitind_like_state[~checkerboard] = torch.arange(
+        int(length**2/2),
+        length**2,
+        dtype=torch.long,
+    )
+    return splitind_like_state.flatten()
 
 N_BATCH = 2000
+INDEX = split_to_flat_index(L)
 
-def train_multivariate(model, epochs, a_left, b_right):
+def train_multivariate(model, epochs):
     """example of training loop of model"""
     # create your optimizer and a scheduler
     optimizer = optim.Adadelta(model.parameters(), lr=1)
@@ -76,8 +81,8 @@ def train_multivariate(model, epochs, a_left, b_right):
         z = torch.randn((N_BATCH, N_UNITS))
         phi = model.inverse_map(z)
         # phi here will be phi = (phi_a, phi_b) so need to undo transform
-        # phi@a_left = (a_left.T @ phi.T).T
-        target = target_distribution_s(phi@a_left + phi@b_right)
+        # using INDEX
+        target = target_distribution_s(phi[:, INDEX])
         output = model(phi)
 
         model.zero_grad() # get rid of stored gradients
@@ -90,13 +95,12 @@ def train_multivariate(model, epochs, a_left, b_right):
         if (i%50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
 
-def sample_multivariate(model, a_left, b_right, n_large):
+def sample_multivariate(model, n_large):
     """Analyse and plot if the covariance has been reproduced"""
     with torch.no_grad(): # don't want gradients being tracked in sampling stage
         z = torch.randn((n_large, N_UNITS))
         phi = model.inverse_map(z)
-        a = phi@a_left + phi@b_right
-        cov = np.cov(a, rowvar=False)
+        cov = np.cov(phi[:, INDEX], rowvar=False)
     # Save plots
     fig, ax = plt.subplots()
     im = ax.imshow(cov)
@@ -134,11 +138,10 @@ def main():
         size_in=N_UNITS, n_affine=8, affine_hidden_shape=(16,)
     )
     epochs = 5000 # Gives a decent enough approx.
-    a_left, b_right = split_transformation(L)
     # model needs to learn rotation and rescale
-    train_multivariate(model, epochs, a_left, b_right)
+    train_multivariate(model, epochs)
     n_large = 20000 # to estimate covmat
-    sample_multivariate(model, a_left, b_right, n_large)
+    sample_multivariate(model, n_large)
 
 if __name__ == "__main__":
     main()
