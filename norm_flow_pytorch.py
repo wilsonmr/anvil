@@ -48,127 +48,6 @@ def probability_normal(x_tensor: torch.Tensor) -> torch.Tensor:
     normalization = sqrt(pow(2*pi, x_tensor.shape[-1]))
     return torch.exp(exponent)/normalization
 
-def swap_half_mask_mat(size: int, first_half: bool = True) -> torch.Tensor:
-    """Gives a transformation matrix which swaps the two halfs of a vector
-    and then masks one of them.
-
-    Parameters
-    ----------
-    size: int
-        Number of elements in vector which is to be transformed
-    first_half: bool, optional
-        flag which dictates which half of original vector to keep
-
-    Returns
-    -------
-    out: torch.Tensor
-        A 2-D tensor which represents a transformation matrix with shape
-        (`size`,`size`)
-
-    Example
-    -------
-    The transformation is best explained through a demonstration
-
-    >>> x = torch.arange(1, 11, dtype=torch.float32).view(-1, 1)
-    >>> M = swap_half_mask_mat(10)
-    >>> M@x
-    tensor([[0.],
-            [0.],
-            [0.],
-            [0.],
-            [0.],
-            [1.],
-            [2.],
-            [3.],
-            [4.],
-            [5.]])
-    >>> M = swap_half_mask_mat(10, first_half=False)
-    >>> M@x
-    tensor([[ 6.],
-            [ 7.],
-            [ 8.],
-            [ 9.],
-            [10.],
-            [ 0.],
-            [ 0.],
-            [ 0.],
-            [ 0.],
-            [ 0.]])
-    """
-    transform_matrix = torch.zeros((size, size))
-    if first_half:
-        transform_matrix[
-            int(size/2) + torch.arange(int(size/2)),
-            torch.arange(int(size/2))
-        ] = 1.
-    else:
-        transform_matrix[
-            torch.arange(int(size/2)),
-            int(size/2) + torch.arange(int(size/2))
-        ] = 1.
-    return transform_matrix
-
-def half_mask_mat(size: int, first_half: bool = True) -> torch.Tensor:
-    """Gives a transformation matrix which masks either first or second half of
-    a vector (sets elements to zero)
-
-    Parameters
-    ----------
-    size: int
-        Number of elements in vector which is to be transformed
-    first_half: bool, optional
-        flag which dictates which half of original vector to keep
-
-    Returns
-    -------
-    out: torch.Tensor
-        A 2-D tensor which represents a transformation matrix with shape
-        (`size`,`size`) which masks half of a vector of length `size`
-
-    Example
-    -------
-    See how the transformation masks half of a vector
-
-    >>> x = torch.arange(1, 11, dtype=torch.float32).view(-1, 1)
-    >>> M = half_mask_mat(10)
-    >>> M@x
-    tensor([[1.],
-            [2.],
-            [3.],
-            [4.],
-            [5.],
-            [0.],
-            [0.],
-            [0.],
-            [0.],
-            [0.]])
-    >>> M = half_mask_mat(10, first_half=False)
-    >>> M@x
-    tensor([[ 0.],
-            [ 0.],
-            [ 0.],
-            [ 0.],
-            [ 0.],
-            [ 6.],
-            [ 7.],
-            [ 8.],
-            [ 9.],
-            [10.]])
-
-    """
-    transform_matrix = torch.zeros((size, size))
-    if first_half:
-        transform_matrix[
-            torch.arange(int(size/2)),
-            torch.arange(int(size/2))
-        ] = 1.
-    else:
-        transform_matrix[
-            int(size/2) + torch.arange(int(size/2)),
-            int(size/2) + torch.arange(int(size/2))
-        ] = 1.
-    return transform_matrix
-
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
@@ -238,8 +117,9 @@ class AffineLayer(nn.Module):
             i_affine: int,
     ):
         super(AffineLayer, self).__init__()
-        s_shape = [size_in, *s_hidden_shape, size_in]
-        t_shape = [size_in, *t_hidden_shape, size_in]
+        size_half = int(size_in/2)
+        s_shape = [size_half, *s_hidden_shape, size_half]
+        t_shape = [size_half, *t_hidden_shape, size_half]
 
         self.s_layers = nn.ModuleList(
             [
@@ -258,14 +138,14 @@ class AffineLayer(nn.Module):
 
         if (i_affine % 2) == 0: #starts at zero
             # a is first half of input vector
-            self._a_to_b = swap_half_mask_mat(size_in)
-            self._a_to_a = half_mask_mat(size_in)
-            self._b_to_b = half_mask_mat(size_in, first_half=False)
+            self._a_ind = slice(0, int(size_half))
+            self._b_ind = slice(int(size_half), size_in)
+            self.join_func = torch.cat
         else:
             # a is second half of input vector
-            self._a_to_b = swap_half_mask_mat(size_in, first_half=False)
-            self._a_to_a = half_mask_mat(size_in, first_half=False)
-            self._b_to_b = half_mask_mat(size_in)
+            self._a_ind = slice(int(size_half), size_in)
+            self._b_ind = slice(0, int(size_half))
+            self.join_func = lambda a, *args, **kwargs: torch.cat((a[1], a[0]), *args, **kwargs)
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
@@ -315,15 +195,14 @@ class AffineLayer(nn.Module):
             stack of transformed vectors z, with same shape as input
 
         """
-        # since inputs are like (None, D) transformation would need to be
-        # (a_to_b@phi.T).T, which is equivalent to
-        phi_a = phi_input@self._a_to_b.T
-        phi_b = phi_input@self._b_to_b.T
+        # since inputs are like (N_states, D) we need to index correct halves
+        # of if input states
+        phi_a = phi_input[:, self._a_ind]
+        phi_b = phi_input[:, self._b_ind]
         s_out = self._s_forward(phi_a)
-        t_out = self._t_forward(phi_a)@self._b_to_b.T # mask output
-        z_b = (s_out.exp()*phi_b + t_out) # s output is masked by phi_b
-        z_a = phi_input@self._a_to_a.T
-        return z_a + z_b
+        t_out = self._t_forward(phi_a)
+        z_b = (s_out.exp()*phi_b + t_out)
+        return self.join_func([phi_a, z_b], dim=1) #put back together state
 
     def inverse_coupling_layer(self, z_input):
         r"""performs the transformation of the inverse coupling layer, denoted
@@ -347,13 +226,12 @@ class AffineLayer(nn.Module):
                 stack of transformed vectors phi, with same shape as input
 
         """
-        z_a = z_input@self._a_to_b.T # = (a_to_b@x.T).T (see coupling layer)
-        z_b = z_input@self._b_to_b.T
+        z_a = z_input[:, self._a_ind]
+        z_b = z_input[:, self._b_ind]
         s_out = self._s_forward(z_a)
         t_out = self._t_forward(z_a)
-        phi_b = ((z_b - t_out)*torch.exp(-s_out))@self._b_to_b.T
-        phi_a = z_input@self._a_to_a.T
-        return phi_a + phi_b
+        phi_b = ((z_b - t_out)*torch.exp(-s_out))
+        return self.join_func([z_a, phi_b], dim=1)
 
     def forward(self, phi_input):
         """Same as `coupling_layer`, but `forward` is a special method of a
@@ -379,8 +257,8 @@ class AffineLayer(nn.Module):
             column vector of contributions to jacobian (N_states, 1)
 
         """
-        a_for_net = phi_input@self._a_to_b.T
-        s_out = self._s_forward(a_for_net)@self._b_to_b.T
+        a_for_net = phi_input[:, self._a_ind] # select phi_a
+        s_out = self._s_forward(a_for_net)
         return s_out.exp().prod(dim=-1)
 
 class NormalisingFlow(nn.Module):
