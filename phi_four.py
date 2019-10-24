@@ -149,7 +149,7 @@ def train(model, epochs, a_left, b_right):
         # gen simple states
         z = torch.randn((N_BATCH, N_UNITS))
         phi = model.inverse_map(z)
-        target = target_distribution_s(phi@a_left + phi@b_right, m_sq, l, shift)
+        target = target_distribution_s(phi, m_sq, l, shift)
         output = model(phi)
 
         model.zero_grad() # get rid of stored gradients
@@ -212,16 +212,16 @@ def main():
     'Pass "train" and a model name to train new model or "load" and model name to load existing model'
     if sys.argv[1] == 'train':
         model = NormalisingFlow(
-            size_in=N_UNITS, n_affine=8, affine_hidden_shape=(pow(N_UNITS,2),)
+            size_in=N_UNITS, n_affine=8, affine_hidden_shape=(32,)
         )
-        epochs = 5000 # Gives a decent enough approx.
+        epochs = 4000 # Gives a decent enough approx.
         # model needs to learn rotation and rescale
         train(model, epochs, a_left, b_right)
         torch.save(model, 'models/'+sys.argv[2])
     elif sys.argv[1] == 'load':
         model = torch.load('models/'+sys.argv[2])
     target_length = 10000 # Number of length L^2 samples we want
-    n_large = 10 * target_length # Number of configurations to generate to sample from. 10*target_length seems to generate enough. 
+    n_large = 2 * target_length # Number of configurations to generate to sample from. 10*target_length seems to generate enough.
     start_time = time.time() 
     # Perform Metroplis-Hastings sampling
     sample_dist = sample(model, a_left, b_right, n_large, target_length)
