@@ -1,22 +1,20 @@
-from tqdm import tqdm
+"""
+phi_four.py
+
+script which can train and load models for phi^4 action
+"""
 import sys
 import time
-from math import ceil
+from math import ceil, exp
 
+from tqdm import tqdm
 import numpy as np
-import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
 import torch.nn as nn
 
 from norm_flow_pytorch import NormalisingFlow, shifted_kl
-
-random = np.random.RandomState(1234)
-L = 6
-N_UNITS = L**2
-m_sq, l = -4, 6.975
-N_BATCH = 2000
 
 def get_shift(length: int) -> torch.Tensor:
     r"""Given a 2D state of size lengthxlength returns a 4x(length^2)
@@ -61,7 +59,6 @@ def get_shift(length: int) -> torch.Tensor:
         shift[i, :] = splitind_like_state.roll(direction, dims=dim).flatten()[out_ind]
     return shift
 
-
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given a state
     might be possible to jit compile this to make training a bit faster
@@ -85,42 +82,19 @@ class PhiFourAction(nn.Module):
         ).sum(dim=1, keepdim=True) # sum across sites
         return action
 
-action = PhiFourAction(L, m_sq, l)
+N_BATCH = 2000 # keep batch size constant for now
 
-def split_transformation(length, a_left=True):
-    r"""Given a flattened 2D state, represented by a vector \phi, returns a
-    matrix transformation, M, which acting on the flattened state seperates
-    two halves of the matrix according to a checkerboard pattern into
-    \phi = (\phi_a, \phi_b) (by default even sites sent left, odd sites sent
-    right). This behaviour can be changed with `a_left` flag.
-
-    """
-    if a_left:
-        condition = (1, 0)
-    else:
-        condition = (0, 1)
-    N = length**2
-    state = np.zeros((length, length)) # define a checkerboard
-    state[1::2, 1::2] = 1
-    state[::2, ::2] = 1 # even sites are = 1
-    flat = state.flatten()
-    left = np.zeros((N, N), dtype=np.float32)
-    right = np.zeros((N, N), dtype=np.float32)
-    # ceil lets this handle length odd, unneccesary for our project
-    left[np.arange(np.ceil(N/2), dtype=int), np.where(flat == condition[0])[0]] = 1.
-    right[np.arange(np.ceil(N/2), N, dtype=int), np.where(flat == condition[1])[0]] = 1.
-    return torch.from_numpy(left), torch.from_numpy(right)
-
-def train(model, epochs, a_left, b_right):
+def train(model, action, epochs):
     """example of training loop of model"""
     # create your optimizer and a scheduler
     optimizer = optim.Adadelta(model.parameters(), lr=1)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=500)
     # let's use tqdm to see progress
     pbar = tqdm(range(epochs), desc=f"loss: N/A")
+    n_units = model.size_in
     for i in pbar:
         # gen simple states
-        z = torch.randn((N_BATCH, N_UNITS))
+        z = torch.randn((N_BATCH, n_units))
         phi = model.inverse_map(z)
         target = action(phi)
         output = model(phi)
@@ -135,7 +109,9 @@ def train(model, epochs, a_left, b_right):
         if (i%50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
 
-def sample(model, a_left, b_right, n_large, target_length):
+RNG = np.random.RandomState(1234) # seed MCMC for now
+
+def sample(model, action, n_large, target_length):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi configurations.
     We calculate an A = min(1, \frac{\tilde p(phi^i)}{p(phi^i)} \frac{p(phi^j)}{\tilde p(phi^j)})
@@ -145,26 +121,26 @@ def sample(model, a_left, b_right, n_large, target_length):
     is rejected, then i=i for the next proposal and a new j is picked. We continue until the chain
     has the desired length.
     """
-
+    n_units = model.size_in
     with torch.no_grad(): # don't want gradients being tracked in sampling stage
-        z = torch.randn((n_large, N_UNITS)) # random z configurations
+        z = torch.randn((n_large, n_units)) # random z configurations
         phi = model.inverse_map(z) # map using trained model to phi
         log_ptilde = model.forward(phi) # log of probabilities of generated phis using trained model
         S = action(phi)
         chain_len = 0 # intialise current chain length
-        sample_distribution = torch.Tensor(target_length, N_UNITS) # intialise tensor to store samples
+        sample_distribution = torch.Tensor(target_length, n_units) # intialise tensor to store samples
         accepted, rejected = 0,0 # track accept/reject statistics
-        i = np.random.randint(n_large) # random index to start sampling from configurations tensor
+        i = RNG.randint(n_large) # random index to start sampling from configurations tensor
         used = [] # track which configurations have been added to the chain
         used.append(i) 
         while chain_len < target_length:
-            j = np.random.randint(n_large) # random initial phi^j for update proposal
+            j = RNG.randint(n_large) # random initial phi^j for update proposal
             while j in used: # make sure we don't pick a phi we have already used
-                j = np.random.randint(n_large)
+                j = RNG.randint(n_large)
             exponent = log_ptilde[i] - S[j] - log_ptilde[j] + S[i]
-            P_accept = np.exp(float(exponent)) # much faster if you tell it to use a float
+            P_accept = exp(float(exponent)) # much faster if you tell it to use a float
             A = min(1, P_accept) # faster than np.min and torch.min
-            u = np.random.uniform() # pick a random u for comparison
+            u = RNG.uniform() # pick a random u for comparison
             if u <= A:
                 sample_distribution[chain_len,:] = phi[i,:] # add to chain if accepted
                 chain_len += 1 
@@ -178,31 +154,37 @@ def sample(model, a_left, b_right, n_large, target_length):
     return sample_distribution
 
 def main():
-    
+    length = 6
+    n_units = length**2
+    m_sq, l = -4, 6.975
     # set seed, hopefully result is reproducible
     torch.manual_seed(0)
-    a_left, b_right = split_transformation(L)
+    action = PhiFourAction(length, m_sq, l)
     # define simple mode, each network is single layered
     assert (len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load']),\
     'Pass "train" and a model name to train new model or "load" and model name to load existing model'
     if sys.argv[1] == 'train':
         model = NormalisingFlow(
-            size_in=N_UNITS, n_affine=8, affine_hidden_shape=(32,)
+            size_in=n_units, n_affine=8, affine_hidden_shape=(32,)
         )
         epochs = 4000 # Gives a decent enough approx.
         # model needs to learn rotation and rescale
-        train(model, epochs, a_left, b_right)
+        train(model, action, epochs)
         torch.save(model, 'models/'+sys.argv[2])
     elif sys.argv[1] == 'load':
         model = torch.load('models/'+sys.argv[2])
     target_length = 10000 # Number of length L^2 samples we want
-    n_large = 2 * target_length # Number of configurations to generate to sample from. 10*target_length seems to generate enough.
-    start_time = time.time() 
+    # Number of configurations to generate to sample from.
+    n_large = 2*target_length
+    start_time = time.time()
     # Perform Metroplis-Hastings sampling
-    sample_dist = sample(model, a_left, b_right, n_large, target_length)
+    sample_dist = sample(model, action, n_large, target_length)
     print('Generated phi distribution:')
     print(sample_dist)
-    print("Time to run MC for a chain of %s samples on an L=%s lattice: %s seconds" % (target_length, L, (time.time() - start_time)))
+    print(
+        f"Time to run MC for a chain of {target_length} "
+        f"samples on an L={length} lattice: {time.time() - start_time} seconds"
+    )
 
 if __name__ == "__main__":
     main()
