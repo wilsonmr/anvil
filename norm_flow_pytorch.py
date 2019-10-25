@@ -419,7 +419,7 @@ class NormalisingFlow(nn.Module):
             affine_hidden_shape: tuple = (16,)
         ):
         super(NormalisingFlow, self).__init__()
-
+        self.size_in = size_in
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
