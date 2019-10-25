@@ -85,9 +85,9 @@ class array_mapping(object):
         return left, right
 
 random = np.random.RandomState(1234)
-L = 4
+L = 6
 N_UNITS = L**2
-m_sq, l = 1, 1
+m_sq, l = -4, 6.975
 mu, sigma = 0, 1
 N_BATCH = 2000
 phi_initial_np = (random.normal(mu, sigma, (L, L))).astype(np.float32)
@@ -103,7 +103,6 @@ phi = torch.from_numpy(phi)
 
 def target_distribution_s(phi, m_sq, l, shift):
     r"""Returns action S(\phi) for a stack of states \phi, shape (N_states, D).
-    TODO: 
     """
     action = 0
     action += (2+0.5*m_sq)*torch.sum(phi**2, dim=1) + l*torch.sum(phi**4, dim=1)
@@ -176,8 +175,10 @@ def sample(model, a_left, b_right, n_large, target_length):
     with torch.no_grad(): # don't want gradients being tracked in sampling stage
         z = torch.randn((n_large, N_UNITS)) # random z configurations
         phi = model.inverse_map(z) # map using trained model to phi
-        p_tilde = torch.exp(model.forward(phi)) # probabilities of generated phis using trained model
-        p = torch.exp(-target_distribution_s(phi, m_sq, l, shift)) # probabilities of phis from target pdf
+        # p_tilde = torch.exp(model.forward(phi)) # probabilities of generated phis using trained model
+        log_ptilde = model.forward(phi)
+        # p = torch.exp(-target_distribution_s(phi, m_sq, l, shift)) # probabilities of phis from target pdf
+        S = -target_distribution_s(phi, m_sq, l, shift)
         chain_len = 0 # intialise current chain length
         sample_distribution = torch.Tensor(target_length, N_UNITS) # intialise tensor to store samples
         accepted, rejected = 0,0 # track accept/reject statistics
@@ -188,8 +189,11 @@ def sample(model, a_left, b_right, n_large, target_length):
             j = np.random.randint(n_large) # random initial phi^j for update proposal
             while j in used: # make sure we don't pick a phi we have already used
                 j = np.random.randint(n_large)
-            ratio = (p_tilde[i]/p_tilde[j]) * (p[j]/p[i]) # calculate the ratio in A
-            A = min(1, ratio) # set A
+            # ratio = (p_tilde[i]/p_tilde[j]) * (p[j]/p[i]) # calculate the ratio in A
+            exponent = log_ptilde[i] + S[j] - log_ptilde[j] - S[i]
+            P_accept = np.exp(float(exponent)) # much faster if you tell it to use a float
+            # A = min(1, ratio) # set A
+            A = min(1, P_accept) # faster than np.min and torch.min
             u = np.random.uniform() # pick a random u for comparison
             if u <= A:
                 sample_distribution[chain_len,:] = phi[i,:] # add to chain if accepted
