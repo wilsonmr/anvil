@@ -156,10 +156,10 @@ def sample(model, action, n_large, target_length):
 def main():
     length = 6
     n_units = length**2
-    m_sq, l = -4, 6.975
+    m_sq, lam = -4, 6.975
     # set seed, hopefully result is reproducible
     torch.manual_seed(0)
-    action = PhiFourAction(length, m_sq, l)
+    action = PhiFourAction(length, m_sq, lam)
     # define simple mode, each network is single layered
     assert (len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load']),\
     'Pass "train" and a model name to train new model or "load" and model name to load existing model'
@@ -169,10 +169,14 @@ def main():
         )
         epochs = 4000 # Gives a decent enough approx.
         # model needs to learn rotation and rescale
+        start_train_time = time.time()
         train(model, action, epochs)
-        torch.save(model, 'models/'+sys.argv[2])
+        torch.save(model.state_dict(), 'models/'+sys.argv[2])
     elif sys.argv[1] == 'load':
-        model = torch.load('models/'+sys.argv[2])
+        model = NormalisingFlow(
+            size_in=n_units, n_affine=8, affine_hidden_shape=(32,)
+        )
+        model.load_state_dict(torch.load('models/'+sys.argv[2]))
     target_length = 10000 # Number of length L^2 samples we want
     # Number of configurations to generate to sample from.
     n_large = 2*target_length
