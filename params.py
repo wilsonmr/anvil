@@ -12,8 +12,8 @@ D = L*L
 # ---------- #
 N_BATCH = 5000
 n_affine = 8
-affine_hidden_shape=(32,)
-epochs = 100000
+affine_hidden_shape=(32,32)
+epochs = 10000
 
 # ---------- #
 #  Sampling  #

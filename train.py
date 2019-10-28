@@ -1,7 +1,7 @@
 """
-phi_four.py
+train.py
 
-script which can train and load models for phi^4 action
+Run python3 train.py <model_name>
 """
 import sys
 import os
