@@ -154,7 +154,7 @@ def sample(model, action, n_large, target_length):
     return sample_distribution
 
 def main():
-    length = 6
+    length = 4
     n_units = length**2
     m_sq, lam = -4, 6.975
     # set seed, hopefully result is reproducible
