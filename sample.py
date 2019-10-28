@@ -1,7 +1,8 @@
 """
-phi_four.py
+sample.py
 
-script which can train and load models for phi^4 action
+Run python3 sample.py <model_name> where <model_name> is a pre-trained model saved in a
+directory names 'models/'.
 """
 import sys
 import time

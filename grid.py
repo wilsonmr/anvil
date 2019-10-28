@@ -3,6 +3,9 @@ grid.py
 
 Module containing functions related to the grid, and transformations between the original
 2-d grid and the 1-d chequerboard "split state" as required by the neural networks.
+
+The only module not to import params.py - currently it's imported *by* params.py for
+the phi4 action computation.
 """
 import torch
 
