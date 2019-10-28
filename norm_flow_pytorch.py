@@ -9,7 +9,7 @@ distribution as per https://arxiv.org/abs/1904.12072
 Key imports from this module are NormalisingFlow and shifted_kl. Which are the
 necessary ingredients to train your own normalising flow model.
 """
-from math import sqrt, pi
+from math import sqrt, pi, log
 
 import torch
 import torch.nn as nn
@@ -47,6 +47,14 @@ def probability_normal(x_tensor: torch.Tensor) -> torch.Tensor:
     exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
     normalization = sqrt(pow(2*pi, x_tensor.shape[-1]))
     return torch.exp(exponent)/normalization
+
+def log_probability_normal(x_tensor: torch.Tensor) -> torch.Tensor:
+    """Caculate the log probability of states, if each node was drawn from
+    a normal distribution with mean 0, variance 1
+    """
+    exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
+    normalization = sqrt(pow(2*pi, x_tensor.shape[-1]))
+    return exponent - log(normalization)
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -239,7 +247,7 @@ class AffineLayer(nn.Module):
         """
         return self.coupling_layer(phi_input)
 
-    def det_jacobian(self, phi_input):
+    def log_det_jacobian(self, phi_input):
         r"""returns the contribution to the determinant of the jacobian
 
             \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
@@ -259,7 +267,7 @@ class AffineLayer(nn.Module):
         """
         a_for_net = phi_input[:, self._a_ind] # select phi_a
         s_out = self._s_forward(a_for_net)
-        return s_out.exp().prod(dim=-1)
+        return s_out.sum(dim=-1)
 
 class NormalisingFlow(nn.Module):
     r"""Extension to nn.Module which is built up of multiple `AffineLayer`s
@@ -350,10 +358,10 @@ class NormalisingFlow(nn.Module):
         jacob_contr = torch.ones(phi_input.size()[0], 1)
         z_out = phi_input
         for layer in self.affine_layers:
-            jacob_contr *= layer.det_jacobian(z_out).view(-1, 1)
+            jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
-        simple_prob_z_out = probability_normal(z_out)
-        return torch.log(simple_prob_z_out*jacob_contr)
+        simple_prob_z_out = log_probability_normal(z_out)
+        return simple_prob_z_out + jacob_contr
 
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
