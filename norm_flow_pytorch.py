@@ -338,13 +338,13 @@ class NormalisingFlow(nn.Module):
             column of log(\tilde p) associated with each of input states
 
         """
-        jacob_contr = torch.ones(phi_input.size()[0], 1)
+        log_jacob_contr = torch.zeros(phi_input.size()[0], 1)
         z_out = phi_input
         for layer in self.affine_layers:
-            jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
+            log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
-        simple_prob_z_out = self.log_probability_normal(z_out)
-        return simple_prob_z_out + jacob_contr
+        log_simple_prob = self.log_probability_normal(z_out)
+        return log_simple_prob + log_jacob_contr
 
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
