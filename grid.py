@@ -44,8 +44,8 @@ def get_2d_ind_wrapped(index, L):
 def get_stateind_like_split(L: int):
     """A 1xL^2 "split" array of tuples corresponding to the state indices."""
 
-    indices_even = [ (i%L+(i//L)%2, i//L) for i in range(0,L**2,2) ]
-    indices_odd  = [ (i%L-(i//L)%2, i//L) for i in range(1,L**2,2) ]
+    indices_even = [ (i//L, i%L+(i//L)%2) for i in range(0,L**2,2) ]
+    indices_odd  = [ (i//L, i%L-(i//L)%2) for i in range(1,L**2,2) ]
 
     return indices_even + indices_odd
 

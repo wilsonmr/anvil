@@ -65,7 +65,8 @@ with torch.no_grad(): # don't want gradients being tracked in sampling stage
     
     # Pick a starting configuration, but don't add it to the chain
     i = random.choice(states_remaining)
-
+    
+    # List to record series of acceptions/rejections
     acc_rej = []
 
     chain_len = 0
@@ -79,7 +80,7 @@ with torch.no_grad(): # don't want gradients being tracked in sampling stage
         if u <= P_accept:
             chain[chain_len,:] = phi[j,:]
             chain_len += 1
-            acc_rej.append(False)
+            acc_rej.append(False)       # False (0) for accepted moves!
             states_remaining.remove(j)
             i = j
         else:
@@ -91,8 +92,8 @@ N_proposals = len(acc_rej)
 N_rejected = sum(acc_rej)
 N_accepted = N_proposals - N_rejected
 
-print( "Accepted: "+str(N_accepted)+", Rejected:"+str(N_rejected) )
-print( "Fraction accepted: "+str(N_accepted/N_proposals) )
+print( f"Accepted: {N_accepted}, Rejected: {N_rejected}" )
+print( f"Fraction accepted: {N_accepted/N_proposals}" )
 
 # Save state for computing observables
 torch.save(phi, "sample_dist.pt")
