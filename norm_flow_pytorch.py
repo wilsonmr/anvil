@@ -267,7 +267,8 @@ class NormalisingFlow(nn.Module):
         ):
         super(NormalisingFlow, self).__init__()
         self.size_in = size_in
-        self._gaussian_normalization = log(sqrt(pow(2*pi, size_in)))
+        # log(Normalization) for `size_in` gaussian units prob distribution func
+        self._log_gauss_norm = log(sqrt(pow(2*pi, size_in)))
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
@@ -319,7 +320,7 @@ class NormalisingFlow(nn.Module):
 
         """
         exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
-        return exponent - self._gaussian_normalization
+        return exponent - self._log_gauss_norm
 
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
         r"""Returns the log of the exact probability (of model) associated with
