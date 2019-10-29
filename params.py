@@ -11,9 +11,9 @@ D = L*L
 #  Training  #
 # ---------- #
 N_BATCH = 5000
-n_affine = 8
-affine_hidden_shape=(32,32)
-epochs = 10000
+n_affine = 12
+affine_hidden_shape=(32,)
+epochs = 100000
 
 # ---------- #
 #  Sampling  #
