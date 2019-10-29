@@ -9,44 +9,13 @@ distribution as per https://arxiv.org/abs/1904.12072
 Key imports from this module are NormalisingFlow and shifted_kl. Which are the
 necessary ingredients to train your own normalising flow model.
 """
-from math import sqrt, pi
+from math import sqrt, pi, log
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 ACTIVATION_FUNC = F.leaky_relu # Globally define activation function
-
-def probability_normal(x_tensor: torch.Tensor) -> torch.Tensor:
-    """Caculate the probability of states, if each node was drawn from
-    a normal distribution with mean 0, variance 1
-
-    Parameters
-    ----------
-    x_tensor: torch.Tensor
-        A 2-D tensor. Each row of x_tensor represents a state and each column
-        represents a lattice site
-
-    Returns
-    -------
-    out: torch.Tensor
-        A 2-D tensor with a single column. Each entry is the probability of the
-        corresponding state of the input `x_tensor`
-
-    Example
-    -------
-    Consider the intergral of the domain [-1, 1]:
-
-    >>> x = torch.linspace(-1, 1, 1000).view(-1, 1)
-    >>> delta_x = 1/torch.shape[0]
-    >>> p_x = probability_normal(x)
-    >>> delta_x*torch.sum(p_x)*(1 - -1) # integrate
-    tensor(0.6825)
-
-    """
-    exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
-    normalization = sqrt(pow(2*pi, x_tensor.shape[-1]))
-    return torch.exp(exponent)/normalization
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -239,8 +208,8 @@ class AffineLayer(nn.Module):
         """
         return self.coupling_layer(phi_input)
 
-    def det_jacobian(self, phi_input):
-        r"""returns the contribution to the determinant of the jacobian
+    def log_det_jacobian(self, phi_input):
+        r"""returns the contribution to the log determinant of the jacobian
 
             \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
 
@@ -254,12 +223,12 @@ class AffineLayer(nn.Module):
         Returns
         -------
         out: torch.Tensor
-            column vector of contributions to jacobian (N_states, 1)
+            column vector of contributions to log det jacobian (N_states, 1)
 
         """
         a_for_net = phi_input[:, self._a_ind] # select phi_a
         s_out = self._s_forward(a_for_net)
-        return s_out.exp().prod(dim=-1)
+        return s_out.sum(dim=-1)
 
 class NormalisingFlow(nn.Module):
     r"""Extension to nn.Module which is built up of multiple `AffineLayer`s
@@ -298,6 +267,8 @@ class NormalisingFlow(nn.Module):
         ):
         super(NormalisingFlow, self).__init__()
         self.size_in = size_in
+        # log(Normalization) for `size_in` gaussian units prob distribution func
+        self._log_gauss_norm = log(sqrt(pow(2*pi, size_in)))
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
@@ -331,6 +302,26 @@ class NormalisingFlow(nn.Module):
             # TODO: make this yield, then make a yield from wrapper?
         return phi_out
 
+    def log_probability_normal(self, x_tensor):
+        """Caculate the log probability of states, if each node was drawn from
+        a normal distribution with mean 0, variance 1
+
+        Parameters
+        ----------
+        x_tensor: torch.Tensor
+            A 2-D tensor. Each row of x_tensor represents a state and each column
+            represents a lattice site
+
+        Returns
+        -------
+        out: torch.Tensor
+            A 2-D tensor with a single column. Each entry is the log
+            probability of the corresponding state of the input `x_tensor`
+
+        """
+        exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
+        return exponent - self._log_gauss_norm
+
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
         r"""Returns the log of the exact probability (of model) associated with
         each of the input states according to eq. (8) of
@@ -347,13 +338,13 @@ class NormalisingFlow(nn.Module):
             column of log(\tilde p) associated with each of input states
 
         """
-        jacob_contr = torch.ones(phi_input.size()[0], 1)
+        log_jacob_contr = torch.zeros(phi_input.size()[0], 1)
         z_out = phi_input
         for layer in self.affine_layers:
-            jacob_contr *= layer.det_jacobian(z_out).view(-1, 1)
+            log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
-        simple_prob_z_out = probability_normal(z_out)
-        return torch.log(simple_prob_z_out*jacob_contr)
+        log_simple_prob = self.log_probability_normal(z_out)
+        return log_simple_prob + log_jacob_contr
 
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
