@@ -111,7 +111,7 @@ def train(model, action, epochs):
 
 RNG = np.random.RandomState(1234) # seed MCMC for now
 
-def sample(model, action, n_large, target_length):
+def sample(model, action, n_large, target_length, output):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi configurations.
     We calculate an A = min(1, \frac{\tilde p(phi^i)}{p(phi^i)} \frac{p(phi^j)}{\tilde p(phi^j)})
@@ -149,19 +149,20 @@ def sample(model, action, n_large, target_length):
                 accepted += 1
             else:
                 rejected += 1
-    print('Accepted: '+str(accepted)+', Rejected:'+str(rejected))
-    print('Fraction accepted: '+str(accepted/(accepted+rejected)))
+    output.write(f'Accepted: {accepted}; Rejected: {rejected}\n')
+    output.write(f'Fraction accepted: {accepted/(accepted+rejected)}\n')
     return sample_distribution
 
 def main():
-    length = 6
+    length = int(sys.argv[3])
     n_units = length**2
-    m_sq, lam = -4, 6.975
+    m_sq, lam = float(sys.argv[4]), float(sys.argv[5])
     # set seed, hopefully result is reproducible
-    torch.manual_seed(0)
+    torch.manual_seed(1)
     action = PhiFourAction(length, m_sq, lam)
+    output = open(sys.argv[6], 'a')
     # define simple mode, each network is single layered
-    assert (len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load']),\
+    assert (len(sys.argv) == 7) and (sys.argv[1] in ['train', 'load']),\
     'Pass "train" and a model name to train new model or "load" and model name to load existing model'
     if sys.argv[1] == 'train':
         model = NormalisingFlow(
@@ -171,6 +172,7 @@ def main():
         # model needs to learn rotation and rescale
         start_train_time = time.time()
         train(model, action, epochs)
+        output.write(f'Time to train L={length} model: {time.time() - start_train_time} seconds\n')
         torch.save(model.state_dict(), 'models/'+sys.argv[2])
     elif sys.argv[1] == 'load':
         model = NormalisingFlow(
@@ -182,13 +184,11 @@ def main():
     n_large = 2*target_length
     start_time = time.time()
     # Perform Metroplis-Hastings sampling
-    sample_dist = sample(model, action, n_large, target_length)
-    print('Generated phi distribution:')
-    print(sample_dist)
-    print(
-        f"Time to run MC for a chain of {target_length} "
-        f"samples on an L={length} lattice: {time.time() - start_time} seconds"
-    )
+    sample_dist = sample(model, action, n_large, target_length, output)
+    output.write('Generated distribution\n')
+    output.write(str(sample_dist)+'\n')
+    output.write(f'Time to run MC for chain of {target_length}\n')
+    output.write(f'samples on L = {length} lattice: {time.time() - start_time} seconds\n')
 
 if __name__ == "__main__":
     main()
