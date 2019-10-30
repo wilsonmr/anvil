@@ -17,8 +17,8 @@ import torch.nn as nn
 from norm_flow_pytorch import NormalisingFlow, shifted_kl
 
 def get_shift(length: int) -> torch.Tensor:
-    r"""Given a 2D state of size lengthxlength returns a 4x(length^2)
-    tensor where each row gives the 4 nearest neighbours to a flattened state
+    r"""Given a 2D state of size lengthxlength returns a 2x(length^2)
+    tensor where each row gives the 2 nearest neighbours to a flattened state
     which has been split into (\phi_even, \phi_odd) where even/odd refer to
     parity of the site
     """
@@ -48,12 +48,10 @@ def get_shift(length: int) -> torch.Tensor:
     )
 
     direction_dimension = [
-        (-1, 1),
         (1, 1),
-        (-1, 0),
         (1, 0)
     ]
-    shift = torch.zeros(4, length*length, dtype=torch.long)
+    shift = torch.zeros(2, length*length, dtype=torch.long)
     for i, (direction, dim) in enumerate(direction_dimension):
         # each shift, roll the 2d state-like indices and then flatten and split
         shift[i, :] = splitind_like_state.roll(direction, dims=dim).flatten()[out_ind]
@@ -75,7 +73,7 @@ class PhiFourAction(nn.Module):
         action = (
             (2+0.5*self.m_sq)*phi_state**2 + # phi^2 terms
             self.lam*phi_state**4 - #phi^4 term
-            0.5*torch.sum(
+            torch.sum(
                 phi_state[:, self.shift]*phi_state.view(-1, 1, self.length**2),
                 dim=1,
             ) # derivative
