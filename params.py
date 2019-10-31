@@ -4,28 +4,38 @@ import grid
 # --------- #
 #  Lattice  #
 # --------- #
-L = 6
+L = 4
 D = L*L
 
 # ---------- #
 #  Training  #
 # ---------- #
-N_BATCH = 5000
+N_BATCH = 1000
 n_affine = 12
 affine_hidden_shape=(32,)
-epochs = 100000
+epochs = 100
+
+# Directory for saving models. Include '/'
+model_dir = 'models/'
+
+# Run a few MCMC simulations every few epochs as another convergence check
+epochs_sample = epochs//10
+N_MCMC_sims = 3
+
+# Directory for saving convergence data. Include '/'
+training_data_dir = 'training_data/'
 
 # ---------- #
 #  Sampling  #
 # ---------- #
-target_length = 100000
-n_large = 2*target_length
+target_length = 1000
+n_large = 5*target_length
 
 # ----------------- #
 #  Autocorrelation  #
 # ----------------- #
-tau_max = 20
-i_therm = 1
+tau_max = 20 # longest computed autocorrelation 'time'
+i_therm = 10 # only start measuring autocorrelation after i_therm configurations
 
 
 # ------ #
