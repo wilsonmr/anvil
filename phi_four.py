@@ -17,10 +17,45 @@ import torch.nn as nn
 from norm_flow_pytorch import NormalisingFlow, shifted_kl
 
 def get_shift(length: int) -> torch.Tensor:
-    r"""Given a 2D state of size lengthxlength returns a 4x(length^2)
-    tensor where each row gives the 4 nearest neighbours to a flattened state
-    which has been split into (\phi_even, \phi_odd) where even/odd refer to
-    parity of the site
+    r"""Given length, which refers to size of a 2D state (length * length)
+    returns a 2x(length^2) tensor where each row gives the 2 nearest neighbours
+    to a flattened state which has been split into (\phi_even, \phi_odd) where
+    even/odd refer to parity of the site.
+
+    Parameters
+    ----------
+    length: int
+        Defines size of 2D state (length * length)
+    Returns
+    -------
+    shift: torch.Tensor
+        Tensor which can be used to index flattened, split states such that
+
+            state = tensor([\phi_even, \phi_odd]),
+
+        then state[shift] will return a 2xlength tensor:
+
+            state[shift] -> tensor([[neighbour right], [neighbour down]])
+
+    Example
+    -------
+    Consider the small example of 2x2 state:
+
+    >>> state_2d = torch.arange(4).view(2, 2)
+    >>> state_2d
+    tensor([[0, 1],
+            [2, 3]])
+
+    even sites are [0, 3], odd sites are [1, 2]
+
+    >>> state_split = torch.tensor([0, 3, 1, 2])
+    >>> shift = get_shift(2)
+    >>> state_split[shift]
+    tensor([[1, 2, 0, 3],
+            [2, 1, 3, 0]])
+
+    correct nearest neighbours (left and down) are given in each row respectively
+
     """
     # define a checkerboard
     checkerboard = torch.zeros((length, length), dtype=torch.int)
@@ -48,20 +83,54 @@ def get_shift(length: int) -> torch.Tensor:
     )
 
     direction_dimension = [
-        (-1, 1),
         (1, 1),
-        (-1, 0),
         (1, 0)
     ]
-    shift = torch.zeros(4, length*length, dtype=torch.long)
+    shift = torch.zeros(2, length*length, dtype=torch.long)
     for i, (direction, dim) in enumerate(direction_dimension):
         # each shift, roll the 2d state-like indices and then flatten and split
         shift[i, :] = splitind_like_state.roll(direction, dims=dim).flatten()[out_ind]
     return shift
 
 class PhiFourAction(nn.Module):
-    """Extend the nn.Module class to return the phi^4 action given a state
-    might be possible to jit compile this to make training a bit faster
+    """Extend the nn.Module class to return the phi^4 action given either
+    a single state size (1, length * length) or a stack of N states
+    (N, length * length). See Notes about action definition.
+
+    Parameters
+    ----------
+    length: int
+        defines 2D lattice size (length * length)
+    m_sq: float
+        the value of the bare mass squared
+    lam: float
+        the value of the bare coupling
+
+    Examples
+    --------
+    Consider the toy example of the action acting on a random state
+
+    >>> action = PhiFourAction(2, 1, 1)
+    >>> state = torch.rand((1, 2*2))
+    >>> action(state)
+    tensor([[0.9138]])
+
+    Now consider a stack of states
+
+    >>> stack_of_states = torch.rand((5, 2*2))
+    >>> action(stack_of_states)
+    tensor([[3.7782],
+            [2.8707],
+            [4.0511],
+            [2.2342],
+            [2.6494]])
+
+    Notes
+    -----
+    that this is the action as defined in
+    https://doi.org/10.1103/PhysRevD.100.034515 which might differ from the
+    current version on the arxiv.
+
     """
     def __init__(self, length, m_sq, lam):
         super(PhiFourAction, self).__init__()
@@ -71,11 +140,14 @@ class PhiFourAction(nn.Module):
         self.length = length
 
     def forward(self, phi_state: torch.Tensor) -> torch.Tensor:
-        """Given a stack of states, calculate the action for each state"""
+        """Perform forward pass, returning action for stack of states.
+
+        see class Notes for details on definition of action.
+        """
         action = (
             (2+0.5*self.m_sq)*phi_state**2 + # phi^2 terms
             self.lam*phi_state**4 - #phi^4 term
-            0.5*torch.sum(
+            torch.sum(
                 phi_state[:, self.shift]*phi_state.view(-1, 1, self.length**2),
                 dim=1,
             ) # derivative
