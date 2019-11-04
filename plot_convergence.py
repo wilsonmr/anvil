@@ -8,23 +8,15 @@ loss, acceptance fraction and integrated autocorrelation time.
 import numpy as np
 import matplotlib.pyplot as plt
 from sys import argv
+import ast
 
 from params import *
 
 # Which files are we loading?
-file_list = ('L4b100.txt','L4b1000.txt')
+# Files to be found in 'training_data_dir', specified in params.py
+file_list = ('L4B1000.txt',)
 
-# First line of file is a list of these simulation parameters
-col_dict = {
-        'L': 0,
-        'N_BATCH': 1,
-        'n_affine': 2,
-        'affine_hidden_shape': 3,
-        'epochs_sample': 4,
-        'target_length': 5,
-        'n_large': 6
-        }
-# Which parameter(s) vary between input files?
+# Which parameter(s) vary between input files? (will be shown on plot legend)
 params_to_compare = ('N_BATCH',)
 
 # Set up plot
@@ -37,7 +29,9 @@ ax3.set_ylabel('int. autocorr')
 # Load and plot data
 for afile in file_list:
     # Load parameters from header
-    with open(training_data_dir+afile, 'r') as f: aparams = f.readline().strip().split()[1:]
+    with open(training_data_dir+afile, 'r') as f:
+        # strip "# " from front then evaluate as dict
+        aparams = ast.literal_eval( f.readline().strip()[2:] )
     
     # Load data as array
     data = np.loadtxt(training_data_dir+afile)
@@ -49,8 +43,8 @@ for afile in file_list:
     # Make label
     label = ""
     for param in params_to_compare:
-        label = label + param + "=" + aparams[col_dict[param]]
-    
+        label = label + param + "=" + str(aparams[param])
+     
     ax1.plot(time, loss, 'o-', label=label)
     ax2.plot(time, facc, 'o-')
     ax3.plot(time, auto, 'o-')

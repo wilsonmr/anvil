@@ -1,8 +1,8 @@
 """
 sample.py
 
-Run python3 sample.py <model_name> where <model_name> is a pre-trained model saved in a
-directory names 'models/'.
+Run python3 sample.py <model_name> where <model_name> is a pre-trained model saved as
+<model_name>.pt in a directory names 'models/'.
 """
 from sys import argv
 import time
@@ -36,7 +36,9 @@ def autocorr(acc_rej_list: list, tau: int) -> float:
     return sum_j / (N-tau)
 
 
-def sample(model):
+def sample(model, save_phi=False):
+    """ Don't actually want this for the sampling step that's done periodically
+     during the training stage..."""
     # set seed, hopefully result is reproducible
     #random.seed(1234)
     #torch.manual_seed(0)
@@ -94,7 +96,8 @@ def sample(model):
     )
 
     # Save state for computing observables
-    torch.save(phi, 'sample_dist.pt')
+    if (save_phi):
+        torch.save(phi, 'sample_dist.pt')
 
     # --------------- #
     # Autocorrelation #
@@ -120,8 +123,8 @@ if __name__ == "__main__":
         affine_hidden_shape=affine_hidden_shape)
     model.load_state_dict(torch.load(model_dir+argv[1]+'.pt'))
 
-    autocorr_np = sample(model)[2]
+    autocorr_np = sample(model, save_phi=True)[2]
     
-    np.savetxt(training_data_dir+'autocorr.txt', autocorr_np)
+    np.savetxt(training_data_dir+'autocorr_'+argv[1]+'.txt', autocorr_np)
 
 

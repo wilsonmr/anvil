@@ -10,10 +10,10 @@ D = L*L
 # ---------- #
 #  Training  #
 # ---------- #
-N_BATCH = 1000
+N_BATCH = 100
 n_affine = 12
 affine_hidden_shape=(32,)
-epochs = 100
+epochs = 1000
 
 # Directory for saving models. Include '/'
 model_dir = 'models/'
@@ -28,7 +28,7 @@ training_data_dir = 'training_data/'
 # ---------- #
 #  Sampling  #
 # ---------- #
-target_length = 1000
+target_length = 100
 n_large = 5*target_length
 
 # ----------------- #
