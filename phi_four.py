@@ -107,49 +107,88 @@ def train(model, action, epochs):
         if (i%50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
 
-def sample(model, action, n_large, target_length):
+def sample(
+        model,
+        action,
+        target_length: int,
+        n_large=20000
+    ) -> torch.Tensor:
     r"""
-    Sample using Metroplis-Hastings algorithm from a large number of phi configurations.
-    We calculate an A = min(1, \frac{\tilde p(phi^i)}{p(phi^i)} \frac{p(phi^j)}{\tilde p(phi^j)})
-    Where i is the index of the current phi, and j is the index of the update proposal phi.
-    We then generate a random number u, and if u <= A then we accept the update and i = j for the
-    next proposal, phi^i is added to the chain of samples, and a new j is picked. If the update
-    is rejected, then i=i for the next proposal and a new j is picked. We continue until the chain
-    has the desired length.
+    Sample using Metroplis-Hastings algorithm from a large number of phi
+    configurations.
+
+    We calculate the condition
+
+        A = min[1, (\tilde p(phi^i) * p(phi^j)) / (p(phi^i) * \tilde p(phi^j))]
+
+    Where i is the index of the current phi in metropolise chain and j is the
+    current proposal. A uniform random number, u, is drawn and if u <= A then
+    the proposed state phi^j is accepted (and becomes phi^i for the next update)
+
+    Parameters
+    ----------
+    model: Module
+        model which is going to be used to generate sample states
+    action: Module
+        the action upon which the model was trained, used to calculate the
+        acceptance condition
+    target_length: int
+        the desired number of states to generate from the model
+    n_large: int (default 20000)
+        the number of total states to generate from the model per batch, set
+        to a reasonable default value. setting this number excessively high can
+        cause slow down due to running out of memory
+
+    Returns
+    -------
+    sample: torch.Tensor
+        a sample of states from model, size = (target_length, model.size_in)
+
     """
-    n_units = model.size_in
-    with torch.no_grad(): # don't want gradients being tracked in sampling stage
-        z = torch.randn((n_large, n_units)) # random z configurations
-        phi = model.inverse_map(z) # map using trained model to phi
-        log_ptilde = model(phi) # log of probabilities of generated phis using trained model
-        S = action(phi)
-        chain_len = 0 # intialise current chain length
-        sample_distribution = torch.Tensor(target_length, n_units) # intialise tensor to store samples
-        accepted, rejected = 0,0 # track accept/reject statistics
-        i = np.random.randint(n_large) # random index to start sampling from configurations tensor
-        used = [] # track which configurations have been added to the chain
-        used.append(i) 
-        while chain_len < target_length:
-            j = np.random.randint(n_large) # random initial phi^j for update proposal
-            while j in used: # make sure we don't pick a phi we have already used
-                j = np.random.randint(n_large)
-            exponent = log_ptilde[i] - S[j] - log_ptilde[j] + S[i]
-            P_accept = exp(float(exponent)) # much faster if you tell it to use a float
-            A = min(1, P_accept) # faster than np.min and torch.min
-            u = np.random.uniform() # pick a random u for comparison
-            if u <= A:
-                sample_distribution[chain_len,:] = phi[i,:] # add to chain if accepted
-                chain_len += 1 
-                i = j # update i for next proposal
-                used.append(i)
+    accepted = 0
+    rejected = 0
+    batches = []
+
+    while accepted < target_length:
+        with torch.no_grad(): # don't track gradients
+            z = torch.randn((n_large, model.size_in)) # random z configurations
+            phi = model.inverse_map(z) # map using trained model to phi
+            log_ptilde = model(phi)
+        accept_reject = torch.zeros(n_large, dtype=bool)
+
+        log_ratio = log_ptilde + action(phi)
+        if ~np.isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
+            raise ValueError("could run into nans")
+
+        if not batches: # first batch
+            log_ratio_i = log_ratio[0]
+            start = 1
+        else:
+            start = 0 # keep last log_ratio_i and start from 0
+
+        for j in range(start, n_large):
+            condition = min(1, exp(float(log_ratio_i - log_ratio[j])))
+            if np.random.uniform() <= condition:
+                accept_reject[j] = True
+                log_ratio_i = log_ratio[j]
                 accepted += 1
+                if accepted == target_length:
+                    break
             else:
+                accept_reject[j] = False
                 rejected += 1
-    print('Accepted: '+str(accepted)+', Rejected:'+str(rejected))
-    print('Fraction accepted: '+str(accepted/(accepted+rejected)))
-    return sample_distribution
+        batches.append(phi[accept_reject, :])
+
+    print(
+        f"Accepted: {accepted}, Rejected: {rejected}, Fraction: "
+        f"{accepted/(accepted+rejected):.2g}"
+    )
+    return torch.cat(batches, dim=0) # join up batches
+
+class InvalidArgsError(Exception): pass
 
 def main():
+    """main loop for phi_four.py"""
     length = 6
     n_units = length**2
     m_sq, lam = -4, 6.975
@@ -157,8 +196,12 @@ def main():
     #torch.manual_seed(0)
     action = PhiFourAction(length, m_sq, lam)
     # define simple mode, each network is single layered
-    assert (len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load']),\
-    'Pass "train" and a model name to train new model or "load" and model name to load existing model'
+    if not ((len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load'])):
+        raise InvalidArgsError(
+            "Pass `train` and a model name to train new model or "
+            "`load` and model name to load existing model"
+        )
+
     if sys.argv[1] == 'train':
         model = NormalisingFlow(
             size_in=n_units, n_affine=8, affine_hidden_shape=(32,)
@@ -171,12 +214,11 @@ def main():
             size_in=n_units, n_affine=8, affine_hidden_shape=(32, )
         )
         model.load_state_dict(torch.load('models/'+sys.argv[2]))
-    target_length = 10000 # Number of length L^2 samples we want
-    # Number of configurations to generate to sample from.
-    n_large = 5*target_length
+    target_length = 100000 # Number of samples we want
+
     start_time = time.time()
     # Perform Metroplis-Hastings sampling
-    sample_dist = sample(model, action, n_large, target_length)
+    sample_dist = sample(model, action, target_length)
     print_plot_observables(sample_dist)
     print(
         f"Time to run MC for a chain of {target_length} "
