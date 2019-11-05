@@ -13,8 +13,10 @@ from normflow.observables import PhiFourAction, print_plot_observables
 from normflow.train import train
 from normflow.sample import sample
 
+
 class InvalidArgsError(Exception):
     pass
+
 
 def main():
     """main loop for phi_four.py"""

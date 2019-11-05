@@ -9,6 +9,7 @@ from math import exp, isfinite
 import numpy as np
 import torch
 
+
 def sample(model, action, target_length: int, n_large=20000) -> torch.Tensor:
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi

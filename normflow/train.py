@@ -11,6 +11,7 @@ import torch.optim as optim
 
 N_BATCH = 2000  # keep batch size constant for now
 
+
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
@@ -31,6 +32,7 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
 
     """
     return torch.mean(log_tilde_p + action, dim=0)
+
 
 def train(model, action, epochs):
     """example of training loop of model"""
@@ -56,4 +58,3 @@ def train(model, action, epochs):
 
         if (i % 50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
-

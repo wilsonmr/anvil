@@ -337,5 +337,6 @@ class NormalisingFlow(nn.Module):
         log_simple_prob = self.log_probability_normal(z_out)
         return log_simple_prob + log_jacob_contr
 
+
 if __name__ == "__main__":
     pass

@@ -26,6 +26,7 @@ from normflow.geometry import get_shift
 
 # TODO: length should be deprecated in favour of Geometry later
 
+
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given either
     a single state size (1, length * length) or a stack of N states
@@ -90,6 +91,7 @@ class PhiFourAction(nn.Module):
             dim=1, keepdim=True
         )  # sum across sites
         return action
+
 
 def two_point_green_function(phi_states, x_0: int, x_1: int, length: int):
     r"""Calculates the two point connected green function given a set of
