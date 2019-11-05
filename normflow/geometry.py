@@ -7,13 +7,14 @@ from math import ceil
 
 import torch
 
-class ShiftsMismatchError(Exception): pass
+
+class ShiftsMismatchError(Exception):
+    pass
+
 
 def get_shift(
-        length: int,
-        shifts: tuple = (1, 1),
-        dims: tuple = (0, 1),
-        ) -> torch.Tensor:
+    length: int, shifts: tuple = (1, 1), dims: tuple = (0, 1)
+) -> torch.Tensor:
     r"""Given length, which refers to size of a 2D state (length * length)
     returns a Nx(length^2) tensor where N is the length of `shifts` and `dims`
     (which must be equal). Each row of the returned tensor indexes a flattened
@@ -104,23 +105,19 @@ def get_shift(
     # make 2d state-like matrix filled with corresponding indices in split-flat state
     splitind_like_state = torch.zeros((length, length), dtype=torch.int)
     splitind_like_state[checkerboard.bool()] = torch.arange(
-        int(ceil(length**2/2)),
-        dtype=torch.int,
+        int(ceil(length ** 2 / 2)), dtype=torch.int
     )
     splitind_like_state[~checkerboard.bool()] = torch.arange(
-        int(ceil(length**2/2)),
-        length**2,
-        dtype=torch.int,
+        int(ceil(length ** 2 / 2)), length ** 2, dtype=torch.int
     )
 
     flat_checker = checkerboard.flatten()
     # make split-flat state like object with corresponding indices in flat state
     out_ind = torch.cat(
-        [torch.where(flat_checker == 1)[0], torch.where(flat_checker == 0)[0]],
-        dim=0,
+        [torch.where(flat_checker == 1)[0], torch.where(flat_checker == 0)[0]], dim=0
     )
 
-    shift_index = torch.zeros(len(shifts), length*length, dtype=torch.long)
+    shift_index = torch.zeros(len(shifts), length * length, dtype=torch.long)
     for i, (shift, dim) in enumerate(zip(shifts, dims)):
         # each shift, roll the 2d state-like indices and then flatten and split
         shift_index[i, :] = splitind_like_state.roll(shift, dims=dim).flatten()[out_ind]

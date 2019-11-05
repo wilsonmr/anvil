@@ -15,7 +15,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-ACTIVATION_FUNC = F.leaky_relu # Globally define activation function
+ACTIVATION_FUNC = F.leaky_relu  # Globally define activation function
+
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -78,34 +79,23 @@ class AffineLayer(nn.Module):
         = \frac{\partial g(\phi)}{\partial \phi}
 
     """
+
     def __init__(
-            self,
-            size_in: int,
-            s_hidden_shape: tuple,
-            t_hidden_shape: tuple,
-            i_affine: int,
+        self, size_in: int, s_hidden_shape: tuple, t_hidden_shape: tuple, i_affine: int
     ):
         super(AffineLayer, self).__init__()
-        size_half = int(size_in/2)
+        size_half = int(size_in / 2)
         s_shape = [size_half, *s_hidden_shape, size_half]
         t_shape = [size_half, *t_hidden_shape, size_half]
 
         self.s_layers = nn.ModuleList(
-            [
-                nn.Linear(s_in, s_out)
-                for s_in, s_out in
-                zip(s_shape[:-1], s_shape[1:])
-            ]
+            [nn.Linear(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
         )
         self.t_layers = nn.ModuleList(
-            [
-                nn.Linear(t_in, t_out)
-                for t_in, t_out
-                in zip(t_shape[:-1], t_shape[1:])
-            ]
+            [nn.Linear(t_in, t_out) for t_in, t_out in zip(t_shape[:-1], t_shape[1:])]
         )
 
-        if (i_affine % 2) == 0: #starts at zero
+        if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
             self._a_ind = slice(0, int(size_half))
             self._b_ind = slice(int(size_half), size_in)
@@ -114,7 +104,9 @@ class AffineLayer(nn.Module):
             # a is second half of input vector
             self._a_ind = slice(int(size_half), size_in)
             self._b_ind = slice(0, int(size_half))
-            self.join_func = lambda a, *args, **kwargs: torch.cat((a[1], a[0]), *args, **kwargs)
+            self.join_func = lambda a, *args, **kwargs: torch.cat(
+                (a[1], a[0]), *args, **kwargs
+            )
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
@@ -170,8 +162,8 @@ class AffineLayer(nn.Module):
         phi_b = phi_input[:, self._b_ind]
         s_out = self._s_forward(phi_a)
         t_out = self._t_forward(phi_a)
-        z_b = (s_out.exp()*phi_b + t_out)
-        return self.join_func([phi_a, z_b], dim=1) #put back together state
+        z_b = s_out.exp() * phi_b + t_out
+        return self.join_func([phi_a, z_b], dim=1)  # put back together state
 
     def inverse_coupling_layer(self, z_input):
         r"""performs the transformation of the inverse coupling layer, denoted
@@ -199,7 +191,7 @@ class AffineLayer(nn.Module):
         z_b = z_input[:, self._b_ind]
         s_out = self._s_forward(z_a)
         t_out = self._t_forward(z_a)
-        phi_b = ((z_b - t_out)*torch.exp(-s_out))
+        phi_b = (z_b - t_out) * torch.exp(-s_out)
         return self.join_func([z_a, phi_b], dim=1)
 
     def forward(self, phi_input):
@@ -226,9 +218,10 @@ class AffineLayer(nn.Module):
             column vector of contributions to log det jacobian (N_states, 1)
 
         """
-        a_for_net = phi_input[:, self._a_ind] # select phi_a
+        a_for_net = phi_input[:, self._a_ind]  # select phi_a
         s_out = self._s_forward(a_for_net)
         return s_out.sum(dim=-1)
+
 
 class NormalisingFlow(nn.Module):
     r"""Extension to nn.Module which is built up of multiple `AffineLayer`s
@@ -259,16 +252,14 @@ class NormalisingFlow(nn.Module):
         list of affine layers that form the full transformation
 
     """
+
     def __init__(
-            self, *,
-            n_affine: int = 2,
-            size_in: int,
-            affine_hidden_shape: tuple = (16,)
-        ):
+        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
+    ):
         super(NormalisingFlow, self).__init__()
         self.size_in = size_in
         # log(Normalization) for `size_in` gaussian units prob distribution func
-        self._log_gauss_norm = log(sqrt(pow(2*pi, size_in)))
+        self._log_gauss_norm = log(sqrt(pow(2 * pi, size_in)))
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
@@ -297,7 +288,7 @@ class NormalisingFlow(nn.Module):
 
         """
         phi_out = z_input
-        for layer in reversed(self.affine_layers): #reverse layers!
+        for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out = layer.inverse_coupling_layer(phi_out)
             # TODO: make this yield, then make a yield from wrapper?
         return phi_out
@@ -319,7 +310,7 @@ class NormalisingFlow(nn.Module):
             probability of the corresponding state of the input `x_tensor`
 
         """
-        exponent = -torch.sum(pow(x_tensor, 2)/2, dim=-1, keepdim=True)
+        exponent = -torch.sum(pow(x_tensor, 2) / 2, dim=-1, keepdim=True)
         return exponent - self._log_gauss_norm
 
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
@@ -346,6 +337,7 @@ class NormalisingFlow(nn.Module):
         log_simple_prob = self.log_probability_normal(z_out)
         return log_simple_prob + log_jacob_contr
 
+
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
@@ -366,6 +358,7 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
 
     """
     return torch.mean(log_tilde_p + action, dim=0)
+
 
 if __name__ == "__main__":
     pass

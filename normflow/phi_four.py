@@ -18,6 +18,7 @@ from normflow.models import NormalisingFlow, shifted_kl
 from normflow.geometry import get_shift
 from normflow.observables import print_plot_observables
 
+
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given either
     a single state size (1, length * length) or a stack of N states
@@ -58,6 +59,7 @@ class PhiFourAction(nn.Module):
     current version on the arxiv.
 
     """
+
     def __init__(self, length, m_sq, lam):
         super(PhiFourAction, self).__init__()
         self.shift = get_shift(length)
@@ -71,16 +73,20 @@ class PhiFourAction(nn.Module):
         see class Notes for details on definition of action.
         """
         action = (
-            (2+0.5*self.m_sq)*phi_state**2 + # phi^2 terms
-            self.lam*phi_state**4 - #phi^4 term
-            torch.sum(
-                phi_state[:, self.shift]*phi_state.view(-1, 1, self.length**2),
+            (2 + 0.5 * self.m_sq) * phi_state ** 2
+            + self.lam * phi_state ** 4  # phi^2 terms
+            - torch.sum(  # phi^4 term
+                phi_state[:, self.shift] * phi_state.view(-1, 1, self.length ** 2),
                 dim=1,
-            ) # derivative
-        ).sum(dim=1, keepdim=True) # sum across sites
+            )  # derivative
+        ).sum(
+            dim=1, keepdim=True
+        )  # sum across sites
         return action
 
-N_BATCH = 2000 # keep batch size constant for now
+
+N_BATCH = 2000  # keep batch size constant for now
+
 
 def train(model, action, epochs):
     """example of training loop of model"""
@@ -97,22 +103,18 @@ def train(model, action, epochs):
         target = action(phi)
         output = model(phi)
 
-        model.zero_grad() # get rid of stored gradients
+        model.zero_grad()  # get rid of stored gradients
         loss = shifted_kl(output, target)
-        loss.backward() # calc gradients
+        loss.backward()  # calc gradients
 
         optimizer.step()
         scheduler.step(loss)
 
-        if (i%50) == 0:
+        if (i % 50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
 
-def sample(
-        model,
-        action,
-        target_length: int,
-        n_large=20000
-    ) -> torch.Tensor:
+
+def sample(model, action, target_length: int, n_large=20000) -> torch.Tensor:
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -150,9 +152,9 @@ def sample(
     batches = []
 
     while accepted < target_length:
-        with torch.no_grad(): # don't track gradients
-            z = torch.randn((n_large, model.size_in)) # random z configurations
-            phi = model.inverse_map(z) # map using trained model to phi
+        with torch.no_grad():  # don't track gradients
+            z = torch.randn((n_large, model.size_in))  # random z configurations
+            phi = model.inverse_map(z)  # map using trained model to phi
             log_ptilde = model(phi)
         accept_reject = torch.zeros(n_large, dtype=bool)
 
@@ -160,11 +162,11 @@ def sample(
         if ~np.isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
             raise ValueError("could run into nans")
 
-        if not batches: # first batch
+        if not batches:  # first batch
             log_ratio_i = log_ratio[0]
             start = 1
         else:
-            start = 0 # keep last log_ratio_i and start from 0
+            start = 0  # keep last log_ratio_i and start from 0
 
         for j in range(start, n_large):
             condition = min(1, exp(float(log_ratio_i - log_ratio[j])))
@@ -183,38 +185,37 @@ def sample(
         f"Accepted: {accepted}, Rejected: {rejected}, Fraction: "
         f"{accepted/(accepted+rejected):.2g}"
     )
-    return torch.cat(batches, dim=0) # join up batches
+    return torch.cat(batches, dim=0)  # join up batches
 
-class InvalidArgsError(Exception): pass
+
+class InvalidArgsError(Exception):
+    pass
+
 
 def main():
     """main loop for phi_four.py"""
     length = 6
-    n_units = length**2
+    n_units = length ** 2
     m_sq, lam = -4, 6.975
     # set seed, hopefully result is reproducible
-    #torch.manual_seed(0)
+    # torch.manual_seed(0)
     action = PhiFourAction(length, m_sq, lam)
     # define simple mode, each network is single layered
-    if not ((len(sys.argv) == 3) and (sys.argv[1] in ['train', 'load'])):
+    if not ((len(sys.argv) == 3) and (sys.argv[1] in ["train", "load"])):
         raise InvalidArgsError(
             "Pass `train` and a model name to train new model or "
             "`load` and model name to load existing model"
         )
 
-    if sys.argv[1] == 'train':
-        model = NormalisingFlow(
-            size_in=n_units, n_affine=8, affine_hidden_shape=(32,)
-        )
-        epochs = 10000 # Gives a decent enough approx.
+    if sys.argv[1] == "train":
+        model = NormalisingFlow(size_in=n_units, n_affine=8, affine_hidden_shape=(32,))
+        epochs = 10000  # Gives a decent enough approx.
         train(model, action, epochs)
-        torch.save(model.state_dict(), 'models/'+sys.argv[2])
-    elif sys.argv[1] == 'load':
-        model = NormalisingFlow(
-            size_in=n_units, n_affine=8, affine_hidden_shape=(32, )
-        )
-        model.load_state_dict(torch.load('models/'+sys.argv[2]))
-    target_length = 100000 # Number of samples we want
+        torch.save(model.state_dict(), "models/" + sys.argv[2])
+    elif sys.argv[1] == "load":
+        model = NormalisingFlow(size_in=n_units, n_affine=8, affine_hidden_shape=(32,))
+        model.load_state_dict(torch.load("models/" + sys.argv[2]))
+    target_length = 100000  # Number of samples we want
 
     start_time = time.time()
     # Perform Metroplis-Hastings sampling
@@ -224,6 +225,7 @@ def main():
         f"Time to run MC for a chain of {target_length} "
         f"samples on an L={length} lattice: {time.time() - start_time} seconds"
     )
+
 
 if __name__ == "__main__":
     main()
