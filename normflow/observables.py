@@ -19,7 +19,7 @@ from math import acosh, sqrt
 
 import matplotlib.pyplot as plt
 
-from geometry import get_shift
+from normflow.geometry import get_shift
 
 #TODO: length should be deprecated in favour of Geometry later
 

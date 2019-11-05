@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-norm_flow_pytorch.py
+models.py
 
 Module containing the base classes for affine layers and full normalising flow
 model used to transform a simple distribution into an estimate of a target

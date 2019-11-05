@@ -14,9 +14,9 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 
-from norm_flow_pytorch import NormalisingFlow, shifted_kl
-from geometry import get_shift
-from observables import print_plot_observables
+from normflow.models import NormalisingFlow, shifted_kl
+from normflow.geometry import get_shift
+from normflow.observables import print_plot_observables
 
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given either
