@@ -1,0 +1,51 @@
+################################################################################
+###############            Define the Lattice                    ###############
+################################################################################
+
+action: phi4
+lattice_length: 6
+dimension: 2
+geometry: checkerboard
+
+################################################################################
+###############            Define the Model                      ###############
+################################################################################
+
+model:
+  n_affine: 12
+  s_network:
+    - {nodes: 32, type: dense, activation: relu}
+    - {nodes: size, type: dense, activation: relu}
+  t_network:
+    - {nodes: 32, type: dense, activation: relu}
+    - {nodes: size, type: dense, activation: relu}
+  checkpoint: None # whether to try and load model from output folder
+
+################################################################################
+###################            Define Training               ###################
+################################################################################
+
+train:
+  epochs: 10000
+  save_interval: 2000 # interval for checkpointing
+  n_batch: 2000
+  minimiser: {name: adadelta} # use defaults here
+
+################################################################################
+###################            Define Sampling               ###################
+################################################################################
+
+sample:
+  chain_length: 1e6 # will be converted to int
+  thermalisation: 10
+  autocorrelation: 10
+
+################################################################################
+###################            Choose Observables            ###################
+################################################################################
+
+observables:
+  - plot_m_eff
+  - plot_zero_mom_green_function
+  - ising_energy
+  - susceptibility
