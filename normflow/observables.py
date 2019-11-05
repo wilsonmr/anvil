@@ -19,10 +19,77 @@ from math import acosh, sqrt
 
 import matplotlib.pyplot as plt
 
+import torch
+import torch.nn as nn
+
 from normflow.geometry import get_shift
 
 # TODO: length should be deprecated in favour of Geometry later
 
+class PhiFourAction(nn.Module):
+    """Extend the nn.Module class to return the phi^4 action given either
+    a single state size (1, length * length) or a stack of N states
+    (N, length * length). See Notes about action definition.
+
+    Parameters
+    ----------
+    length: int
+        defines 2D lattice size (length * length)
+    m_sq: float
+        the value of the bare mass squared
+    lam: float
+        the value of the bare coupling
+
+    Examples
+    --------
+    Consider the toy example of the action acting on a random state
+
+    >>> action = PhiFourAction(2, 1, 1)
+    >>> state = torch.rand((1, 2*2))
+    >>> action(state)
+    tensor([[0.9138]])
+
+    Now consider a stack of states
+
+    >>> stack_of_states = torch.rand((5, 2*2))
+    >>> action(stack_of_states)
+    tensor([[3.7782],
+            [2.8707],
+            [4.0511],
+            [2.2342],
+            [2.6494]])
+
+    Notes
+    -----
+    that this is the action as defined in
+    https://doi.org/10.1103/PhysRevD.100.034515 which might differ from the
+    current version on the arxiv.
+
+    """
+
+    def __init__(self, length, m_sq, lam):
+        super(PhiFourAction, self).__init__()
+        self.shift = get_shift(length)
+        self.lam = lam
+        self.m_sq = m_sq
+        self.length = length
+
+    def forward(self, phi_state: torch.Tensor) -> torch.Tensor:
+        """Perform forward pass, returning action for stack of states.
+
+        see class Notes for details on definition of action.
+        """
+        action = (
+            (2 + 0.5 * self.m_sq) * phi_state ** 2
+            + self.lam * phi_state ** 4  # phi^2 terms
+            - torch.sum(  # phi^4 term
+                phi_state[:, self.shift] * phi_state.view(-1, 1, self.length ** 2),
+                dim=1,
+            )  # derivative
+        ).sum(
+            dim=1, keepdim=True
+        )  # sum across sites
+        return action
 
 def two_point_green_function(phi_states, x_0: int, x_1: int, length: int):
     r"""Calculates the two point connected green function given a set of

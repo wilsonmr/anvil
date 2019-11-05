@@ -337,28 +337,5 @@ class NormalisingFlow(nn.Module):
         log_simple_prob = self.log_probability_normal(z_out)
         return log_simple_prob + log_jacob_contr
 
-
-def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-    r"""Sample mean of the shifted Kullbach-Leibler divergence between target
-    and model distribution.
-
-    Parameters
-    ----------
-    log_tilde_p: torch.Tensor
-        column of log (\tilde p) for a sample of states, which is returned by
-        forward pass of `NormalisingFlow` model
-    action: torch.Tensor
-        column of actions S(\phi) for set of sample states
-
-    Returns
-    -------
-    out: torch.Tensor
-        torch tensor with single element, corresponding to the estimation of the
-        shifted K-L for set of sample states.
-
-    """
-    return torch.mean(log_tilde_p + action, dim=0)
-
-
 if __name__ == "__main__":
     pass
