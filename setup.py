@@ -9,7 +9,7 @@ setup(
     description="Normalising flow model on the lattice",
     author="Michael Wilson",
     author_email="michael.wilson@ed.ac.uk",
-    url="https://github.com/wilsonmr/norm_flow_model",
+    url="https://github.com/wilsonmr/normflow_lattice",
     long_description=LONG_DESC,
     entry_points={
         'console_scripts':
