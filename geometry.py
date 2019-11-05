@@ -15,9 +15,12 @@ def get_shift(
         dims: tuple = (0, 1),
         ) -> torch.Tensor:
     r"""Given length, which refers to size of a 2D state (length * length)
-    returns a 2x(length^2) tensor where each row gives the 2 nearest neighbours
-    to a flattened state which has been split into (\phi_even, \phi_odd) where
-    even/odd refer to parity of the site.
+    returns a Nx(length^2) tensor where N is the length of `shifts` and `dims`
+    (which must be equal). Each row of the returned tensor indexes a flattened
+    split state \phi = (\phi_even, \phi_odd) which is split according to a
+    checkerboard geometry (even and odd refer to parity of the site). The
+    indices refer to shifts on the states in their original 2D form. By default
+    N = 2 and get_shift simply returns the right and down nearest neighbours.
 
     Parameters
     ----------
@@ -26,13 +29,15 @@ def get_shift(
     shifts: tuple
         a tuple of shifts to be applied. Each element represents a shift and can
         either be an integer (if the shift is in a single dimension) or a tuple
-        if the shift is applied simultaneously in multiple dimensions.
-        By default it is set to have two shifts, left 1 and up 1 (which in turn
-        allow for right and down nearest neighbours)
+        if the shift is applied simultaneously in multiple dimensions (see
+        Examples). By default it is set to have two shifts which give right and
+        down nearest neighbours
     dims: tuple
         a tuple of dimensions to apply `shifts` to. As with shift, each element
         in dim can itself be a tuple which indicates that multiple shifts will
-        be applied in multiple dimensions simultaneously.
+        be applied in multiple dimensions simultaneously. Note that
+        corresponding entries of dims and shifts must also match (either both
+        ints or both tuples of same length).
     Returns
     -------
     shift: torch.Tensor
@@ -61,7 +66,8 @@ def get_shift(
     tensor([[1, 2, 0, 3],
             [2, 1, 3, 0]])
 
-    correct nearest neighbours (left and down) are given in each row respectively
+    correct nearest neighbours in reference to the original `state_2d` (left and
+    down) are given in each row respectively
 
     to see how multiple shifts works, consider the shift (1, 1)
     (left one, up one)
@@ -73,15 +79,25 @@ def get_shift(
     we see that each element of shifts and dims can perform multiple shifts, in
     different dimensions at once.
 
+    Notes
+    -----
+    The conventions for how the shifts are applied are according the torch.roll
+    function, shift = +ve rolls the state left and so the indices will refer to
+    lattice sights to the right.
+
+    See Also
+    --------
+    torch.roll: https://pytorch.org/docs/stable/torch.html#torch.roll
+
     """
     if len(shifts) != len(dims):
         raise ShiftsMismatchError(
             "Number of shifts and number of dimensions: "
-            f"{len(shifts)} and {len(shifts)} do not match."
+            f"{len(shifts)} and {len(dims)} do not match."
         )
-    # define a checkerboard
+    # TODO: make a Geometry2D class which is initialised with a matrix
+    # (like checker) which tells you the split geometry of the state
     checkerboard = torch.zeros((length, length), dtype=torch.int)
-    # set even sites to 1
     checkerboard[1::2, 1::2] = 1
     checkerboard[::2, ::2] = 1
 
