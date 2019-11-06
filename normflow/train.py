@@ -34,7 +34,7 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     return torch.mean(log_tilde_p + action, dim=0)
 
 
-def train(model, action, epochs):
+def train(model, action, *, epochs, save_int, n_batch, outpath):
     """example of training loop of model"""
     # create your optimizer and a scheduler
     optimizer = optim.Adadelta(model.parameters(), lr=1)

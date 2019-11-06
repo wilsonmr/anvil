@@ -2,10 +2,14 @@
 ###############            Define the Lattice                    ###############
 ################################################################################
 
-action: phi4
-lattice_length: 6
-dimension: 2
-geometry: checkerboard
+geometry:
+  lattice_length: 6
+  dimension: 2
+  split: checkerboard
+
+action:
+  m_sq: -4
+  lambda: 6.975
 
 ################################################################################
 ###############            Define the Model                      ###############
@@ -13,13 +17,9 @@ geometry: checkerboard
 
 model:
   n_affine: 12
-  s_network:
-    - {nodes: 32, type: dense, activation: relu}
-    - {nodes: size, type: dense, activation: relu}
-  t_network:
-    - {nodes: 32, type: dense, activation: relu}
-    - {nodes: size, type: dense, activation: relu}
-  checkpoint: None # whether to try and load model from output folder
+  network:
+    hidden_nodes: [32,]
+  checkpoint: null # whether to try and load model from output folder
 
 ################################################################################
 ###################            Define Training               ###################
@@ -36,16 +36,8 @@ train:
 ################################################################################
 
 sample:
-  chain_length: 1e6 # will be converted to int
+  chain_length: 100000
   thermalisation: 10
   autocorrelation: 10
-
-################################################################################
-###################            Choose Observables            ###################
-################################################################################
-
-observables:
-  - plot_m_eff
-  - plot_zero_mom_green_function
-  - ising_energy
-  - susceptibility
+  observables:
+    - print_plot_observables
