@@ -61,3 +61,9 @@ def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optim
 
         if (i % 50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
+    torch.save({
+        'epoch': stop,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss}, f"{outpath}/checkpoint_{stop}.pt"
+        )
