@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 import torch
+import torch.optim as optim
 
 from normflow.models import NormalisingFlow
 from normflow.observables import Observables, PhiFourAction
@@ -58,12 +59,17 @@ class ConfigParser:
         #split = self.check_key(geom_spec, 'split', str)
         return dict(length=length, size_in=size)
 
-    def parse_train(self, train_spec):
+    def parse_train(self, train_spec, loss, start):
         epochs = self.check_key(train_spec, 'epochs', int)
+        if start is not None:
+            stop = start+epochs
+        else:
+            start = 0
+            stop = epochs
         save = self.check_key(train_spec, 'save_interval', int)
         n_batch = self.check_key(train_spec, 'n_batch', int)
         #minimiser
-        return dict(epochs=epochs, save_int=save, n_batch=n_batch)
+        return dict(start=start, stop=stop, loss=loss, save_int=save, n_batch=n_batch)
 
     def parse_sample(self, sample_spec):
         chain_length = self.check_key(sample_spec, 'chain_length', int)
@@ -93,9 +99,29 @@ class ConfigParser:
             raise ConfigError("Must specify at least one of `train` and `sample`")
         geom_dict = self.parse_geometry(self.config['geometry'])
         mod_dict = self.parse_model(self.config['model'])
+
+        if mod_dict['checkpoint'] is not None:
+            print(f"Loading model from checkpoint: {mod_dict['checkpoint']}")
+            checkp = torch.load(mod_dict['checkpoint'])
+            mod_state = checkp['model_state_dict']
+            opt_state = checkp['optimizer_state_dict']
+            loss = checkp['loss']
+            start = checkp['epoch']
+        else:
+            mod_state, opt_state, loss, start = None, None, None, None
+
+        model = NormalisingFlow(
+            n_affine=mod_dict['n_affine'], size_in=geom_dict['size_in'], affine_hidden_shape=mod_dict['hid_shape'], 
+        )
+        optimizer = optim.Adadelta(model.parameters())
+
+        if mod_state is not None:
+            model.load_state_dict(mod_state)
+            optimizer.load_state_dict(opt_state)
+
         act_dict = self.parse_action(self.config['action'])
         if 'train' in self.config.keys():
-            train = self.parse_train(self.config['train'])
+            train = self.parse_train(self.config['train'], loss=loss, start=start)
         else:
             train = None
 
@@ -106,12 +132,7 @@ class ConfigParser:
         else:
             sample = None
 
-        model = NormalisingFlow(
-            n_affine=mod_dict['n_affine'], size_in=geom_dict['size_in'], affine_hidden_shape=mod_dict['hid_shape'], 
-        )
-        if mod_dict['checkpoint']:
-            print(f"Loading model from checkpoint: {mod_dict['checkpoint']}")
-            model.load_state_dict(torch.load(mod_dict['checkpoint']))
+        
         geometry = Geometry2D(geom_dict['length'])
         action = PhiFourAction(act_dict['m_sq'], act_dict['lam'], geometry)
-        return model, action, geometry, train, sample
+        return model, optimizer, action, geometry, train, sample

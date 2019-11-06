@@ -9,9 +9,6 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
-N_BATCH = 2000  # keep batch size constant for now
-
-
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
@@ -34,17 +31,23 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     return torch.mean(log_tilde_p + action, dim=0)
 
 
-def train(model, action, *, epochs, save_int, n_batch, outpath):
-    """example of training loop of model"""
+def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optimizer):
+    """training loop of model"""
     # create your optimizer and a scheduler
-    optimizer = optim.Adadelta(model.parameters(), lr=1)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=500)
     # let's use tqdm to see progress
-    pbar = tqdm(range(epochs), desc=f"loss: N/A")
+    pbar = tqdm(range(start, stop), desc=f"loss: {loss}")
     n_units = model.size_in
     for i in pbar:
+        if (i%save_int) == 0:
+            torch.save({
+                'epoch': i,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss}, f"{outpath}/checkpoint_{i}.pt"
+            )
         # gen simple states
-        z = torch.randn((N_BATCH, n_units))
+        z = torch.randn((n_batch, n_units))
         phi = model.inverse_map(z)
         target = action(phi)
         output = model(phi)

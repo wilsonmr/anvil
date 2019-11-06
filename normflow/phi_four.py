@@ -25,9 +25,9 @@ def main():
     outpath = sys.argv[2]
     os.mkdir(outpath)
 
-    model, action, geometry, train_spec, sample_spec = config.resolve()
+    model, optimizer, action, geometry, train_spec, sample_spec = config.resolve()
     if train_spec is not None:
-        train(model, action, **train_spec, outpath=outpath)
+        train(model, action, **train_spec, outpath=outpath, optimizer=optimizer)
         torch.save(model.state_dict(), f"{outpath}/final.pt")
     if sample_spec is not None:
         start_time = time.time()
