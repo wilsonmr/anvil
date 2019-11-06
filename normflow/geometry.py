@@ -11,6 +11,7 @@ import torch
 class ShiftsMismatchError(Exception):
     pass
 
+
 class Geometry2D:
     def __init__(self, length):
         self.length = length
@@ -19,9 +20,7 @@ class Geometry2D:
         checkerboard[::2, ::2] = True
         self.checkerboard = checkerboard
 
-    def get_shift(
-        self, shifts: tuple = (1, 1), dims: tuple = (0, 1)
-    ) -> torch.Tensor:
+    def get_shift(self, shifts: tuple = (1, 1), dims: tuple = (0, 1)) -> torch.Tensor:
         r"""Given length, which refers to size of a 2D state (length * length)
         returns a Nx(length^2) tensor where N is the length of `shifts` and `dims`
         (which must be equal). Each row of the returned tensor indexes a flattened
@@ -117,8 +116,12 @@ class Geometry2D:
             [torch.where(flat_checker)[0], torch.where(~flat_checker)[0]], dim=0
         )
 
-        shift_index = torch.zeros(len(shifts), self.length * self.length, dtype=torch.long)
+        shift_index = torch.zeros(
+            len(shifts), self.length * self.length, dtype=torch.long
+        )
         for i, (shift, dim) in enumerate(zip(shifts, dims)):
             # each shift, roll the 2d state-like indices and then flatten and split
-            shift_index[i, :] = splitind_like_state.roll(shift, dims=dim).flatten()[out_ind]
+            shift_index[i, :] = splitind_like_state.roll(shift, dims=dim).flatten()[
+                out_ind
+            ]
         return shift_index

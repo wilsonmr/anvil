@@ -9,6 +9,7 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
+
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
@@ -39,12 +40,15 @@ def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optim
     pbar = tqdm(range(start, stop), desc=f"loss: {loss}")
     n_units = model.size_in
     for i in pbar:
-        if (i%save_int) == 0:
-            torch.save({
-                'epoch': i,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss}, f"{outpath}/checkpoint_{i}.pt"
+        if (i % save_int) == 0:
+            torch.save(
+                {
+                    "epoch": i,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss": loss,
+                },
+                f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
         z = torch.randn((n_batch, n_units))
@@ -61,9 +65,12 @@ def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optim
 
         if (i % 50) == 0:
             pbar.set_description(f"loss: {loss.item()}")
-    torch.save({
-        'epoch': stop,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss}, f"{outpath}/checkpoint_{stop}.pt"
-        )
+    torch.save(
+        {
+            "epoch": stop,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "loss": loss,
+        },
+        f"{outpath}/checkpoint_{stop}.pt",
+    )

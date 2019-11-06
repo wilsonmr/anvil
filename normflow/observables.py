@@ -90,6 +90,7 @@ class PhiFourAction(nn.Module):
         )  # sum across sites
         return action
 
+
 class Observables:
     def __init__(self, phi_states, geometry, outpath):
         self.geometry = geometry
@@ -115,7 +116,9 @@ class Observables:
 
         """
 
-        shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)  # make 1d
+        shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(
+            -1
+        )  # make 1d
 
         g_func = (self.sample[:, shift] * self.sample).mean(
             dim=0
@@ -158,7 +161,6 @@ class Observables:
             g_func_zeromom.append(g_tilde_t / self.geometry.length)
         return g_func_zeromom
 
-
     def effective_pole_mass(self):
         r"""Calculate the effective pole mass m^eff(t) defined as
 
@@ -182,9 +184,10 @@ class Observables:
         g_func_zeromom = self.zero_momentum_green_function()
         m_t = []
         for i, g_0_t in enumerate(g_func_zeromom[1:-1], start=1):
-            m_t.append(acosh((g_func_zeromom[i - 1] + g_func_zeromom[i + 1]) / (2 * g_0_t)))
+            m_t.append(
+                acosh((g_func_zeromom[i - 1] + g_func_zeromom[i + 1]) / (2 * g_0_t))
+            )
         return m_t
-
 
     def susceptibility(self):
         r"""Calculate the susceptibility, which is the sum of two point connected
@@ -209,9 +212,10 @@ class Observables:
         """
         g_func_zeromom = self.zero_momentum_green_function()
         # TODO: we can write this in a more efficient and clearer way.
-        partial_sum = [len(g_func_zeromom) * el for el in g_func_zeromom]  # undo the mean
+        partial_sum = [
+            len(g_func_zeromom) * el for el in g_func_zeromom
+        ]  # undo the mean
         return sum(partial_sum)
-
 
     def ising_energy(self):
         r"""Ising energy defined as
@@ -232,11 +236,9 @@ class Observables:
 
         """
         E = (
-            self.two_point_green_function(1, 0)
-            + self.two_point_green_function(0, 1)
+            self.two_point_green_function(1, 0) + self.two_point_green_function(0, 1)
         ) / 2  # am I missing a factor of 2?
         return E
-
 
     def print_plot_observables(self):
         """Given a sample of states, calculate the relevant observables and either
