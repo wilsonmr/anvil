@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 
-from normflow.models import NormalisingFlow, shifted_kl
+from normflow.models import NormalisingFlow
+from normflow.train import shifted_kl
 
 L = 2 # very small system
 N_UNITS = L**2
