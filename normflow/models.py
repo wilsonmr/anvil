@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 models.py
 
 Module containing the base classes for affine layers and full normalising flow
-model used to transform a simple distribution into an estimate of a target
+models used to transform a simple distribution into an estimate of a target
 distribution as per https://arxiv.org/abs/1904.12072
 
-Key imports from this module are NormalisingFlow and shifted_kl. Which are the
-necessary ingredients to train your own normalising flow model.
+Classes
+-------
+RealNVP: nn.Module
+    Model which performs a real-valued non-volume preserving (real NVP)
+    transformation, which maps a simple distribution z^n to a complicated
+    distribution \phi^n, where n refers to the dimensionality of the data.
+
 """
 from math import sqrt, pi, log
 
@@ -223,7 +228,7 @@ class AffineLayer(nn.Module):
         return s_out.sum(dim=-1)
 
 
-class NormalisingFlow(nn.Module):
+class RealNVP(nn.Module):
     r"""Extension to nn.Module which is built up of multiple `AffineLayer`s
     as per eq. (12) of https://arxiv.org/abs/1904.12072.
 
@@ -256,7 +261,7 @@ class NormalisingFlow(nn.Module):
     def __init__(
         self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
     ):
-        super(NormalisingFlow, self).__init__()
+        super(RealNVP, self).__init__()
         self.size_in = size_in
         # log(Normalization) for `size_in` gaussian units prob distribution func
         self._log_gauss_norm = log(sqrt(pow(2 * pi, size_in)))

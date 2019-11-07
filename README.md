@@ -21,23 +21,13 @@ an idea of how to do this, look at the `examples/train_example.py`
 
 ## phi^4 example
 
-The script can be run either by training a new model, or by loading a model. To
-train, run
+The script can be run either by training a new model, or by loading a model
+depending on runcard content
 
 ```bash
-$ normflowphifour train <model_name>.pt
+$ normflowphifour <runcardname>
 ```
 
-or to load an exisitng model, run
-
-```bash
-$ normflowphifour load <model_name>.pt
-```
-
-The models will be saved to/loaded from a `models` directory. The output will be
-a set of field configurations - each row of the output matrix corresponds to a
-flattened configuration. The number of configurations generated is set by
-`target_length` in the `main` method.
 
 
 ## Toy example

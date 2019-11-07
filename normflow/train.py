@@ -18,7 +18,7 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     ----------
     log_tilde_p: torch.Tensor
         column of log (\tilde p) for a sample of states, which is returned by
-        forward pass of `NormalisingFlow` model
+        forward pass of `RealNVP` model
     action: torch.Tensor
         column of actions S(\phi) for set of sample states
 

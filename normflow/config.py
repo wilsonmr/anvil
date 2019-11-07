@@ -9,7 +9,7 @@ import yaml
 import torch
 import torch.optim as optim
 
-from normflow.models import NormalisingFlow
+from normflow.models import RealNVP
 from normflow.observables import Observables, PhiFourAction
 from normflow.geometry import Geometry2D
 
@@ -122,7 +122,7 @@ class ConfigParser:
         else:
             mod_state, opt_state, loss, start = None, None, None, None
 
-        model = NormalisingFlow(
+        model = RealNVP(
             n_affine=mod_dict["n_affine"],
             size_in=geom_dict["size_in"],
             affine_hidden_shape=mod_dict["hid_shape"],

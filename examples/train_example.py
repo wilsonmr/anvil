@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 
-from normflow.models import NormalisingFlow
+from normflow.models import RealNVP
 from normflow.train import shifted_kl
 
 L = 2 # very small system
@@ -135,7 +135,7 @@ def main():
     # set seed, hopefully result is reproducible
     torch.manual_seed(0)
     # define simple mode, each network is single layered
-    model = NormalisingFlow(
+    model = RealNVP(
         size_in=N_UNITS, n_affine=8, affine_hidden_shape=(16,)
     )
     epochs = 5000 # Gives a decent enough approx.
