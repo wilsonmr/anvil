@@ -23,7 +23,7 @@ def main():
     """main loop for phi_four.py"""
     config = ConfigParser(sys.argv[1])
     outpath = sys.argv[2]
-    os.mkdir(outpath)
+    if not os.path.exists(outpath): os.mkdir(outpath)
 
     model, optimizer, action, geometry, train_spec, sample_spec = config.resolve()
     if train_spec is not None:
