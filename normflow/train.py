@@ -5,6 +5,8 @@ Module containing functions required to train model
 """
 
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import numpy as np
 
 import torch
 import torch.optim as optim
@@ -34,6 +36,8 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
 
 def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optimizer):
     """training loop of model"""
+    # Initiate list to plot loss
+    loss_list = []
     # create your optimizer and a scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=500)
     # let's use tqdm to see progress
@@ -58,6 +62,7 @@ def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optim
 
         model.zero_grad()  # get rid of stored gradients
         loss = shifted_kl(output, target)
+        loss_list.append(loss)
         loss.backward()  # calc gradients
 
         optimizer.step()
@@ -74,3 +79,8 @@ def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optim
         },
         f"{outpath}/checkpoint_{stop}.pt",
     )
+    plt.plot(np.arange(start, stop), loss_list)
+    plt.ylabel("Shifted KL loss")
+    plt.xlabel("Number of epochs")
+    plt.title("Training loss")
+    plt.savefig(outpath+'/loss.png')
