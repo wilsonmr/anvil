@@ -1,0 +1,13 @@
+lattice_length: 2
+lattice_dimension: 2
+
+action_params:
+  m_sq: 1
+  lambda: 1
+
+hidden_nodes: [16]
+
+n_affine: 6
+epochs: 1000
+save_interval: 200
+n_batch: 2000

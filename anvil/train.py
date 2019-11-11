@@ -32,45 +32,55 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     return torch.mean(log_tilde_p + action, dim=0)
 
 
-def train(model, action, *, start, stop, save_int, n_batch, outpath, loss, optimizer):
+def train(
+    loaded_model,
+    action,
+    *,
+    train_range,
+    save_interval,
+    n_batch=2000,
+    outpath,
+    current_loss,
+    loaded_optimizer,
+):
     """training loop of model"""
     # create your optimizer and a scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=500)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(loaded_optimizer, patience=500)
     # let's use tqdm to see progress
-    pbar = tqdm(range(start, stop), desc=f"loss: {loss}")
-    n_units = model.size_in
+    pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
+    n_units = loaded_model.size_in
     for i in pbar:
-        if (i % save_int) == 0:
+        if (i % save_interval) == 0:
             torch.save(
                 {
                     "epoch": i,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss": loss,
+                    "model_state_dict": loaded_model.state_dict(),
+                    "optimizer_state_dict": loaded_optimizer.state_dict(),
+                    "loss": current_loss,
                 },
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
         z = torch.randn((n_batch, n_units))
-        phi = model.inverse_map(z)
+        phi = loaded_model.inverse_map(z)
         target = action(phi)
-        output = model(phi)
+        output = loaded_model(phi)
 
-        model.zero_grad()  # get rid of stored gradients
-        loss = shifted_kl(output, target)
-        loss.backward()  # calc gradients
+        loaded_model.zero_grad()  # get rid of stored gradients
+        current_loss = shifted_kl(output, target)
+        current_loss.backward()  # calc gradients
 
-        optimizer.step()
-        scheduler.step(loss)
+        loaded_optimizer.step()
+        scheduler.step(current_loss)
 
         if (i % 50) == 0:
-            pbar.set_description(f"loss: {loss.item()}")
+            pbar.set_description(f"loss: {current_loss.item()}")
     torch.save(
         {
-            "epoch": stop,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "loss": loss,
+            "epoch": train_range[-1],
+            "model_state_dict": loaded_model.state_dict(),
+            "optimizer_state_dict": loaded_optimizer.state_dict(),
+            "loss": current_loss,
         },
-        f"{outpath}/checkpoint_{stop}.pt",
+        f"{outpath}/checkpoint_{train_range[-1]}.pt",
     )

@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 
-from normflow.models import RealNVP
-from normflow.train import shifted_kl
+from anvil.models import RealNVP
+from anvil.train import shifted_kl
 
 L = 2 # very small system
 N_UNITS = L**2
