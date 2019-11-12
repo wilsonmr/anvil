@@ -1,9 +1,9 @@
 lattice_length: 2
 lattice_dimension: 2
 
-action_params:
-  m_sq: 1
-  lambda: 1
+m_sq: 1
+lam: 1
+use_arxiv_version: False
 
 hidden_nodes: [16]
 

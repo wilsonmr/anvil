@@ -73,18 +73,24 @@ class ConfigParser(Config):
     def parse_optimiser_input(self, optim):
         raise NotImplementedError
 
-    def parse_action_params(self, params: dict):
-        return params
+    def parse_m_sq(self, m: (float, int)):
+        return m
+
+    def parse_lam(self, lam: (float, int)):
+        return lam
+
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def produce_action(self, action_params, geometry):
+    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
         return PhiFourAction(
-            action_params["m_sq"],
-            action_params["lambda"],
+            m_sq,
+            lam,
             geometry=geometry,
-            use_arxiv_version=action_params.get("use_arxiv_version", False)
+            use_arxiv_version=use_arxiv_version
         )
 
     def parse_target_length(self, targ: int):
