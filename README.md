@@ -1,27 +1,91 @@
-# Git repo for flow-based generative model project
+# A Non-Volume preserving transformation Implementation on the Lattice - ANVIL
 
-We can change this description and title of project as we go along
+Framework for generating lattice proposals for a MCMC from a real NVP model
 
- - `norm_flow_pytorch.py`
+## Installation
 
-    contains the model class and the loss function in the `pytorch` framework
- - `train_example.py`
+At present installing the code into a conda environment is supported. First
+create a new environment and install conda dependencies
 
-    a simple script which demonstrates how to use the model to learn a
-    toy distribution
+```bash
+conda create -n anvil-dev -y
+conda install pytorch torchvision -c pytorch
+conda install reportengine -c https://packages.nnpdf.science/conda
+conda install tqdm
+```
 
- - `phi_four.py`
+These are the minimal requirements for running the code, however if you plan
+on developing the code or doing small external tests, then I highly recommend also
+installing the following packages
 
-   trains a model for the phi^4 theory and generates a sample of the required number of 
-   configurations.
+```bash
+conda install jupyter black pylint
+```
 
-## Toy example
+To install the `anvil` code, run the following whilst in the root of this repository
 
-In order to run the toy example you will need a python environment with `python`
-3.7, `pytorch`, `tqdm` and some of the other common 3rd party modules like
-`numpy` and `matplotlib`.
+```
+$ python -m pip install -e .
+```
 
-Once you have this, simple run
+where `python` here refers to the specific python of the conda environment with
+the rest of the dependencies installed.
+
+Once the code is installed you can import the various objects into your own
+python projects. To get an idea of how to do this, look at the
+`examples/train_example.py` which is discussed in
+[this section](##using-objects-in-external-code.).
+
+
+## phi^4 example
+
+To train a 2d model on the phi^4 action you will need a training runcard, an
+example is given in `examples/runcards/l2_train_example.yml`. To train a new
+model run
+
+```
+anvil-train <runcard name>.yml
+```
+
+by default this will create an output directory in your current directory
+called `<runcard name>` however a specific output can also be given
+
+```
+anvil-train <runcard name>.yml -o <custom output name>
+```
+
+each new model requires its own output directory, however existing models can
+be trained further by instead by giving an exisiting fit output directory as
+input as well as telling the fit which epoch to start the retrain from
+
+```
+anvil-train <existing output name> -r 1000
+```
+
+this will recommence training at epoch 1000 using a checkpoint in the
+`<existing output name>`, provided it exists. Note that you can just start from
+the last checkpoint in the output directory by specifying `-r -1` which uses the
+standard python syntax for index the final entry in, for example, a list.
+
+Once you are satisfied that the training is finished you can generate plots,
+tables and even reports. To see which observables have been implemented run
+`anvil-sample --help anvil.observables`, feel free to open PRs implementing more!
+An example on how to generate a simple report is given in
+`examples/runcards/training_report.yml`. To use this runcard you will need a
+training output with the name `l2_train_example` in your current working directory.
+To generate the report simply run
+
+```
+anvil-sample training_report.yml
+```
+
+by default the outputted resources will be saved in `output` but you can specify
+a custom output using the `-o` flag.
+
+## Using objects in external code.
+
+In the `examples` directory there is an example of using some of the objects
+defined in models to learn a multigaussian distribution, you can run it with
 
 ```bash
 $ ./train_example.py
@@ -30,27 +94,9 @@ $ ./train_example.py
 which should train the model, and output the plots into `./example_output/`.
 If the model successfully trains, then the ratio of the covariance matrix
 sampled from the trained model over the input covariance should be approximately
-1
+1 as shown in the plot below
 
-![ratio plot of sampled vs. target covariance](./example_output/ratio.png)
+![ratio plot of sampled vs. target covariance](./examples/example_output/ratio.png)
 
-## phi^4 example
-
-The script can be run either by training a new model, or by loading a model. To train, run
-```bash
-$ python3 phi_four.py train <new_model_name>.pt
-```
-or to load an exisitng model, run
-```bash
-$ python3 phi_four.py load <model_name>.pt
-```
-
-The models will be saved to/loaded from a `models` directory. The output will be a set of field configurations - each row of the output matrix corresponds to a flattened configuration. The number of configurations generated is set by `target_length` in the `main` method.
-
-### Some notes...
-* I think there's currently some unecessary code in the `array_mapping` class - I need to tidy this up.
-* I have only trained a 4x4 model so far (around 5 minutes) - I started a 6x6 model but this would take around 2 hours 
-so I will do this soon.
-* Based on a few runs of the code, time to run the MH sampling seems to increase linearly with target number of configurations up until ~10^4, after which it seems to diverge.
-* The fraction of update proposals accepted seems to stay in the range of 0.3-0.5 regardless of target number of configurations, but again note this is only based on a few runs of the code for now.
-* I think a *lot* of fine-tuning will need to be performed!
+if you have any issues using the anvil tools in your own projects feel free to
+open an issue.
