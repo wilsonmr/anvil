@@ -36,10 +36,6 @@ class ConfigParser(Config):
     def parse_epochs(self, epochs: int):
         return epochs
 
-    def parse_tskip_guess(self, tskip_guess: int):
-        """Guess the value of ceil(2 * integrated autocorrelation)"""
-        return tskip_guess
-
     @element_of("cp_ids")
     def parse_cp_id(self, cp: (int, type(None))):
         return cp
