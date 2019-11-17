@@ -110,7 +110,7 @@ def thermalisation(loaded_model, action):
     state, log_ratio = sample_batch(
             loaded_model, action, t_therm, first=True)[2:]
 
-    print(f"Thermalisation: {t_therm} configurations.")
+    print(f"Thermalisation: discarded {t_therm} configurations.")
 
     return state, log_ratio
 
@@ -185,7 +185,7 @@ def chain_autocorrelation(loaded_model, action, state, log_ratio) -> float:
 
     tskip = ceil(2 * integrated_autocorrelation)
     print(
-        f"Guess for tskip: {tskip}, based on {batch_size} configurations."
+        f"Guess for sampling interval: {tskip}, based on {batch_size} configurations."
     )
 
     return state, log_ratio, tskip
@@ -244,7 +244,7 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
 
     # Accept-reject statistics
     accepted = torch.sum(history)
-    rejected = batch * batch_size - accepted
+    rejected = n_large - accepted
     fraction = accepted / float(accepted + rejected)
     print(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: " f"{fraction:.2g}")
 
@@ -256,7 +256,7 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
         f"decorrelated chain of length: {len(decorrelated_chain)}"
     )
 
-    return full_chain
+    return decorrelated_chain
 
 
 sample_training_output = collect("sample", ("training_context",))
