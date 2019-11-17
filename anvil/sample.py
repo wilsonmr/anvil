@@ -13,8 +13,7 @@ from reportengine import collect
 
 
 def sample_batch(
-    loaded_model, action, batch_size, state_i=None, log_ratio_i=None, first=False
-):
+    loaded_model, action, batch_size, state_i=None):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -38,10 +37,6 @@ def sample_batch(
         the number of states to generate from the loaded_model
     state_i: torch.Tensor or None
         the current state of the chain. None if this is the first batch
-    log_ratio_i: float or None
-        the ratio corresponding to state_i, to be used in the acceptance step
-    first: bool
-        Flag indicating whether this is the first batch or not
 
     Returns
     -------
@@ -51,12 +46,12 @@ def sample_batch(
         boolean tensor containing accept/reject history of chain
     state: torch.Tensor
         the current phi state, for continuity between batches
-    log_ratio: float
-        the ratio associated with state
     """
     with torch.no_grad():  # don't track gradients
         z = torch.randn((batch_size, loaded_model.size_in))  # random z configurations
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
+        if state_i is not None:
+            phi[0] = state_i
         log_ptilde = loaded_model(phi)
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
@@ -65,13 +60,8 @@ def sample_batch(
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise ValueError("could run into nans")
 
-    if first:  # first batch
-        log_ratio_i = log_ratio[0]
-        state_i = phi[0]
-    else:
-        log_ratio[0] = log_ratio_i  # else set first to be last accepted
-        phi[0] = state_i
     i = 0
+    log_ratio_i = log_ratio[0]
     for j in range(1, batch_size):
         condition = min(1, exp(float(log_ratio_i - log_ratio[j])))
         if np.random.uniform() <= condition:
@@ -83,7 +73,7 @@ def sample_batch(
         else:
             chain_indices[j] = i
 
-    return phi[chain_indices, :], history, state_i, log_ratio_i
+    return phi[chain_indices, :], history, state_i
 
 
 def thermalisation(loaded_model, action):
@@ -107,15 +97,14 @@ def thermalisation(loaded_model, action):
     """
     t_therm = 1000 # ideally come up with a way of working this out on the fly
 
-    state, log_ratio = sample_batch(
-            loaded_model, action, t_therm, first=True)[2:]
+    state = sample_batch(
+            loaded_model, action, t_therm)[2]
 
     print(f"Thermalisation: discarded {t_therm} configurations.")
+    return state
 
-    return state, log_ratio
 
-
-def chain_autocorrelation(loaded_model, action, state, log_ratio) -> float:
+def chain_autocorrelation(loaded_model, action, state) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
     time for the Markov chain.
@@ -160,8 +149,8 @@ def chain_autocorrelation(loaded_model, action, state, log_ratio) -> float:
     batch_size = 1000 # Hard coded num states for estimating integrated autocorrelation
 
     # Sample some states
-    history, state, log_ratio = sample_batch(
-            loaded_model, action, batch_size, state, log_ratio
+    history, state = sample_batch(
+            loaded_model, action, batch_size, state
     )[1:]
 
     N = len(history)
@@ -188,7 +177,7 @@ def chain_autocorrelation(loaded_model, action, state, log_ratio) -> float:
         f"Guess for sampling interval: {tskip}, based on {batch_size} configurations."
     )
 
-    return state, log_ratio, tskip
+    return state, tskip
 
 
 def sample(loaded_model, action, target_length: int) -> torch.Tensor:
@@ -214,11 +203,11 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
     """
 
     # Thermalise
-    state, log_ratio = thermalisation(loaded_model, action)
+    state = thermalisation(loaded_model, action)
 
     # Estimate observable-independent autocorrelation time
-    state, log_ratio, tskip = chain_autocorrelation(
-            loaded_model, action, state, log_ratio
+    state, tskip = chain_autocorrelation(
+            loaded_model, action, state
     )
 
     # Decide how many configurations to generate, in order to get approximately
@@ -233,8 +222,8 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
 
     for batch in range(Nbatches):
         # Generate sub-chain of batch_size configurations
-        batch_chain, batch_history, state, log_ratio = sample_batch(
-            loaded_model, action, batch_size, state, log_ratio
+        batch_chain, batch_history, state = sample_batch(
+            loaded_model, action, batch_size, state
         )
 
         # Add to larger chain
