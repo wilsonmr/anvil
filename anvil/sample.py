@@ -203,6 +203,8 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
             loaded_model, action, current_state
     )
 
+    sample_interval *= 100 ### HELLO
+
     # Decide how many configurations to generate, in order to get approximately
     # target_length after picking out decorrelated configurations
     batch_size = min(target_length, 10000)  # hard coded for now

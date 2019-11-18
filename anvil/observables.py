@@ -15,24 +15,34 @@ Check the definitions of functions, most are defined according the the arxiv
 version: https://arxiv.org/pdf/1904.12072.pdf
 
 """
-from math import acosh
+from math import acosh, sqrt, fabs
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.signal import correlate
 
 from reportengine.table import table
 from reportengine.figure import figure
-
 
 class GreenFunction:
     def __init__(self, states, geometry):
         self.geometry = geometry
         self.sample = states
 
-    def __call__(self, x_0: int, x_1: int):
+    def __call__(self, x_0: int, x_1: int, error=False, sequence=False):
         r"""Calculates the two point connected green function given a set of
         states G(x) where x = (x_0, x_1) refers to a shift applied to the fields
         \phi
+
+        Also calculates statistical uncertainty in G(x), based on the assumption
+        that the \phi fields are statistically independent, so that the error on
+        the mean is the standard error, i.e. the standard deviation divided by
+        the square root of the number of fields being averaged over.
+
+        Standard errors in <\phi(x)>, <\phi(x+shift)>, <\phi(x+shift)\phi(x)> are
+        propagated to get an error for G(x) using the functional approach.
+        See Hughes & Hase, Measurements and their uncertainties for details.
 
         Parameters
         ----------
@@ -40,6 +50,8 @@ class GreenFunction:
             shift of dimension 0
         x_1: int
             shift of dimension 1
+        error: bool
+            if True, computes and returns the standard error
 
         Returns
         -------
@@ -47,20 +59,45 @@ class GreenFunction:
             scalar (torch.Tensor with single element) value of green function G(x)
 
         """
-        shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(
-            -1
-        )  # make 1d
+        shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)  # make 1d
 
-        g_func = (self.sample[:, shift] * self.sample).mean(
-            dim=0
-        ) - self.sample[  # mean over states
-            :, shift
-        ].mean(
-            dim=0
-        ) * self.sample.mean(
-            dim=0
-        )
-        return g_func.mean()  # integrate over y and divide by volume
+        phi = self.sample
+        phi_shift = self.sample[:, shift]
+        
+        if sequence == True:
+            term1 = (phi_shift * phi).mean(dim=1)  # average over coordinates
+            term2 = phi_shift.mean(dim=1) * phi.mean(dim=1)
+            term1var = (phi_shift * phi).var(dim=1)
+            term2var = phi_shift.var(dim=1) + phi.var(dim=1)
+            e = np.sqrt(term1var + term2var)
+            g_func_stack = term1 - term2
+            return g_func_stack
+            #return g_func_stack / (e * self.geometry.length)
+
+
+        #  Average over stack of states
+        phi_mean = phi.mean(dim=0)
+        phi_shift_mean = phi_shift.mean(dim=0)
+        phi_shift_phi_mean = (phi_shift * phi).mean(dim=0)
+        
+        if error == True:
+            phi_var = phi.var(dim=0)
+            phi_shift_var = phi_shift.var(dim=0)
+            phi_shift_phi_var = (phi_shift * phi).var(dim=0)
+            Nstates = len(phi[:,0])
+
+            g_func_error = (
+                phi_shift_phi_var / Nstates  # first term error squared
+                +  # add squared errors from first and second term
+                (phi_shift_mean * phi_mean)**2 * (
+                    phi_shift_var / (Nstates * phi_shift_mean**2) + phi_var / (Nstates * phi_mean**2)
+                )  # second term: add fractional errors in quadrature
+            ).mean().sqrt()
+            
+            return g_func_error
+        else:
+            g_func = (phi_shift_phi_mean - phi_shift_mean * phi_mean)
+            return g_func.mean()  # average over coordinates
 
 
 def two_point_green_function(sample_training_output, training_geometry):
@@ -69,6 +106,13 @@ def two_point_green_function(sample_training_output, training_geometry):
     """
     return GreenFunction(sample_training_output[0], training_geometry)
 
+def green_function_autocorrelation(training_geometry, two_point_green_function):
+    """Autocorr"""
+    G_series = two_point_green_function(0, 0, sequence=True)
+    G_series -= G_series.mean()
+    autocorr = correlate(G_series, G_series, mode="full")
+    c = np.argmax(autocorr)
+    return autocorr[c:c+100]
 
 def zero_momentum_green_function(training_geometry, two_point_green_function):
     r"""Calculate the zero momentum green function as a function of t
@@ -78,9 +122,11 @@ def zero_momentum_green_function(training_geometry, two_point_green_function):
 
     Returns
     -------
-    g_func_zeromom: list
-        zero momentum green function as function of t, where t runs from 0 to
-        length - 1
+    g_func_zeromom: dict of lists
+        'values': zero momentum green function as function of t, where t runs from 0 to
+            length - 1
+        'errors': uncertainty propagated from uncertainty in G(x) using
+            the functional approach
 
     Notes
     -----
@@ -89,14 +135,19 @@ def zero_momentum_green_function(training_geometry, two_point_green_function):
     spacial directions) and with momentum explicitly set to zero.
 
     """
-    g_func_zeromom = []
+    g_func_zeromom = {'values': [], 'errors': []}
     for t in range(training_geometry.length):
         g_tilde_t = 0
+        error_sq = 0
         for x in range(training_geometry.length):
             # not sure if factors are correct here should we account for
             # forward-backward in green function?
             g_tilde_t += float(two_point_green_function(t, x))
-        g_func_zeromom.append(g_tilde_t / training_geometry.length)
+            error_sq += float(two_point_green_function(t, x, error=True))**2
+        
+        g_func_zeromom['values'].append(g_tilde_t / training_geometry.length)
+        g_func_zeromom['errors'].append(sqrt(error_sq) / training_geometry.length)
+
     return g_func_zeromom
 
 
@@ -111,8 +162,9 @@ def effective_pole_mass(zero_momentum_green_function):
 
     Returns
     -------
-    m_t: list
-        effective pole mass as a function of t
+    m_t: dict of lists
+        'values': effective pole mass as a function of t
+        'errors': uncertainty propagated from uncertainty in \tilde{G}(t, 0)
 
     Notes
     -----
@@ -121,13 +173,45 @@ def effective_pole_mass(zero_momentum_green_function):
 
     """
     g_func_zeromom = zero_momentum_green_function
-    m_t = []
-    for i, g_0_t in enumerate(g_func_zeromom[1:-1], start=1):
-        m_t.append(acosh((g_func_zeromom[i - 1] + g_func_zeromom[i + 1]) / (2 * g_0_t)))
+    m_t = {'values': [], 'errors': []}
+    for i, g_0_t in enumerate(g_func_zeromom['values'][1:-1], start=1):
+
+        numerator = g_func_zeromom['values'][i - 1] + g_func_zeromom['values'][i + 1]
+        denominator = 2 * g_0_t
+        argument = numerator / denominator
+        m_t['values'].append(acosh(argument))
+
+        # Error calculation 1: functional approach based on function m_t of three
+        # independent variables, whose errors are added in quadrature
+        """error1_sq = fabs(acosh((numerator + g_func_zeromom['errors'][i - 1]) / denominator)
+                        - acosh(argument))**2
+        error2_sq = fabs(acosh((numerator + g_func_zeromom['errors'][i + 1]) / denominator)
+                        - acosh(argument))**2
+        error3_sq = fabs(acosh(numerator / (denominator + 2 * g_func_zeromom['errors'][i]))
+                        - acosh(argument))**2
+        error_v1 = sqrt(error1_sq + error2_sq + error3_sq)
+        #print("v1: ", error_v1)"""
+
+        # Error calculation 2: two-level functional approach based on function m_t
+        # of one variable, which itself is a function of three variables.
+        # The two calculations should agree
+        
+        error_numerator_sq = (
+                g_func_zeromom['errors'][i - 1]**2 + g_func_zeromom['errors'][i + 1]**2
+        )
+        error_denominator_sq = (2 * g_func_zeromom['errors'][i])**2
+        error_argument = (numerator / denominator) * sqrt(
+                error_numerator_sq / numerator**2 + error_denominator_sq / denominator**2
+        )
+        error_v2 = fabs(acosh(argument + error_argument) - acosh(argument))
+        #print("v2: ", error_v2)
+        
+        m_t['errors'].append(error_v2)
+
     return m_t
 
 
-def susceptibility(zero_momentum_green_function):
+def susceptibility(training_geometry, two_point_green_function):
     r"""Calculate the susceptibility, which is the sum of two point connected
     green functions over all seperations
 
@@ -142,16 +226,24 @@ def susceptibility(zero_momentum_green_function):
     -------
     chi: float
         value for the susceptibility
+    error: float
+        uncertainty in the susceptibility, based on uncertainty in G(x)
 
     Notes
     -----
     as defined in eq. (25) of https://arxiv.org/pdf/1904.12072.pdf
 
     """
-    g_func_zeromom = zero_momentum_green_function
-    # TODO: we can write this in a more efficient and clearer way.
-    partial_sum = [len(g_func_zeromom) * el for el in g_func_zeromom]  # undo the mean
-    return sum(partial_sum)
+    chi = 0
+    error_sq = 0
+    for t in range(training_geometry.length):
+        for x in range(training_geometry.length):
+            chi += float(two_point_green_function(t, x))
+            error_sq += float(
+                    two_point_green_function(t, x, error=True)
+            )**2  # sum -> add errors in quadrature
+
+    return chi, sqrt(error_sq)
 
 
 def ising_energy(two_point_green_function):
@@ -166,6 +258,8 @@ def ising_energy(two_point_green_function):
     -------
     E: float
         value for the Ising energy
+    error: float
+        uncertainty based on uncertainty in G(x)
 
     Notes
     -----
@@ -175,7 +269,11 @@ def ising_energy(two_point_green_function):
     E = (
         two_point_green_function(1, 0) + two_point_green_function(0, 1)
     ) / 2  # am I missing a factor of 2?
-    return float(E)
+    error = sqrt(
+        two_point_green_function(1, 0, error=True)**2 +
+        two_point_green_function(0, 1, error=True)**2
+    ) / 2
+    return float(E), error
 
 
 def print_plot_observables(self):
@@ -216,7 +314,8 @@ def print_plot_observables(self):
 
 @table
 def ising_observables_table(ising_energy, susceptibility, training_output):
-    res = [[ising_energy], [susceptibility]]
+    res = [[rf"{ising_energy[0]:.3g} $\pm$ {ising_energy[1]:.1g}"],
+           [rf"{susceptibility[0]:.3g} $\pm$ {susceptibility[1]:.1g}"]]
     df = pd.DataFrame(
         res, columns=[training_output.name], index=["Ising energy", "susceptibility"]
     )
@@ -226,9 +325,64 @@ def ising_observables_table(ising_energy, susceptibility, training_output):
 @figure
 def plot_zero_momentum_green_function(zero_momentum_green_function, training_geometry):
     fig, ax = plt.subplots()
-    ax.plot(zero_momentum_green_function, "-r", label=f"L = {training_geometry.length}")
+    ax.errorbar(
+            x = range(len(zero_momentum_green_function['values'])),
+            y = zero_momentum_green_function['values'],
+            yerr = zero_momentum_green_function['errors'],
+            fmt = "-r",
+            label=f"L = {training_geometry.length}"
+    )
     ax.set_yscale("log")
     ax.set_ylabel(r"$\hat{G}(0, t)$")
-    ax.set_xlabel("t")
+    ax.set_xlabel(r"$t$")
     ax.set_title("Zero momentum Green function")
     return fig
+
+@figure
+def plot_effective_pole_mass(training_geometry, effective_pole_mass):
+    Npoints = len(effective_pole_mass['values'])
+    fig, ax = plt.subplots()
+    ax.errorbar(
+        x = range(1, Npoints + 1),
+        y = effective_pole_mass['values'],
+        yerr = effective_pole_mass['errors'],
+        fmt = "-b",
+        label = f"L = {training_geometry.length}"
+    )
+    ax.set_ylabel(r"$m_p^{eff}$")
+    ax.set_xlabel(r"$t$")
+    ax.set_title("Effective pole mass")
+    return fig
+
+@figure
+def plot_corr_errors(training_geometry, two_point_green_function):
+
+    corr = np.empty( (training_geometry.length, training_geometry.length) )
+    error = np.empty( (training_geometry.length, training_geometry.length) )
+    for t in range(training_geometry.length):
+        for x in range(training_geometry.length):
+            corr[x,t] = float(two_point_green_function(t, x))
+            error = float(two_point_green_function(t, x, error=True))
+    
+    fractional_error = error / corr
+
+    fig, ax = plt.subplots()
+    ax.set_title(r"Fractional error in $G(x, t)$")
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$t$")
+    im = ax.pcolor(fractional_error)
+    fig.colorbar(im)
+
+    return fig
+
+@figure
+def plot_G_autocorr(green_function_autocorrelation):
+    data = green_function_autocorrelation
+    fig, ax = plt.subplots()
+    ax.set_yscale("log")
+    ax.set_title(r"Autocorrelation of Green function")
+    ax.set_xlabel(r"$t$")
+    ax.set_ylabel("Auto")
+    ax.plot(data)
+    return fig
+

@@ -1,15 +1,19 @@
-training_output: l2_train_example
+training_output: l6_train_example
 
 cp_id: -1
-target_length: 100000
+target_length: 10000
 
 meta:
-  author: New User
+  author: Joe
   title: Training Report
   keywords: [example]
 
 template_text: |
  {@ising_observables_table@}
+ {@plot_G_autocorr@}
+ {@plot_corr_errors@}
+ {@plot_zero_momentum_green_function@}
+ {@plot_effective_pole_mass@}
 
 actions_:
   - report(main=True)

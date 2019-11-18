@@ -1,0 +1,13 @@
+lattice_length: 6
+lattice_dimension: 2
+
+m_sq: -4
+lam: 6.975
+use_arxiv_version: True
+
+hidden_nodes: [16]
+
+n_affine: 12
+epochs: 10000
+save_interval: 2000
+n_batch: 2000
