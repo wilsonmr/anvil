@@ -20,6 +20,7 @@ from math import acosh, sqrt, fabs
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from scipy.signal import correlate
 
 from reportengine.table import table
@@ -107,11 +108,14 @@ def two_point_green_function(sample_training_output, training_geometry):
 
 def green_function_autocorrelation(training_geometry, two_point_green_function):
     """Autocorr"""
-    G_series = two_point_green_function(0, 0, sequence=True)
-    G_series -= G_series.mean()
-    autocorr = correlate(G_series, G_series, mode="full")
-    c = np.argmax(autocorr)
-    return autocorr[c:c+100]
+    output = []
+    for coord in ((0, 0), (3, 3)):
+        G_series = two_point_green_function(coord[0], coord[1], sequence=True)
+        G_series -= G_series.mean()
+        autocorr = correlate(G_series, G_series, mode="full")
+        c = np.argmax(autocorr)
+        output.append(autocorr[c:c+100])
+    return output
 
 def zero_momentum_green_function(training_geometry, two_point_green_function):
     r"""Calculate the zero momentum green function as a function of t
@@ -354,7 +358,7 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     return fig
 
 @figure
-def plot_corr_errors(training_geometry, two_point_green_function):
+def plot_G(training_geometry, two_point_green_function):
 
     corr = np.empty( (training_geometry.length, training_geometry.length) )
     error = np.empty( (training_geometry.length, training_geometry.length) )
@@ -365,12 +369,21 @@ def plot_corr_errors(training_geometry, two_point_green_function):
     
     fractional_error = error / corr
 
-    fig, ax = plt.subplots()
-    ax.set_title(r"Fractional error in $G(x, t)$")
-    ax.set_xlabel(r"$x$")
-    ax.set_ylabel(r"$t$")
-    im = ax.pcolor(fractional_error)
-    fig.colorbar(im)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13,6), sharey=True)
+    ax2.set_title(r"Fractional error in $G(x, t)$")
+    ax1.set_title(r"$G(x, t)$")
+    ax1.set_xlabel(r"$x$")
+    ax2.set_xlabel(r"$x$")
+    ax1.set_ylabel(r"$t$")
+    im1 = ax1.pcolor(corr)
+    im2 = ax2.pcolor(fractional_error)
+
+    ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax2.xaxis.set_major_locator(MaxNLocator(integer=True))
+    
+    fig.colorbar(im1, ax=ax1)
+    fig.colorbar(im2, ax=ax2)
 
     return fig
 
@@ -382,6 +395,17 @@ def plot_G_autocorr(green_function_autocorrelation):
     ax.set_title(r"Autocorrelation of Green function")
     ax.set_xlabel(r"$t$")
     ax.set_ylabel("Auto")
-    ax.plot(data)
+    ax.plot(data[0], label="G(0,0)")
+    ax.plot(data[1], label="G(3,3)")
+    ax.legend()
     return fig
 
+@figure
+def plot_G_series(two_point_green_function):
+    series = two_point_green_function(0, 0, sequence=True)
+    fig, ax = plt.subplots()
+    ax.set_title("Series")
+    ax.set_ylabel(r"G")
+    ax.set_xlabel(r"$t$")
+    ax.plot(series[20:], '-')
+    return fig
