@@ -12,8 +12,7 @@ import torch
 from reportengine import collect
 
 
-def sample_batch(
-    loaded_model, action, batch_size, current_state=None):
+def sample_batch(loaded_model, action, batch_size, current_state=None):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -46,7 +45,9 @@ def sample_batch(
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = torch.randn((batch_size + 1, loaded_model.size_in))  # random z configurations
+        z = torch.randn(
+            (batch_size + 1, loaded_model.size_in)
+        )  # random z configurations
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
         if current_state is not None:
             phi[0] = current_state
@@ -62,11 +63,11 @@ def sample_batch(
     for j in range(1, batch_size + 1):  # j = phi index of proposed state
         condition = min(1, exp(float(log_ratio[i] - log_ratio[j])))
         if np.random.uniform() <= condition:  # accepted
-            chain_indices[j-1] = j
-            history[j-1] = True
+            chain_indices[j - 1] = j
+            history[j - 1] = True
             i = j
         else:  # rejected
-            chain_indices[j-1] = i
+            chain_indices[j - 1] = i
 
     return phi[chain_indices, :], history
 
@@ -88,10 +89,9 @@ def thermalised_state(loaded_model, action) -> torch.Tensor:
     states[-1]: torch.Tensor
         the final phi state
     """
-    t_therm = 10000 # ideally come up with a way of working this out on the fly
+    t_therm = 10000  # ideally come up with a way of working this out on the fly
 
-    states, _ = sample_batch(
-            loaded_model, action, t_therm)
+    states, _ = sample_batch(loaded_model, action, t_therm)
 
     print(f"Thermalisation: discarded {t_therm} configurations.")
     return states[-1]
@@ -137,28 +137,29 @@ def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
         Guess for subsampling interval, based on the integrated autocorrelation time
 
     """
-    batch_size = 10000 # Hard coded num states for estimating integrated autocorrelation
+    # Hard coded num states for estimating integrated autocorrelation
+    batch_size = 10000
 
     # Sample some states
-    states, history = sample_batch(
-            loaded_model, action, batch_size, thermalised_state
-    )
+    states, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
 
     N = len(history)
     autocorrelations = torch.zeros(N, dtype=torch.float)
     consecutive_rejections = 0
-    
+
     for step in history:
         if step == True:  # move accepted
             if consecutive_rejections > 0:  # faster than unnecessarily accessing array
-                autocorrelations[1 : consecutive_rejections + 1] += \
-                        torch.arange(consecutive_rejections, 0, -1, dtype=torch.float)
+                autocorrelations[1 : consecutive_rejections + 1] += torch.arange(
+                    consecutive_rejections, 0, -1, dtype=torch.float
+                )
             consecutive_rejections = 0
         else:  # move rejected
             consecutive_rejections += 1
     if consecutive_rejections > 0:  # pick up last rejection run
-        autocorrelations[1 : consecutive_rejections + 1] += \
-                torch.arange(consecutive_rejections, 0, -1, dtype=torch.float)
+        autocorrelations[1 : consecutive_rejections + 1] += torch.arange(
+            consecutive_rejections, 0, -1, dtype=torch.float
+        )
 
     # Compute integrated autocorrelation
     integrated_autocorrelation = 0.5 + torch.sum(
@@ -174,7 +175,9 @@ def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
     return sample_interval
 
 
-def sample(loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation) -> torch.Tensor:
+def sample(
+    loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation
+) -> torch.Tensor:
     r"""
     Produces a Markov chain with approximately target_length decorrelated configurations,
     using the Metropolis-Hastings algorithm.
