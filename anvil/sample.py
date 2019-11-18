@@ -71,7 +71,7 @@ def sample_batch(
     return phi[chain_indices, :], history
 
 
-def thermalised_state(loaded_model, action):
+def thermalised_state(loaded_model, action) -> torch.Tensor:
     r"""
     A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -86,9 +86,9 @@ def thermalised_state(loaded_model, action):
     Returns
     -------
     states[-1]: torch.Tensor
-        the current phi state, for continuity between batches
+        the final phi state
     """
-    t_therm = 1000 # ideally come up with a way of working this out on the fly
+    t_therm = 10000 # ideally come up with a way of working this out on the fly
 
     states, _ = sample_batch(
             loaded_model, action, t_therm)
@@ -97,7 +97,7 @@ def thermalised_state(loaded_model, action):
     return states[-1]
 
 
-def chain_autocorrelation(loaded_model, action, current_state) -> float:
+def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
     time for the Markov chain.
@@ -133,17 +133,15 @@ def chain_autocorrelation(loaded_model, action, current_state) -> float:
 
     Returns
     -------
-    states[-1]: torch.Tensor
-        the current phi state, for continuity between batches
     sample_interval: float
         Guess for subsampling interval, based on the integrated autocorrelation time
 
     """
-    batch_size = 1000 # Hard coded num states for estimating integrated autocorrelation
+    batch_size = 10000 # Hard coded num states for estimating integrated autocorrelation
 
     # Sample some states
     states, history = sample_batch(
-            loaded_model, action, batch_size, current_state
+            loaded_model, action, batch_size, thermalised_state
     )
 
     N = len(history)
@@ -173,10 +171,10 @@ def chain_autocorrelation(loaded_model, action, current_state) -> float:
         f"Guess for sampling interval: {sample_interval}, based on {batch_size} configurations."
     )
 
-    return states[-1], sample_interval
+    return sample_interval
 
 
-def sample(loaded_model, action, target_length: int) -> torch.Tensor:
+def sample(loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation) -> torch.Tensor:
     r"""
     Produces a Markov chain with approximately target_length decorrelated configurations,
     using the Metropolis-Hastings algorithm.
@@ -199,12 +197,10 @@ def sample(loaded_model, action, target_length: int) -> torch.Tensor:
     """
 
     # Thermalise
-    current_state = thermalised_state(loaded_model, action)
+    current_state = thermalised_state
 
-    # Estimate observable-independent autocorrelation time
-    current_state, sample_interval = chain_autocorrelation(
-            loaded_model, action, current_state
-    )
+    # Calculate sampling interval from integrated autocorrelation time
+    sample_interval = chain_autocorrelation
 
     # Decide how many configurations to generate, in order to get approximately
     # target_length after picking out decorrelated configurations
