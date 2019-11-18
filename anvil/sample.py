@@ -92,7 +92,6 @@ def thermalised_state(loaded_model, action):
 
     states, _ = sample_batch(
             loaded_model, action, t_therm)
-
     print(f"Thermalisation: discarded {t_therm} configurations.")
     return states[-1]
 

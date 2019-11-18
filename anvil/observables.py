@@ -74,7 +74,6 @@ class GreenFunction:
             return g_func_stack
             #return g_func_stack / (e * self.geometry.length)
 
-
         #  Average over stack of states
         phi_mean = phi.mean(dim=0)
         phi_shift_mean = phi_shift.mean(dim=0)

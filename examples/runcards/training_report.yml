@@ -9,6 +9,9 @@ meta:
   keywords: [example]
 
 template_text: |
+ {@plot_corr_errors@}
+ {@plot_zero_momentum_green_function@}
+ {@plot_effective_pole_mass@}
  {@ising_observables_table@}
  {@plot_G_autocorr@}
  {@plot_corr_errors@}
