@@ -147,23 +147,26 @@ def chain_autocorrelation(loaded_model, action, current_state) -> float:
     )
 
     N = len(history)
-    autocorrelations = torch.zeros(N - 1, dtype=torch.float)
+    autocorrelations = torch.zeros(N, dtype=torch.float)
     consecutive_rejections = 0
-
+    
     for step in history:
         if step == True:  # move accepted
             if consecutive_rejections > 0:  # faster than unnecessarily accessing array
-                autocorrelations[1 : consecutive_rejections + 1] += 1
+                autocorrelations[1 : consecutive_rejections + 1] += \
+                        torch.arange(consecutive_rejections, 0, -1, dtype=torch.float)
             consecutive_rejections = 0
         else:  # move rejected
             consecutive_rejections += 1
     if consecutive_rejections > 0:  # pick up last rejection run
-        autocorrelations[1 : consecutive_rejections + 1] += 1
+        autocorrelations[1 : consecutive_rejections + 1] += \
+                torch.arange(consecutive_rejections, 0, -1, dtype=torch.float)
 
     # Compute integrated autocorrelation
     integrated_autocorrelation = 0.5 + torch.sum(
-        autocorrelations / (N - torch.arange(N - 1))
+        autocorrelations / torch.arange(N, 0, -1, dtype=torch.float)
     )
+    print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
 
     sample_interval = ceil(2 * integrated_autocorrelation)
     print(
