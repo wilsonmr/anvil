@@ -85,14 +85,16 @@ class GreenFunction:
             phi_shift_var = phi_shift.var(dim=0)
             phi_shift_phi_var = (phi_shift * phi).var(dim=0)
             Nstates = len(phi[:,0])
+            Npoints = len(phi[0,:])
 
             g_func_error = (
                 phi_shift_phi_var / Nstates  # first term error squared
                 +  # add squared errors from first and second term
                 (phi_shift_mean * phi_mean)**2 * (
-                    phi_shift_var / (Nstates * phi_shift_mean**2) + phi_var / (Nstates * phi_mean**2)
+                    phi_shift_var / (Nstates * phi_shift_mean**2)
+                    + phi_var / (Nstates * phi_mean**2)
                 )  # second term: add fractional errors in quadrature
-            ).mean().sqrt()
+            ).sum().sqrt() / Npoints  # sum over coordinates, sqrt, scale 
             
             return g_func_error
         else:
@@ -182,8 +184,8 @@ def effective_pole_mass(zero_momentum_green_function):
         numerator = g_func_zeromom['values'][i - 1] + g_func_zeromom['values'][i + 1]
         denominator = 2 * g_0_t
         argument = numerator / denominator
-        m_t['values'].append(acosh(argument))
-
+        #m_t['values'].append(acosh(argument))
+        m_t['values'].append(0)
         # Error calculation 1: functional approach based on function m_t of three
         # independent variables, whose errors are added in quadrature
         """error1_sq = fabs(acosh((numerator + g_func_zeromom['errors'][i - 1]) / denominator)
@@ -206,9 +208,9 @@ def effective_pole_mass(zero_momentum_green_function):
         error_argument = (numerator / denominator) * sqrt(
                 error_numerator_sq / numerator**2 + error_denominator_sq / denominator**2
         )
-        error_v2 = fabs(acosh(argument + error_argument) - acosh(argument))
+        #error_v2 = fabs(acosh(argument + error_argument) - acosh(argument))
         #print("v2: ", error_v2)
-        
+        error_v2 = 0
         m_t['errors'].append(error_v2)
 
     return m_t
@@ -407,5 +409,5 @@ def plot_G_series(two_point_green_function):
     ax.set_title("Series")
     ax.set_ylabel(r"G")
     ax.set_xlabel(r"$t$")
-    ax.plot(series[20:], '-')
+    ax.plot(series[:500], '-')
     return fig

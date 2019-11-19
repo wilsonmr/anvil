@@ -9,6 +9,8 @@ from math import exp, isfinite, ceil
 import numpy as np
 import torch
 
+from tqdm import tqdm
+
 from reportengine import collect
 
 
@@ -89,7 +91,7 @@ def thermalised_state(loaded_model, action) -> torch.Tensor:
     states[-1]: torch.Tensor
         the final phi state
     """
-    t_therm = 10000  # ideally come up with a way of working this out on the fly
+    t_therm = 100000  # ideally come up with a way of working this out on the fly
 
     states, _ = sample_batch(loaded_model, action, t_therm)
 
@@ -204,6 +206,8 @@ def sample(
 
     # Calculate sampling interval from integrated autocorrelation time
     sample_interval = chain_autocorrelation
+    #sample_interval *= 50
+    sample_interval = 5000
 
     # Decide how many configurations to generate, in order to get approximately
     # target_length after picking out decorrelated configurations
@@ -214,8 +218,10 @@ def sample(
 
     full_chain = torch.empty((n_large, loaded_model.size_in), dtype=torch.float32)
     history = torch.empty(n_large, dtype=torch.bool)  # accept/reject history
+    
+    pbar = tqdm(range(Nbatches), desc="batch")
+    for batch in pbar:
 
-    for batch in range(Nbatches):
         # Generate sub-chain of batch_size configurations
         batch_chain, batch_history = sample_batch(
             loaded_model, action, batch_size, current_state
@@ -241,6 +247,7 @@ def sample(
         f"decorrelated chain of length: {len(decorrelated_chain)}"
     )
 
+    #return full_chain
     return decorrelated_chain
 
 
