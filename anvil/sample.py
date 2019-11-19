@@ -4,17 +4,17 @@ sample.py
 Module containing functions related to sampling from a trained model
 """
 
-frommath import exp, isfinite, ceil
+from math import exp, isfinite, ceil
 
-importnumpy as np
-importtorch
+import numpy as np
+import torch
 
-fromtqdm import tqdm
+from tqdm import tqdm
 
-fromreportengine import collect
+from reportengine import collect
 
 
-defsample_batch(loaded_model, action, batch_size, current_state=None):
+def sample_batch(loaded_model, action, batch_size, current_state=None):
    r"""
    Sample using Metroplis-Hastings algorithm from a large number of phi
    configurations.
@@ -74,7 +74,7 @@ defsample_batch(loaded_model, action, batch_size, current_state=None):
    return phi[chain_indices, :], history
 
 
-defthermalised_state(loaded_model, action) -> torch.Tensor:
+def thermalised_state(loaded_model, action) -> torch.Tensor:
    r"""
    A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -99,7 +99,7 @@ defthermalised_state(loaded_model, action) -> torch.Tensor:
    return states[-1]
 
 
-defchain_autocorrelation(loaded_model, action, thermalised_state) -> float:
+def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
    r"""
    Compute an observable-independent measure of the integrated autocorrelation
    time for the Markov chain.
@@ -177,7 +177,7 @@ defchain_autocorrelation(loaded_model, action, thermalised_state) -> float:
    return sample_interval
 
 
-defsample(
+def sample(
    loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation
 )-> torch.Tensor:
    r"""
