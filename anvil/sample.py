@@ -92,6 +92,7 @@ def thermalised_state(loaded_model, action) -> torch.Tensor:
         the final phi state
     """
     t_therm = 10000  # ideally come up with a way of working this out on the fly
+    #t_therm = 1
 
     states, _ = sample_batch(loaded_model, action, t_therm)
 
@@ -206,6 +207,7 @@ def sample(
 
     # Calculate sampling interval from integrated autocorrelation time
     sample_interval = chain_autocorrelation
+    sample_interval = 1
 
     # Decide how many configurations to generate, in order to get approximately
     # target_length after picking out decorrelated configurations
