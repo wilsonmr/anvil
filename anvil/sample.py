@@ -74,7 +74,7 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
     return phi[chain_indices, :], history
 
 
-def thermalised_state(loaded_model, action) -> torch.Tensor:
+def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
     r"""
     A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -91,15 +91,13 @@ def thermalised_state(loaded_model, action) -> torch.Tensor:
     states[-1]: torch.Tensor
         the final phi state
     """
-    t_therm = 10000  # ideally come up with a way of working this out on the fly
+    states, _ = sample_batch(loaded_model, action, thermalisation)
 
-    states, _ = sample_batch(loaded_model, action, t_therm)
-
-    print(f"Thermalisation: discarded {t_therm} configurations.")
+    print(f"Thermalisation: discarded {thermalisation} configurations.")
     return states[-1]
 
 
-def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
+def chain_autocorrelation(loaded_model, action, thermalised_state, sample_interval) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
     time for the Markov chain.
@@ -139,6 +137,10 @@ def chain_autocorrelation(loaded_model, action, thermalised_state) -> float:
         Guess for subsampling interval, based on the integrated autocorrelation time
 
     """
+    if sample_interval >= 1:
+        print(f"User-specified sampling interval: {sample_interval}")
+        return sample_interval  # no need for this function..
+
     # Hard coded num states for estimating integrated autocorrelation
     batch_size = 10000
 

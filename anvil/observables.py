@@ -232,3 +232,4 @@ def plot_zero_momentum_green_function(zero_momentum_green_function, training_geo
     ax.set_xlabel("t")
     ax.set_title("Zero momentum Green function")
     return fig
+
