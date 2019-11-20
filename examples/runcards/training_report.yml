@@ -3,6 +3,9 @@ training_output: l2_train_example
 cp_id: -1
 target_length: 100000
 
+thermalisation: 1
+sample_interval: 1
+
 meta:
   author: New User
   title: Training Report
@@ -10,6 +13,9 @@ meta:
 
 template_text: |
  {@ising_observables_table@}
+ {@plot_zero_momentum_green_function@}
+ {@plot_volume_averaged_2pf@}
+ {@plot_autocorrelation_2pf@}
 
 actions_:
   - report(main=True)
