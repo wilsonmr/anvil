@@ -12,8 +12,6 @@ from reportengine.figure import figure
 
 @table
 def ising_observables_table(ising_energy, susceptibility, training_output): 
-    ising_energy = ising_energy[0]
-    susceptibility = susceptibility[0]
     res = [[rf"{ising_energy[0]:.5g} $\pm$ {ising_energy[1]:.1g}"],
            [rf"{susceptibility[0]:.5g} $\pm$ {susceptibility[1]:.1g}"]]
     df = pd.DataFrame(
@@ -22,13 +20,12 @@ def ising_observables_table(ising_energy, susceptibility, training_output):
     return df
 
 @figure
-def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
-    zero_momentum_2pf = zero_momentum_2pf[0]
+def plot_zero_momentum_2pf(zero_momentum_2pf_out, training_geometry):
     fig, ax = plt.subplots()
     ax.errorbar(
-            x = range(len(zero_momentum_2pf['values'])),
-            y = zero_momentum_2pf['values'],
-            yerr = zero_momentum_2pf['errors'],
+            x = range(len(zero_momentum_2pf_out[0])),
+            y = zero_momentum_2pf_out[0],
+            yerr = zero_momentum_2pf_out[1],
             fmt = "-r",
             label=f"L = {training_geometry.length}"
     )
@@ -40,13 +37,12 @@ def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
 
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
-    effective_pole_mass = effective_pole_mass[0]
-    Npoints = len(effective_pole_mass['values'])
+    Npoints = len(effective_pole_mass[0])
     fig, ax = plt.subplots()
     ax.errorbar(
         x = range(1, Npoints + 1),
-        y = effective_pole_mass['values'],
-        yerr = effective_pole_mass['errors'],
+        y = effective_pole_mass[0],
+        yerr = effective_pole_mass[1],
         fmt = "-b",
         label = f"L = {training_geometry.length}"
     )
@@ -54,7 +50,7 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     ax.set_xlabel(r"$t$")
     ax.set_title("Effective pole mass")
     return fig
-
+"""
 '''
 @figure
 def plot_2pf(training_geometry, two_point_function):
@@ -116,3 +112,4 @@ def plot_G_series(two_point_green_function):
     ax.plot(series[:1000], '-')
     return fig
 '''
+"""

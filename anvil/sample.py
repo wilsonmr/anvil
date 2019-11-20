@@ -207,7 +207,7 @@ def sample(
 
     # Calculate sampling interval from integrated autocorrelation time
     sample_interval = chain_autocorrelation
-    sample_interval = 1
+    #sample_interval = 1
 
     # Decide how many configurations to generate, in order to get approximately
     # target_length after picking out decorrelated configurations
