@@ -30,8 +30,8 @@ def plot_zero_momentum_2pf(zero_momentum_2pf_out, training_geometry):
             label=f"L = {training_geometry.length}"
     )
     ax.set_yscale("log")
-    ax.set_ylabel(r"$\hat{G}(0, t)$")
-    ax.set_xlabel(r"$t$")
+    ax.set_ylabel("$\hat{G}(0, t)$")
+    ax.set_xlabel("$t$")
     ax.set_title("Zero momentum two point function")
     return fig
 
@@ -46,8 +46,8 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
         fmt = "-b",
         label = f"L = {training_geometry.length}"
     )
-    ax.set_ylabel(r"$m_p^{eff}$")
-    ax.set_xlabel(r"$t$")
+    ax.set_ylabel("$m_p^{eff}$")
+    ax.set_xlabel("$t$")
     ax.set_title("Effective pole mass")
     return fig
 
@@ -65,11 +65,11 @@ def plot_2pf(training_geometry, two_point_function, two_point_function_error):
     fractional_error = error / corr
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13,6), sharey=True)
-    ax2.set_title(r"Fractional error in $G(x, t)$")
-    ax1.set_title(r"$G(x, t)$")
-    ax1.set_xlabel(r"$x$")
-    ax2.set_xlabel(r"$x$")
-    ax1.set_ylabel(r"$t$")
+    ax2.set_title("Fractional error in $G(x, t)$")
+    ax1.set_title("$G(x, t)$")
+    ax1.set_xlabel("$x$")
+    ax2.set_xlabel("$x$")
+    ax1.set_ylabel("$t$")
     im1 = ax1.pcolor(corr)
     im2 = ax2.pcolor(fractional_error)
 
@@ -86,8 +86,8 @@ def plot_2pf(training_geometry, two_point_function, two_point_function_error):
 def plot_volume_averaged_2pf(volume_averaged_2pf):
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
-    ax.set_ylabel(r"$G_V$")
-    ax.set_xlabel(r"$t$")
+    ax.set_ylabel("$G_V$")
+    ax.set_xlabel("$t$")
     ax.plot(volume_averaged_2pf(0, 0), '-')
     return fig
 
@@ -97,12 +97,12 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
     autocorrelation = autocorrelation
     fig, ax = plt.subplots()
     #ax.set_yscale("log")
-    ax.set_title(r"Autocorrelation of volume-averaged two point function")
-    ax.set_xlabel(r"$t$")
+    ax.set_title("Autocorrelation of volume-averaged two point function")
+    ax.set_xlabel("$t$")
     ax.set_ylabel("$\Gamma_{G_V}(t)$")
     ax.plot(autocorrelation, '-')
     x = 0.8 * (1 + len(autocorrelation))
     y = 0.8
-    ax.text(x, y, r"$\tau_{int} = $ %.3g" %integrated_autocorrelation, fontsize='large')
+    ax.text(x, y, "$\tau_{int} = $ %.3g" %integrated_autocorrelation, fontsize='large')
     return fig
 

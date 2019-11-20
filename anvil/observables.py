@@ -3,12 +3,6 @@ observables.py
 
 functions for calculating observables on a stack of states.
 
-Functions
----------
-print_plot_observables:
-    can be considered the main function which in turn calculates the rest
-    of the observables defined in this module.}
-
 Notes
 -----
 Check the definitions of functions, most are defined according the the arxiv
@@ -23,6 +17,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy.signal import correlate
 import torch
+
+from tqdm import tqdm
 
 from reportengine import collect
 
@@ -138,11 +134,7 @@ class TwoPointFunctionError:
         return g_func_error
 
 
-class VolumeAveraged2pf:
-    def __init__(self, states, geometry):
-        self.sample = states
-        self.geometry = geometry
-
+class VolumeAveraged2pf(TwoPointFunction):
     def __call__(self, x_0: int, x_1: int):
         """
         Return torch Tensor of volume-averaged two point functions, i.e.
@@ -162,7 +154,6 @@ class VolumeAveraged2pf:
             for each state in the sample
         """
         shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)
-
         va_2pf = (self.sample[:, shift] * self.sample).mean(dim=1) - self.sample.mean(
             dim=1
         ).pow(2)
@@ -338,7 +329,6 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     Returns
     -------
     autocorrelation: numpy.array
-
     integrated_autocorrelation: float
     """
     x = t = 0  # Should really look at more than one separation
@@ -358,11 +348,13 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
 def bootstrap(observable, sample_size):
     mean = observable()
     bootstrap_results = []
-    for sample in range(1000):
+    Nb = 100  # number of bootstrap samples
+    pbar = tqdm(range(Nb), desc="bootstrap sample")
+    for sample in pbar:
         bootstrap_results.append(observable(sample_size))
     bootstrap_results = np.array(bootstrap_results)
 
-    error_sq = np.sum((bootstrap_results - mean) ** 2, axis=0) / 1000.0
+    error_sq = np.sum((bootstrap_results - mean) ** 2, axis=0) / Nb
 
     return mean, np.sqrt(error_sq)
 
@@ -371,15 +363,15 @@ def two_point_function(sample_training_output, training_geometry):
     r"""Return instance of TwoPointFunction which can be used to calculate the
     two point green function for a given seperation
     """
-    return TwoPointFunction(sample_training_output[0], training_geometry)
+    return TwoPointFunction(sample_training_output, training_geometry)
 
 
 def two_point_function_error(sample_training_output, training_geometry):
-    return TwoPointFunctionError(sample_training_output[0], training_geometry)
+    return TwoPointFunctionError(sample_training_output, training_geometry)
 
 
 def volume_averaged_2pf(sample_training_output, training_geometry):
-    return VolumeAveraged2pf(sample_training_output[0], training_geometry)
+    return VolumeAveraged2pf(sample_training_output, training_geometry)
 
 
 def zero_momentum_2pf(training_geometry, two_point_function):
@@ -390,22 +382,26 @@ def zero_momentum_2pf(training_geometry, two_point_function):
 
 
 def zero_momentum_2pf_out(training_geometry, two_point_function, target_length):
+    print("Computing zero-momentum two point function")
     return bootstrap(
         ZeroMomentum2pf(training_geometry, two_point_function), target_length // 10
     )
 
 
 def effective_pole_mass(zero_momentum_2pf, target_length):
+    print("Computing effective pole mass")
     return bootstrap(EffectivePoleMass(zero_momentum_2pf), target_length // 10)
 
 
 def susceptibility(training_geometry, two_point_function, target_length):
+    print("Computing susceptibility")
     return bootstrap(
         Susceptibility(training_geometry, two_point_function), target_length // 10
     )
 
 
 def ising_energy(two_point_function, target_length):
+    print("Computing Ising energy")
     return bootstrap(IsingEnergy(two_point_function), target_length // 10)
 
 
