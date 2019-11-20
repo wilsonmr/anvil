@@ -91,14 +91,14 @@ class TwoPointFunctionError:
         Standard errors in <\phi(x)>, <\phi(x+shift)>, <\phi(x+shift)\phi(x)> are
         propagated to get an error for G(x) using the functional approach.
         See Hughes & Hase, Measurements and their uncertainties for details.
-        
+
         Parameters
         ----------
         x_0: int
             shift of dimension 0
         x_1: int
             shift of dimension 1
-        
+
         Returns
         -------
         g_func_error: float
@@ -123,12 +123,17 @@ class TwoPointFunctionError:
 
         g_func_error = (
             phi_shift_phi_var / Nstates  # first error term squared
-            +  # add squared errors from first and second term
-            (phi_shift_mean * phi_mean)**2 * (
-                phi_shift_var / (Nstates * phi_shift_mean**2) +
-                phi_var / (Nstates * phi_mean**2)
-                )  # second error term squared
-        ).sum().sqrt() / sqrt(Npoints)  # sum over coords, sqrt, scale by rootN
+            + (  # add squared errors from first and second term
+                phi_shift_mean * phi_mean
+            )
+            ** 2
+            * (
+                phi_shift_var / (Nstates * phi_shift_mean ** 2)
+                + phi_var / (Nstates * phi_mean ** 2)
+            )  # second error term squared
+        ).sum().sqrt() / sqrt(
+            Npoints
+        )  # sum over coords, sqrt, scale by rootN
 
         return g_func_error
 
@@ -142,7 +147,7 @@ class VolumeAveraged2pf:
         """
         Return torch Tensor of volume-averaged two point functions, i.e.
         where <\phi(x)> is a mean over points within a single configuration.
-        
+
         Parameters
         ----------
         x_0: int
@@ -168,13 +173,13 @@ class ZeroMomentum2pf:
     def __init__(self, training_geometry, two_point_function):
         self.training_geometry = training_geometry
         self.two_point_function = two_point_function
-    
+
     def __call__(self, sample_size=None):
         r"""Calculate the zero momentum green function as a function of t
         \tilde{G}(t, 0) which is assumed to be in the first dimension defined as
 
             \tilde{G}(t, 0) = 1/L \sum_{x_1} G(t, x_1)
-        
+
         Parameters
         ----------
         sample_size: int
@@ -209,7 +214,7 @@ class EffectivePoleMass:
     def __init__(self, zero_momentum_2pf):
         self.zero_momentum_2pf = zero_momentum_2pf
 
-    def __call__(self, sample_size):
+    def __call__(self, sample_size=None):
         r"""Calculate the effective pole mass m^eff(t) defined as
 
             m^eff(t) = arccosh(
@@ -217,7 +222,7 @@ class EffectivePoleMass:
             )
 
         from t = 1 to t = L-2, where L is the length of lattice side
-        
+
         Parameters
         ----------
         sample_size: int
@@ -250,7 +255,7 @@ class Susceptibility:
     def __init__(self, training_geometry, two_point_function):
         self.training_geometry = training_geometry
         self.two_point_function = two_point_function
-    
+
     def __call__(self, sample_size=None):
         r"""Calculate the susceptibility, which is the sum of two point connected
         green functions over all seperations
@@ -283,7 +288,7 @@ class Susceptibility:
 class IsingEnergy:
     def __init__(self, two_point_function):
         self.two_point_function = two_point_function
-    
+
     def __call__(self, sample_size=None):
         r"""Ising energy defined as
 
@@ -296,7 +301,7 @@ class IsingEnergy:
         ----------
         sample_size: int
             calculation done based on a subsample of states. See TwoPointFunction
-        
+
         Returns
         -------
         E: float
@@ -308,22 +313,24 @@ class IsingEnergy:
 
         """
         E = (
-            self.two_point_function(1, 0, sample_size) + \
-            self.two_point_function(0, 1, sample_size)
-        ) / 2  # am I missing a factor of 2?
+            self.two_point_function(1, 0, sample_size)
+            + self.two_point_function(0, 1, sample_size)
+        ) / 2
         return float(E)
 
+
 ##############################################################################
+
 
 def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     r"""Compute the autocorrelation of the volume-averaged two point function.
 
     Autocorrelation is defined by
-    
+
         \Gamma(t) = <G(s)G(s+t)> - <G(s)><G(t)>
 
     where G(s) is the volume-averaged two point function at Monte Carlo timestep s.
-    
+
     Integrated autocorrelation is defined by
 
         \tau = 0.5 + sum_t \Gamma(t)
@@ -337,31 +344,28 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     x = t = 0  # Should really look at more than one separation
     G_series = volume_averaged_2pf(x, t)
     G_series -= G_series.mean()
-    autocorrelation = correlate(G_series, G_series, mode="same")  # converts in numpy array
+    autocorrelation = correlate(
+        G_series, G_series, mode="same"
+    )  # converts in numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
-    
-    # This gives the same results, but is much slower
-    """
-    Nstates = len(G_series)
-    autocorr2 = torch.zeros(Nstates)
-    autocorr2[0] = G_series.pow(2).mean() - G_series.mean() ** 2
-    for t in range(1, Nstates):
-        term1 = torch.mean(G_series[:-t] * G_series[t:])
-        term2 = torch.mean(G_series[:-t]) * torch.mean(G_series[t:])
-        autocorr2[t] = term1 - term2
-    autocorr2 = autocorr2 / autocorr2[0]
-    """
-    
+
     integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:])
 
     return autocorrelation, integrated_autocorrelation
 
+
 def bootstrap(observable, sample_size):
-    results = []
-    for sample in range(100):
-        results.append(observable(sample_size))
-    return np.mean(results, axis=0), np.std(results, axis=0) / 10.
+    mean = observable()
+    bootstrap_results = []
+    for sample in range(1000):
+        bootstrap_results.append(observable(sample_size))
+    bootstrap_results = np.array(bootstrap_results)
+
+    error_sq = np.sum((bootstrap_results - mean) ** 2, axis=0) / 1000.0
+
+    return mean, np.sqrt(error_sq)
+
 
 def two_point_function(sample_training_output, training_geometry):
     r"""Return instance of TwoPointFunction which can be used to calculate the
@@ -369,11 +373,14 @@ def two_point_function(sample_training_output, training_geometry):
     """
     return TwoPointFunction(sample_training_output[0], training_geometry)
 
+
 def two_point_function_error(sample_training_output, training_geometry):
     return TwoPointFunctionError(sample_training_output[0], training_geometry)
 
+
 def volume_averaged_2pf(sample_training_output, training_geometry):
     return VolumeAveraged2pf(sample_training_output[0], training_geometry)
+
 
 def zero_momentum_2pf(training_geometry, two_point_function):
     return ZeroMomentum2pf(training_geometry, two_point_function)
@@ -381,20 +388,29 @@ def zero_momentum_2pf(training_geometry, two_point_function):
 
 ############################################################################
 
+
 def zero_momentum_2pf_out(training_geometry, two_point_function, target_length):
-    return bootstrap(ZeroMomentum2pf(training_geometry, two_point_function), target_length//10)
+    return bootstrap(
+        ZeroMomentum2pf(training_geometry, two_point_function), target_length // 10
+    )
+
 
 def effective_pole_mass(zero_momentum_2pf, target_length):
-    return bootstrap(EffectivePoleMass(zero_momentum_2pf), target_length//10)
+    return bootstrap(EffectivePoleMass(zero_momentum_2pf), target_length // 10)
+
 
 def susceptibility(training_geometry, two_point_function, target_length):
-    return bootstrap(Susceptibility(training_geometry, two_point_function), target_length//10)
+    return bootstrap(
+        Susceptibility(training_geometry, two_point_function), target_length // 10
+    )
+
 
 def ising_energy(two_point_function, target_length):
-    return bootstrap(IsingEnergy(two_point_function), target_length//10)
+    return bootstrap(IsingEnergy(two_point_function), target_length // 10)
 
 
 ##############################################################################
+# Currently not used
 # Will need these if we start looping over different namespaces!
 ising_energy_output = collect("ising_energy", ("training_context",))
 susceptibility_output = collect("susceptibility", ("training_contect",))
