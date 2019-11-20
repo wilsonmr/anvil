@@ -3,6 +3,7 @@ config.py
 
 Module to parse runcards
 """
+import logging
 
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
@@ -10,6 +11,8 @@ from reportengine.configparser import ConfigError, element_of
 from anvil.core import PhiFourAction, TrainingOutput
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
+
+log = logging.getLogger(__name__)
 
 
 class ConfigParser(Config):
@@ -40,7 +43,7 @@ class ConfigParser(Config):
     def parse_cp_id(self, cp: (int, type(None))):
         return cp
 
-    @element_of('training_outputs')
+    @element_of("training_outputs")
     def parse_training_output(self, path: str):
         return TrainingOutput(path)
 
@@ -87,19 +90,28 @@ class ConfigParser(Config):
 
     def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
         return PhiFourAction(
-            m_sq,
-            lam,
-            geometry=geometry,
-            use_arxiv_version=use_arxiv_version
+            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
         )
 
     def parse_target_length(self, targ: int):
         return targ
 
-    def parse_thermalisation(self, therm: int):
-        return max(1, therm)  # currently require at least 1
+    def parse_thermalisation(self, therm: (int, type(None))):
+        if therm is None:
+            log.warning("Not Performing thermalisation")
+            return therm
+        if therm < 1:
+            raise ConfigError(
+                "thermalisation must be greater than or equal to 1 or be None"
+            )
+        return therm
 
-    def parse_sample_interval(self, interval: int):
+    def parse_sample_interval(self, interval: (int, type(None))):
+        if interval is None:
+            return interval
+        if interval < 1:
+            raise ConfigError("sample_interval must be greater than or equal to 1")
+        log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
     def produce_training_context(self, training_output):

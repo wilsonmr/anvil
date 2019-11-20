@@ -5,6 +5,7 @@ Module containing functions related to sampling from a trained model
 """
 
 from math import exp, isfinite, ceil
+import logging
 
 import numpy as np
 import torch
@@ -12,6 +13,13 @@ import torch
 from tqdm import tqdm
 
 from reportengine import collect
+
+
+log = logging.getLogger(__name__)
+
+
+class LogRatioNanError(Exception):
+    pass
 
 
 def sample_batch(loaded_model, action, batch_size, current_state=None):
@@ -59,7 +67,9 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
 
     log_ratio = log_ptilde + action(phi)
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
-        raise ValueError("could run into nans")
+        raise LogRatioNanError(
+            "could run into nans based on minimum and maximum log of ratio of probabilities"
+        )
 
     i = 0  # phi index of current state
     for j in range(1, batch_size + 1):  # j = phi index of proposed state
@@ -91,13 +101,17 @@ def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
     states[-1]: torch.Tensor
         the final phi state
     """
-    states, _ = sample_batch(loaded_model, action, thermalisation)
+    if thermalisation is None:
+        return thermalisation
 
-    print(f"Thermalisation: discarded {thermalisation} configurations.")
+    states, _ = sample_batch(loaded_model, action, thermalisation)
+    log.info(f"Thermalisation: discarded {thermalisation} configurations.")
     return states[-1]
 
 
-def chain_autocorrelation(loaded_model, action, thermalised_state, sample_interval) -> float:
+def chain_autocorrelation(
+    loaded_model, action, thermalised_state, sample_interval=None
+) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
     time for the Markov chain.
@@ -137,22 +151,23 @@ def chain_autocorrelation(loaded_model, action, thermalised_state, sample_interv
         Guess for subsampling interval, based on the integrated autocorrelation time
 
     """
-    if sample_interval >= 1:
-        print(f"User-specified sampling interval: {sample_interval}")
-        return sample_interval  # no need for this function..
+    if sample_interval:  # if specified sample_interval will evaluate to true
+        return sample_interval
 
     # Hard coded num states for estimating integrated autocorrelation
     batch_size = 10000
 
     # Sample some states
-    states, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
+    _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
 
-    N = len(history)
-    autocorrelations = torch.zeros(N + 1, dtype=torch.float)  # +1 in case 100% rejected
+    n_states = len(history)
+    autocorrelations = torch.zeros(
+        n_states + 1, dtype=torch.float
+    )  # +1 in case 100% rejected
     consecutive_rejections = 0
 
     for step in history:
-        if step == True:  # move accepted
+        if step:  # move accepted
             if consecutive_rejections > 0:  # faster than unnecessarily accessing array
                 autocorrelations[1 : consecutive_rejections + 1] += torch.arange(
                     consecutive_rejections, 0, -1, dtype=torch.float
@@ -167,12 +182,12 @@ def chain_autocorrelation(loaded_model, action, thermalised_state, sample_interv
 
     # Compute integrated autocorrelation
     integrated_autocorrelation = 0.5 + torch.sum(
-        autocorrelations / torch.arange(N + 1, 0, -1, dtype=torch.float)
+        autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
     )
-    print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
+    log.info(f"Integrated autocorrelation time: {integrated_autocorrelation}")
 
     sample_interval = ceil(2 * integrated_autocorrelation)
-    print(
+    log.info(
         f"Guess for sampling interval: {sample_interval}, based on {batch_size} configurations."
     )
 
@@ -214,20 +229,20 @@ def sample(
     batch_size = min(target_length, 10000)  # hard coded for now
     dec_samp_per_batch = ceil(batch_size / sample_interval)
     batch_size = dec_samp_per_batch * sample_interval
-    Nbatches = ceil(target_length / dec_samp_per_batch)
-    actual_length = dec_samp_per_batch * Nbatches
+    n_batches = ceil(target_length / dec_samp_per_batch)
+    actual_length = dec_samp_per_batch * n_batches
 
     decorrelated_chain = torch.empty(
         (actual_length, loaded_model.size_in), dtype=torch.float32
     )
     accepted = 0
 
-    print(
-        f"Generating {Nbatches * batch_size} configurations "
-        f"in {Nbatches} batches of size {batch_size}"
+    log.debug(
+        f"Generating {n_batches * batch_size} configurations "
+        f"in {n_batches} batches of size {batch_size}"
     )
 
-    pbar = tqdm(range(Nbatches), desc="batch")
+    pbar = tqdm(range(n_batches), desc="batch")
     for batch in pbar:
         # Generate sub-chain of batch_size configurations
         batch_chain, batch_history = sample_batch(
@@ -242,15 +257,19 @@ def sample(
         decorrelated_chain[start : start + dec_samp_per_batch, :] = batch_chain[
             ::sample_interval
         ]
-
+    accepted = float(accepted)
     # Accept-reject statistics
-    rejected = Nbatches * batch_size - accepted
-    fraction = accepted / float(accepted + rejected)
-    print(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: " f"{fraction:.2g}")
+    rejected = n_batches * batch_size - accepted
+    fraction = accepted / (accepted + rejected)
 
-    print(f"Returning a decorrelated chain of length: {actual_length}")
-
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
 
-sample_training_output = collect("sample", ("training_context",))
+_sample_training_output = collect("sample", ("training_context",))
+
+
+def sample_training_output(_sample_training_output):
+    """Returns a sample of the training_output"""
+    return _sample_training_output[0]

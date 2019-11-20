@@ -25,6 +25,7 @@ from scipy.signal import correlate
 from reportengine.table import table
 from reportengine.figure import figure
 
+
 class GreenFunction:
     def __init__(self, states, geometry):
         self.geometry = geometry
@@ -64,11 +65,7 @@ class GreenFunction:
         return g_func.mean()  # integrate over y and divide by volume
 
 
-class VolumeAveraged2pf:
-    def __init__(self, states, geometry):
-        self.sample = states
-        self.geometry = geometry
-
+class VolumeAveraged2pf(GreenFunction):
     def __call__(self, x_0: int, x_1: int):
         """
         Return torch Tensor of volume-averaged two point functions, i.e.
@@ -98,10 +95,12 @@ def two_point_green_function(sample_training_output, training_geometry):
     r"""Return instance of GreenFunction which can be used to calculate the
     two point green function for a given seperation
     """
-    return GreenFunction(sample_training_output[0], training_geometry)
+    return GreenFunction(sample_training_output, training_geometry)
+
 
 def volume_averaged_2pf(sample_training_output, training_geometry):
-    return VolumeAveraged2pf(sample_training_output[0], training_geometry)
+    return VolumeAveraged2pf(sample_training_output, training_geometry)
+
 
 def zero_momentum_green_function(training_geometry, two_point_green_function):
     r"""Calculate the zero momentum green function as a function of t
@@ -210,14 +209,13 @@ def ising_energy(two_point_green_function):
     ) / 2  # am I missing a factor of 2?
     return float(E)
 
+
 def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     r"""Compute the autocorrelation of the volume-averaged two point function.
     Autocorrelation is defined by
     
         \Gamma(t) = <G(s)G(s+t)> - <G(s)><G(t)>
     where G(s) is the volume-averaged two point function at Monte Carlo timestep s.
-    
-    Return 
     """
     x = t = 0
     # Should really look at more than one separation
@@ -226,10 +224,12 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
 
     G_series = volume_averaged_2pf(x, t)
     G_series -= G_series.mean()
-    autocorrelation = correlate(G_series, G_series, mode="same")  # converts to numpy array
+    autocorrelation = correlate(
+        G_series, G_series, mode="same"
+    )  # converts to numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
-    
+
     # This gives the same results, but is much slower
     """
     Nstates = len(G_series)
@@ -241,45 +241,10 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
         autocorr2[t] = term1 - term2
     autocorr2 = autocorr2 / autocorr2[0]
     """
-    
+
     integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:])
 
     return autocorrelation, integrated_autocorrelation
-
-def print_plot_observables(self):
-    """Given a sample of states, calculate the relevant observables and either
-    print them to terminal or create a figure and save to the cwd
-
-    Output
-    -----
-        saves greenfunc.png and mass.png to cwd and prints Ising energy and
-        Susceptibility.
-
-    """
-    g_func_zeromom = self.zero_momentum_green_function()
-    m_t = self.effective_pole_mass()
-    susc = self.susceptibility()
-    E = self.ising_energy()
-    print(f"Ising energy: {E}")
-    print(f"Susceptibility: {susc}")
-
-    fig1, ax = plt.subplots()
-    ax.plot(g_func_zeromom, "-r", label=f"L = {self.geometry.length}")
-    ax.set_yscale("log")
-    ax.set_ylabel(r"$\hat{G}(0, t)$")
-    ax.set_xlabel("t")
-    ax.set_title("Zero momentum Green function")
-    fig1.tight_layout()
-    fig1.savefig(f"{self.outpath}/greenfunc.png")
-
-    fig2, ax = plt.subplots()
-    ax.plot(m_t, "-r", label=f"L = {self.geometry.length}")
-    ax.set_ylabel(r"$m^{\rm eff}_p(t)$")
-    ax.set_xlabel("t")
-    ax.set_title("Effective Pole Mass")
-    fig2.tight_layout()
-    fig2.savefig(f"{self.outpath}/mass.png")
-    return fig1, fig2
 
 
 @table
@@ -289,6 +254,7 @@ def ising_observables_table(ising_energy, susceptibility, training_output):
         res, columns=[training_output.name], index=["Ising energy", "susceptibility"]
     )
     return df
+
 
 @figure
 def plot_zero_momentum_green_function(zero_momentum_green_function, training_geometry):
@@ -300,26 +266,29 @@ def plot_zero_momentum_green_function(zero_momentum_green_function, training_geo
     ax.set_title("Zero momentum Green function")
     return fig
 
+
 @figure
 def plot_volume_averaged_2pf(volume_averaged_2pf):
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
     ax.set_ylabel(r"$G_V$")
     ax.set_xlabel(r"$t$")
-    ax.plot(volume_averaged_2pf(0, 0), '-')
+    ax.plot(volume_averaged_2pf(0, 0), "-")
     return fig
+
 
 @figure
 def plot_autocorrelation_2pf(autocorrelation_2pf):
     autocorrelation, integrated_autocorrelation = autocorrelation_2pf
-    autocorrelation = autocorrelation
     fig, ax = plt.subplots()
-    #ax.set_yscale("log")
-    ax.set_title(r"Autocorrelation of volume-averaged two point function")
-    ax.set_xlabel(r"$t$")
+    # ax.set_yscale("log")
+    ax.set_title("Autocorrelation of volume-averaged two point function")
+    ax.set_xlabel("$t$")
     ax.set_ylabel("$\Gamma_{G_V}(t)$")
-    ax.plot(autocorrelation, '-')
+    ax.plot(autocorrelation, "-")
     x = 0.8 * (1 + len(autocorrelation))
     y = 0.8
-    ax.text(x, y, r"$\tau_{int} = $ %.3g" %integrated_autocorrelation, fontsize='large')
+    ax.text(
+        x, y, r"$\tau_{\rm int} = $ %.3g" % integrated_autocorrelation, fontsize="large"
+    )
     return fig
