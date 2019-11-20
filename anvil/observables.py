@@ -25,9 +25,6 @@ from scipy.signal import correlate
 from reportengine.table import table
 from reportengine.figure import figure
 
-from matplotlib import use
-use('TkAgg')
-
 class GreenFunction:
     def __init__(self, states, geometry):
         self.geometry = geometry
@@ -310,7 +307,6 @@ def plot_volume_averaged_2pf(volume_averaged_2pf):
     ax.set_ylabel(r"$G_V$")
     ax.set_xlabel(r"$t$")
     ax.plot(volume_averaged_2pf(0, 0), '-')
-    plt.show()
     return fig
 
 @figure
@@ -326,5 +322,4 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
     x = 0.8 * (1 + len(autocorrelation))
     y = 0.8
     ax.text(x, y, r"$\tau_{int} = $ %.3g" %integrated_autocorrelation, fontsize='large')
-    plt.show()
     return fig
