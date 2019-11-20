@@ -96,6 +96,12 @@ class ConfigParser(Config):
     def parse_target_length(self, targ: int):
         return targ
 
+    def parse_thermalisation(self, therm: int):
+        return max(1, therm)  # currently require at least 1
+
+    def parse_sample_interval(self, interval: int):
+        return interval
+
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):

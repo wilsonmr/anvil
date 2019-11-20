@@ -50,17 +50,17 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     ax.set_xlabel(r"$t$")
     ax.set_title("Effective pole mass")
     return fig
-"""
-'''
+
+
 @figure
-def plot_2pf(training_geometry, two_point_function):
+def plot_2pf(training_geometry, two_point_function, two_point_function_error):
 
     corr = np.empty( (training_geometry.length, training_geometry.length) )
     error = np.empty( (training_geometry.length, training_geometry.length) )
     for t in range(training_geometry.length):
         for x in range(training_geometry.length):
-            corr[x,t] = float(two_point_green_function(t, x))
-            error = float(two_point_green_function(t, x, error=True))
+            corr[x, t] = float(two_point_function(t, x))
+            error[x, t] = float(two_point_function_error(t, x))
     
     fractional_error = error / corr
 
@@ -81,35 +81,28 @@ def plot_2pf(training_geometry, two_point_function):
     fig.colorbar(im2, ax=ax2)
 
     return fig
-'''
+
+@figure
+def plot_volume_averaged_2pf(volume_averaged_2pf):
+    fig, ax = plt.subplots()
+    ax.set_title("Volume-averaged two point function")
+    ax.set_ylabel(r"$G_V$")
+    ax.set_xlabel(r"$t$")
+    ax.plot(volume_averaged_2pf(0, 0), '-')
+    return fig
 
 @figure
 def plot_autocorrelation_2pf(autocorrelation_2pf):
-    autocorrelation, integrated_autocorrelation = autocorrelation_2pf[0]
-    autocorrelation = autocorrelation[:100]
-
+    autocorrelation, integrated_autocorrelation = autocorrelation_2pf
+    autocorrelation = autocorrelation
     fig, ax = plt.subplots()
     #ax.set_yscale("log")
     ax.set_title(r"Autocorrelation of volume-averaged two point function")
     ax.set_xlabel(r"$t$")
-    ax.set_ylabel("Auto")
-    ax.plot(autocorrelation, '-', label="Autocorrelation")
-
+    ax.set_ylabel("$\Gamma_{G_V}(t)$")
+    ax.plot(autocorrelation, '-')
     x = 0.8 * (1 + len(autocorrelation))
     y = 0.8
     ax.text(x, y, r"$\tau_{int} = $ %.3g" %integrated_autocorrelation, fontsize='large')
-    ax.legend()
     return fig
 
-'''
-@figure
-def plot_G_series(two_point_green_function):
-    series = two_point_green_function(0, 0, sequence=True)
-    fig, ax = plt.subplots()
-    ax.set_title("Series")
-    ax.set_ylabel(r"G")
-    ax.set_xlabel(r"$t$")
-    ax.plot(series[:1000], '-')
-    return fig
-'''
-"""

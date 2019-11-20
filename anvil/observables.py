@@ -32,19 +32,10 @@ class TwoPointFunction:
         self.geometry = geometry
         self.sample = states
 
-    def __call__(self, x_0: int, x_1: int, sample_size):
+    def __call__(self, x_0: int, x_1: int, sample_size=None):
         r"""Calculates the two point connected green function given a set of
         states G(x) where x = (x_0, x_1) refers to a shift applied to the fields
         \phi
-
-        Also calculates statistical uncertainty in G(x), based on the assumption
-        that the \phi fields are statistically independent, so that the error on
-        the mean is the standard error, i.e. the standard deviation divided by
-        the square root of the number of fields being averaged over.
-
-        Standard errors in <\phi(x)>, <\phi(x+shift)>, <\phi(x+shift)\phi(x)> are
-        propagated to get an error for G(x) using the functional approach.
-        See Hughes & Hase, Measurements and their uncertainties for details.
 
         Parameters
         ----------
@@ -52,8 +43,9 @@ class TwoPointFunction:
             shift of dimension 0
         x_1: int
             shift of dimension 1
-        error: bool
-            if True, computes and returns the standard error
+        sample_size: int
+            compute the 2pf from a subsample of states, where the indices of the
+            sample_size states are chosen randomly, with replacement
 
         Returns
         -------
@@ -84,6 +76,63 @@ class TwoPointFunction:
         return g_func
 
 
+class TwoPointFunctionError:
+    def __init__(self, states, geometry):
+        self.sample = states
+        self.geometry = geometry
+
+    def __call__(self, x_0, x_1):
+        """
+        Calculates the statistical uncertainty in G(x), based on the assumption
+        that the \phi fields are statistically independent, so that the error on
+        the mean is the standard error, i.e. the standard deviation divided by
+        the square root of the number of fields being averaged over.
+
+        Standard errors in <\phi(x)>, <\phi(x+shift)>, <\phi(x+shift)\phi(x)> are
+        propagated to get an error for G(x) using the functional approach.
+        See Hughes & Hase, Measurements and their uncertainties for details.
+        
+        Parameters
+        ----------
+        x_0: int
+            shift of dimension 0
+        x_1: int
+            shift of dimension 1
+        
+        Returns
+        -------
+        g_func_error: float
+        """
+        shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(
+            -1
+        )  # make 1d
+
+        phi = self.sample
+        phi_shift = self.sample[:, shift]
+
+        phi_mean = phi.mean(dim=0)
+        phi_shift_mean = phi_shift.mean(dim=0)
+        phi_shift_phi_mean = (phi_shift * phi).mean(dim=0)
+
+        phi_var = phi.var(dim=0)
+        phi_shift_var = phi_shift.var(dim=0)
+        phi_shift_phi_var = (phi_shift * phi).var(dim=0)
+
+        Nstates = len(phi[:, 0])
+        Npoints = len(phi[0, :])
+
+        g_func_error = (
+            phi_shift_phi_var / Nstates  # first error term squared
+            +  # add squared errors from first and second term
+            (phi_shift_mean * phi_mean)**2 * (
+                phi_shift_var / (Nstates * phi_shift_mean**2) +
+                phi_var / (Nstates * phi_mean**2)
+                )  # second error term squared
+        ).sum().sqrt() / sqrt(Npoints)  # sum over coords, sqrt, scale by rootN
+
+        return g_func_error
+
+
 class VolumeAveraged2pf:
     def __init__(self, states, geometry):
         self.sample = states
@@ -103,16 +152,16 @@ class VolumeAveraged2pf:
 
         Returns
         -------
-        vag_func: torch.Tensor
+        va_2pf: torch.Tensor
             A 1d Tensor containing the volume-averaged two point function
             for each state in the sample
         """
         shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)
 
-        vag_func = (self.sample[:, shift] * self.sample).mean(dim=1) - self.sample.mean(
+        va_2pf = (self.sample[:, shift] * self.sample).mean(dim=1) - self.sample.mean(
             dim=1
         ).pow(2)
-        return vag_func
+        return va_2pf
 
 
 class ZeroMomentum2pf:
@@ -125,14 +174,17 @@ class ZeroMomentum2pf:
         \tilde{G}(t, 0) which is assumed to be in the first dimension defined as
 
             \tilde{G}(t, 0) = 1/L \sum_{x_1} G(t, x_1)
+        
+        Parameters
+        ----------
+        sample_size: int
+            calculation done based on a subsample of states. See TwoPointFunction
 
         Returns
         -------
-        g_func_zeromom: dict of lists
+        g_func_zeromom: list
             'values': zero momentum green function as function of t, where t runs from 0 to
                 length - 1
-            'errors': uncertainty propagated from uncertainty in G(x) using
-                the functional approach
 
         Notes
         -----
@@ -165,12 +217,16 @@ class EffectivePoleMass:
             )
 
         from t = 1 to t = L-2, where L is the length of lattice side
+        
+        Parameters
+        ----------
+        sample_size: int
+            calculation done based on a subsample of states. See TwoPointFunction
 
         Returns
         -------
-        m_t: dict of lists
-            'values': effective pole mass as a function of t
-            'errors': uncertainty propagated from uncertainty in \tilde{G}(t, 0)
+        m_t: list
+            effective pole mass as a function of t
 
         Notes
         -----
@@ -203,15 +259,13 @@ class Susceptibility:
 
         Parameters
         ----------
-        g_func_zeromom: list
-            zero momentum green function as a function of t
+        sample_size: int
+            calculation done based on a subsample of states. See TwoPointFunction
 
         Returns
         -------
         chi: float
             value for the susceptibility
-        error: float
-            uncertainty in the susceptibility, based on uncertainty in G(x)
 
         Notes
         -----
@@ -238,12 +292,15 @@ class IsingEnergy:
         where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
         in 2D
 
+        Parameters
+        ----------
+        sample_size: int
+            calculation done based on a subsample of states. See TwoPointFunction
+        
         Returns
         -------
         E: float
             value for the Ising energy
-        error: float
-            uncertainty based on uncertainty in G(x)
 
         Notes
         -----
@@ -256,42 +313,6 @@ class IsingEnergy:
         ) / 2  # am I missing a factor of 2?
         return float(E)
 
-
-def bootstrap(observable, sample_size):
-    results = []
-    for sample in range(100):
-        results.append(observable(sample_size))
-    return np.mean(results, axis=0), np.std(results, axis=0) / 10.
-
-###########################################################################
-def two_point_function(sample_training_output, training_geometry):
-    r"""Return instance of TwoPointFunction which can be used to calculate the
-    two point green function for a given seperation
-    """
-    return TwoPointFunction(sample_training_output[0], training_geometry)
-
-def volume_averaged_2pf(sample_training_output, training_geometry):
-    return VolumeAveraged2pf(sample_training_output[0], training_geometry)
-
-def zero_momentum_2pf(training_geometry, two_point_function):
-    return ZeroMomentum2pf(training_geometry, two_point_function)
-
-def zero_momentum_2pf_out(training_geometry, two_point_function, target_length):
-    func = ZeroMomentum2pf(training_geometry, two_point_function)
-    return bootstrap(func, target_length//10)
-
-def effective_pole_mass(zero_momentum_2pf, target_length):
-    func = EffectivePoleMass(zero_momentum_2pf)
-    return bootstrap(func, target_length//10)
-
-def susceptibility(training_geometry, two_point_function, target_length):
-    func = Susceptibility(training_geometry, two_point_function)
-    return bootstrap(func, target_length//10)
-
-def ising_energy(two_point_function, target_length):
-    func = IsingEnergy(two_point_function)
-    return bootstrap(func, target_length//10)
-
 ##############################################################################
 
 def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
@@ -303,13 +324,21 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
 
     where G(s) is the volume-averaged two point function at Monte Carlo timestep s.
     
-    Return 
+    Integrated autocorrelation is defined by
+
+        \tau = 0.5 + sum_t \Gamma(t)
+
+    Returns
+    -------
+    autocorrelation: numpy.array
+
+    integrated_autocorrelation: float
     """
     x = t = 0  # Should really look at more than one separation
     G_series = volume_averaged_2pf(x, t)
     G_series -= G_series.mean()
     autocorrelation = correlate(G_series, G_series, mode="same")  # converts in numpy array
-    c = len(autocorrelation) // 2
+    c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
     
     # This gives the same results, but is much slower
@@ -327,6 +356,43 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:])
 
     return autocorrelation, integrated_autocorrelation
+
+def bootstrap(observable, sample_size):
+    results = []
+    for sample in range(100):
+        results.append(observable(sample_size))
+    return np.mean(results, axis=0), np.std(results, axis=0) / 10.
+
+def two_point_function(sample_training_output, training_geometry):
+    r"""Return instance of TwoPointFunction which can be used to calculate the
+    two point green function for a given seperation
+    """
+    return TwoPointFunction(sample_training_output[0], training_geometry)
+
+def two_point_function_error(sample_training_output, training_geometry):
+    return TwoPointFunctionError(sample_training_output[0], training_geometry)
+
+def volume_averaged_2pf(sample_training_output, training_geometry):
+    return VolumeAveraged2pf(sample_training_output[0], training_geometry)
+
+def zero_momentum_2pf(training_geometry, two_point_function):
+    return ZeroMomentum2pf(training_geometry, two_point_function)
+
+
+############################################################################
+
+def zero_momentum_2pf_out(training_geometry, two_point_function, target_length):
+    return bootstrap(ZeroMomentum2pf(training_geometry, two_point_function), target_length//10)
+
+def effective_pole_mass(zero_momentum_2pf, target_length):
+    return bootstrap(EffectivePoleMass(zero_momentum_2pf), target_length//10)
+
+def susceptibility(training_geometry, two_point_function, target_length):
+    return bootstrap(Susceptibility(training_geometry, two_point_function), target_length//10)
+
+def ising_energy(two_point_function, target_length):
+    return bootstrap(IsingEnergy(two_point_function), target_length//10)
+
 
 ##############################################################################
 # Will need these if we start looping over different namespaces!
