@@ -114,6 +114,22 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
+    def parse_bootstrap_n_samples(self, n_samples: (int, type(None))):
+        if n_samples is None:
+            return 1000  # default
+        if n_samples < 2:
+            raise ConfigError("bootstrap_n_samples must be greater than 1")
+        log.warning(f"Using user specified bootstrap_n_samples: {n_samples}")
+        return n_samples
+
+    def parse_bootstrap_sample_size(self, sample_size: (int, type(None))):
+        if sample_size is None:
+            return target_length  # default
+        if sample_size < 2:
+            raise ConfigError("bootstrap_sample_size must be greater than 1")
+        log.warning(f"Using user specified bootstrap_sample_size: {sample_size}")
+        return sample_size
+
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
