@@ -113,6 +113,7 @@ class VolumeAveraged2pf:
             for each state in the sample
         """
         shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)
+        
         va_2pf = (self.states[:, shift] * self.states).mean(dim=1) - self.states.mean(
             dim=1
         ).pow(2)
@@ -327,7 +328,6 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:200])
 
     return autocorrelation, integrated_autocorrelation
-
 
 ##############################################################################
 # Currently not used
