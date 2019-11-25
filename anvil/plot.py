@@ -1,4 +1,4 @@
-from math import ceil, floor, log10
+from math import ceil, floor, log10, fabs
 
 import numpy as np
 import pandas as pd
@@ -15,29 +15,35 @@ from reportengine.figure import figure
 def print_format(val, err):
     """Given a value and associated error, returns two strings - the value and error rounded to
     a precision dictated by the first nonzero"""
-    prec = floor(log10(abs(round(err, 1))))
+    val = float(val)
+    err = float(err)
+    prec = floor(log10(abs(err)))
     if prec < 0:
+        err_rnd = round(err, -prec)
+        prec = floor(log10(abs(err_rnd)))
         val_str = np.format_float_positional(
             val, -prec, unique=False, fractional=True, pad_right=1
         )
         err_str = np.format_float_positional(err, -prec, fractional=True, pad_left=1)
     else:
+        err_rnd = round(err, prec)
+        prec = floor(log10(abs(err_rnd)))
         int_prec = ceil(log10(abs(float(val))))
         val_str = np.format_float_positional(
             val, int_prec - prec, fractional=False, pad_right=1
-        ).strip(".")
+        ).replace(".", "")
         err_str = np.format_float_positional(
             err, 1, fractional=False, pad_left=1
-        ).strip(".")
+        ).replace(".", "")
     return val_str, err_str
 
 
 @table
 def ising_observables_table(
-    ising_energy, susceptibility, bootstrap_std, training_output
+    ising_energy, susceptibility, bootstrap, training_output
 ):
-    IE, IE_std = print_format(ising_energy[0], bootstrap_std(ising_energy))
-    S, S_std = print_format(susceptibility[0], bootstrap_std(susceptibility))
+    IE, IE_std = print_format(ising_energy[0], bootstrap(ising_energy))
+    S, S_std = print_format(susceptibility[0], bootstrap(susceptibility))
     res = [[IE, IE_std], [S, S_std]]
     df = pd.DataFrame(
         res,
@@ -48,9 +54,9 @@ def ising_observables_table(
 
 
 @figure
-def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap_std):
+def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
     print("Computing zero-momentum two point function...")
-    error = bootstrap_std(zero_momentum_2pf)
+    error = bootstrap(zero_momentum_2pf)
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(training_geometry.length),
@@ -67,9 +73,9 @@ def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap_std):
 
 
 @figure
-def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap_std):
+def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
     print("Computing effective pole mass...")
-    error = bootstrap_std(effective_pole_mass)
+    error = bootstrap(effective_pole_mass)
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(1, training_geometry.length - 1),
@@ -85,15 +91,17 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap_s
 
 
 @figure
-def plot_2pf(training_geometry, two_point_function, bootstrap_std):
+def plot_2pf(training_geometry, two_point_function, bootstrap):
     print("Computing two point function and error...")
     corr = np.empty((training_geometry.length, training_geometry.length))
     std = np.empty((training_geometry.length, training_geometry.length))
-    t_pbar = tqdm(range(training_geometry.length), desc="t")
-    for t in t_pbar:
+    pbar = tqdm(total=training_geometry.length**2, desc="(x,t)")
+    for t in range(training_geometry.length):
         for x in range(training_geometry.length):
             corr[x, t] = float(two_point_function(t, x)[0])
-            std[x, t] = float(bootstrap_std(two_point_function(t, x)))
+            std[x, t] = float(bootstrap(two_point_function(t, x)))
+            pbar.update(1)
+    pbar.close()
 
     fractional_std = std / corr
 
