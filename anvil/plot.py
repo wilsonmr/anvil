@@ -11,7 +11,6 @@ from tqdm import tqdm
 from reportengine.table import table
 from reportengine.figure import figure
 
-
 def print_format(val, err):
     """Given a value and associated error, returns two strings - the value and error rounded to
     a precision dictated by the first nonzero"""
@@ -129,7 +128,7 @@ def plot_volume_averaged_2pf(volume_averaged_2pf):
     print("Computing volume-averaged two point function for each step...")
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
-    ax.set_ylabel("$G_k$")
+    ax.set_ylabel("$G_k(0,0)$")
     ax.set_xlabel("$t$")
     ax.plot(volume_averaged_2pf(0, 0), "-")
     return fig
@@ -152,3 +151,63 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
         x, y, r"$\tau_{int} = $ %.3g" % integrated_autocorrelation, fontsize="large"
     )
     return fig
+
+
+#######################################
+###     Bootstrap distributions     ###
+#######################################
+def plot_bootstrap_dist(bootstrap, observable, title):
+    """Plot the distribution of some observable calculated using many bootstrap samples"""
+    def do_plot(ax, full_data, bootstrap_data, std):
+            hist, bins = np.histogram(bootstrap_data, bins=50)
+            w = (bins[1]-bins[0])
+            c = (bins[:-1] + bins[1:]) / 2
+            ax.bar(c, hist, width=w, color='w', edgecolor='k')
+            m = np.max(hist)
+            ax.plot([full_data,]*2, [0,m], 'r-', lw=2, label="full sample")
+            ax.plot([full_data - std,]*2, [0,m], 'm-', lw=2)
+            ax.plot([full_data + std,]*2, [0,m], 'm-', lw=2, label=r"$\pm 1 \sigma$")
+            bmean = torch.mean(bootstrap_data)
+            ax.plot([bmean,]*2, [0,m], 'b-', lw=2, label=r"bootstrap mean")
+            return ax
+
+    obs_full = observable[0]
+    obs_bootstrap = observable[1:]
+    std = bootstrap(observable)
+    title = "Bootstrap distribution: " + title
+        
+    if len(obs_bootstrap.shape) == 2:
+        nax = obs_bootstrap.shape[1]
+        fig, all_ax = plt.subplots(nax//2, 2)  # assume L even
+        all_ax_1d = [ax for tup in all_ax for ax in tup]
+        for i, ax in enumerate(all_ax_1d):
+            ax = do_plot(ax, obs_full[i], obs_bootstrap[:,i], std[i])
+            if i == 0: ax.set_title(title)
+            elif i == 1: ax.legend()
+            
+    else:
+        fig, ax = plt.subplots()
+        ax = do_plot(ax, obs_full, obs_bootstrap, std)
+        ax.legend()
+        ax.set_title(title)
+
+    return fig
+
+@figure
+def plot_bootstrap_2pf(bootstrap, two_point_function):
+    x = t = 0
+    data_to_plot = two_point_function(x, t)
+    return plot_bootstrap_dist(bootstrap, data_to_plot, rf"$G$({x},{t})")
+@figure
+def plot_bootstrap_susceptibility(bootstrap, susceptibility):
+    return plot_bootstrap_dist(bootstrap, susceptibility, r"$\chi$")
+@figure
+def plot_bootstrap_ising_energy(bootstrap, ising_energy):
+    return plot_bootstrap_dist(bootstrap, ising_energy, r"Ising $E$")
+@figure
+def plot_bootstrap_zero_momentum_2pf(bootstrap, zero_momentum_2pf):
+    return plot_bootstrap_dist(bootstrap, zero_momentum_2pf, r"$\tilde G(0,t)$")
+@figure
+def plot_bootstrap_effective_pole_mass(bootstrap, effective_pole_mass):
+    return plot_bootstrap_dist(bootstrap, effective_pole_mass, r"$m_p^{eff}$")
+
