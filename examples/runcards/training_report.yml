@@ -3,7 +3,7 @@ training_output: l2_train_example
 cp_id: -1
 target_length: 100000
 
-thermalisation: Null
+thermalisation: null
 sample_interval: 1
 
 meta:
@@ -16,8 +16,6 @@ template_text: |
  {@plot_zero_momentum_2pf@}
  {@plot_effective_pole_mass@}
  {@plot_2pf@}
- {@plot_volume_averaged_2pf@}
- {@plot_autocorrelation_2pf@}
 
 actions_:
   - report(main=True)

@@ -19,8 +19,7 @@ from tqdm import tqdm
 from reportengine import collect
 
 import matplotlib.pyplot as plt
-from matplotlib import use
-use("TkAgg")
+
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -92,21 +91,6 @@ class TwoPointFunction:
         g_func_boot = torch.mean(
             phi_shift_phi_boot_mean - phi_shift_boot_mean * phi_boot_mean, dim=1
         )
-        """
-        t1 = torch.sum(phi_shift_phi_boot_mean, dim=1) * n_states
-        t2 = torch.sum(phi_shift_boot_mean * phi_boot_mean, dim=1) * 4 * n_states**2
-        t1 /= t1.sum()
-        t2 /= t2.sum()
-
-        fig, (ax1, ax2) = plt.subplots(2)
-        ax1.hist(t1,bins=100)
-        ax1.set_title("first term")
-        ax2.hist(t2,bins=100)
-        ax2.set_title("second term")
-        plt.tight_layout()
-        plt.show()
-        print(f"{x_0}, {x_1}. Boostrap means: first term: {t1.mean()}, second term: {t2.mean()}")
-        """
 
         return torch.cat((g_func.view(1), g_func_boot))
 
@@ -135,6 +119,7 @@ class VolumeAveraged2pf:
             for each state in the sample
         """
         shift = self.geometry.get_shift(shifts=((x_0, x_1),), dims=((0, 1),)).view(-1)
+
         va_2pf = (self.states[:, shift] * self.states).mean(dim=1) - self.states.mean(
             dim=1
         ).pow(2)
@@ -301,9 +286,12 @@ class Bootstrap:
         obs_bootstrap = observable[1:]
 
         variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-        bias = torch.mean(obs_bootstrap) - obs_full  # not sure exactly what to do with this
+        bias = (
+            torch.mean(obs_bootstrap) - obs_full
+        )  # not sure exactly what to do with this
 
         return variance.sqrt()
+
 
 def bootstrap(bootstrap_n_samples):
     return Bootstrap(bootstrap_n_samples)
@@ -314,7 +302,7 @@ def bootstrap(bootstrap_n_samples):
 ###############################
 def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
     r"""Computes the autocorrelation of the volume-averaged two point function,
-    the integrated autocorrelation time, and two other functions related to the 
+    the integrated autocorrelation time, and two other functions related to the
     computation of an optimal window size for the integrated autocorrelation.
 
     Autocorrelation is defined by
@@ -339,8 +327,8 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
 
     The automatic windowing procedure and definitions of \tau_{exp}(W) and g(W)
     are found in section 3.3 of Ulli Wolff: Monte Carlo errors with less errors -
-    https://arxiv.org/pdf/hep-lat/0306017.pdf    
-    
+    https://arxiv.org/pdf/hep-lat/0306017.pdf
+
     Returns
     -------
     autocorrelation:    numpy.array
@@ -348,7 +336,7 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
     tau_exp_W:          numpy.array
     g_W:                numpy.array
     W_opt:              int         - minimum of g_W
-    
+
     All numpy arrays are truncated at a point 4*W_opt for the sake of plotting.
     """
     x = t = 0  # Should really look at more than one separation
@@ -364,14 +352,16 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
     tau_int_W = 0.5 + np.cumsum(autocorrelation[1:])
     valid = np.where(tau_int_W > 0.5)[0]
     tau_exp_W = np.ones(tau_int_W.size) * 0.00001  # to prevent domain error in log
-    
+
     S = window_S  # read from runcard parameter
-    tau_exp_W[valid] =  S / (np.log( (2 * tau_int_W[valid] + 1) / (2 * tau_int_W[valid] - 1) ))
+    tau_exp_W[valid] = S / (
+        np.log((2 * tau_int_W[valid] + 1) / (2 * tau_int_W[valid] - 1))
+    )
     W = np.arange(1, tau_int_W.size + 1)
-    g_W = np.exp( - W / tau_exp_W ) - tau_exp_W / np.sqrt(W * n_states)
+    g_W = np.exp(-W / tau_exp_W) - tau_exp_W / np.sqrt(W * n_states)
 
     W_opt = np.where(g_W < 0)[0][0]
-    w = 4*W_opt  # where to cut the plot off
+    w = 4 * W_opt  # where to cut the plot off
 
     return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
 
@@ -389,11 +379,30 @@ _ising_energy = collect("ising_energy", ("training_context",))
 _susceptibility = collect("susceptibility", ("training_context",))
 _autocorrelation_2pf = collect("autocorrelation_2pf", ("training_context",))
 
-def Autocorrelation_2pf(_two_point_function): return _two_point_function[0]
-def Volume_Averaged_2pf(_volume_averaged_2pf): return _volume_averaged_2pf[0]
-def Zero_Momentum_2pf(_zero_momentum_2pf): return _zero_momentum_2pf[0]
-def Effective_Pole_Mass(_effective_pole_mass): return _effective_pole_mass[0]
-def Ising_Energy(_ising_energy): return _ising_energy[0]
-def Susceptibility(_susceptibility): return _susceptibility[0]
-def Autocorrelation_2pf(_autocorrelation_2pf): return _autocorrelation_2pf[0]
 
+def Autocorrelation_2pf(_two_point_function):
+    return _two_point_function[0]
+
+
+def Volume_Averaged_2pf(_volume_averaged_2pf):
+    return _volume_averaged_2pf[0]
+
+
+def Zero_Momentum_2pf(_zero_momentum_2pf):
+    return _zero_momentum_2pf[0]
+
+
+def Effective_Pole_Mass(_effective_pole_mass):
+    return _effective_pole_mass[0]
+
+
+def Ising_Energy(_ising_energy):
+    return _ising_energy[0]
+
+
+def Susceptibility(_susceptibility):
+    return _susceptibility[0]
+
+
+def Autocorrelation_2pf(_autocorrelation_2pf):
+    return _autocorrelation_2pf[0]
