@@ -130,6 +130,14 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap_sample_size: {sample_size}")
         return sample_size
 
+    def parse_window(self, S: (float, type(None))):
+        if S is None:
+            return 2.0  # default
+        if S < 0:
+            raise ConfigError("window_S must be positive")
+        log.warning(f"Using user specified window: {S}")
+        return S
+
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):

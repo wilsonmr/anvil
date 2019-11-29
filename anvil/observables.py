@@ -32,6 +32,7 @@ def arcosh(x):
     c1 = torch.log1p(torch.sqrt(x * x - 1) / x)
     return c0 + c1
 
+
 ###############################
 #####     Observables     #####
 ###############################
@@ -285,9 +286,9 @@ def ising_energy(two_point_function, bootstrap_n_samples):
     return E
 
 
-##########################################################################
-
-
+#################################
+###       Bootstrapping       ###
+#################################
 class Bootstrap:
     """Return the standard deviation for an observable based on a number of
     'bootstrap' samples."""
@@ -304,31 +305,51 @@ class Bootstrap:
 
         return variance.sqrt()
 
-
 def bootstrap(bootstrap_n_samples):
     return Bootstrap(bootstrap_n_samples)
 
 
-##########################################################################
-
-
-def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
-    r"""Compute the autocorrelation of the volume-averaged two point function.
+###############################
+###     Autocorrelation     ###
+###############################
+def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
+    r"""Computes the autocorrelation of the volume-averaged two point function,
+    the integrated autocorrelation time, and two other functions related to the 
+    computation of an optimal window size for the integrated autocorrelation.
 
     Autocorrelation is defined by
 
-        \Gamma(t) = <G(s)G(s+t)> - <G(s)><G(s+t)>
+        \Gamma(t) = <G(k)G(k+t)> - <G(k)><G(k+t)>
 
-    where G(s) is the volume-averaged two point function at Monte Carlo timestep s.
+    where G(k) is the volume-averaged two point function at Monte Carlo timestep 'k',
+    and <> represents an average over all timesteps.
 
-    Integrated autocorrelation is defined by
+    Integrated autocorrelation is defined, for some window size 'W' by
 
-        \tau = 0.5 + sum_t \Gamma(t)
+        \tau_{int}(W) = 0.5 + sum_t^W \Gamma(t)
 
+    Exponential autocorrelation is estimated, up to a factor of S as
+
+        S / \tau_{exp}(W) = log( (2\tau_int(W) + 1) / (2\tau_int(W) - 1) )
+
+    The "g" function has a minimum at 'W_opt' where the sum of the statistical error and the
+    systematic error due to truncation, in \tau_{int}, has a minimum.
+
+        g(W) = exp( -W / \tau_{exp}(W) ) - \tau_{exp}(W) / \sqrt(W*N)
+
+    The automatic windowing procedure and definitions of \tau_{exp}(W) and g(W)
+    are found in section 3.3 of Ulli Wolff: Monte Carlo errors with less errors -
+    https://arxiv.org/pdf/hep-lat/0306017.pdf    
+    
     Returns
     -------
-    autocorrelation: numpy.array
-    integrated_autocorrelation: float
+    autocorrelation:    numpy.array
+    tau_int_W:          numpy.array
+    tau_exp_W:          numpy.array
+    g_W:                numpy.array
+    W_opt:              int         - minimum of g_W
+    
+    All numpy arrays are truncated at a point 4*W_opt for the sake of plotting.
     """
     x = t = 0  # Should really look at more than one separation
     G_series = volume_averaged_2pf(x, t)
@@ -339,18 +360,15 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
 
-    ###############################################
-    ##  To do: automatic windowing using batches ##
-    ###############################################
-    N = int(G_series.size()[0])
+    n_states = int(G_series.size()[0])
     tau_int_W = 0.5 + np.cumsum(autocorrelation[1:])
     valid = np.where(tau_int_W > 0.5)[0]
-    tau_exp_W = np.ones(tau_int_W.size) * 0.00001
+    tau_exp_W = np.ones(tau_int_W.size) * 0.00001  # to prevent domain error in log
     
-    S = 2.0
+    S = window_S  # read from runcard parameter
     tau_exp_W[valid] =  S / (np.log( (2 * tau_int_W[valid] + 1) / (2 * tau_int_W[valid] - 1) ))
     W = np.arange(1, tau_int_W.size + 1)
-    g_W = np.exp( - W / tau_exp_W ) - tau_exp_W / np.sqrt(W * N)
+    g_W = np.exp( - W / tau_exp_W ) - tau_exp_W / np.sqrt(W * n_states)
 
     W_opt = np.where(g_W < 0)[0][0]
     w = 4*W_opt  # where to cut the plot off
@@ -358,10 +376,24 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
 
 
-##############################################################################
-# Currently not used
-# Will need these if we start looping over different namespaces!
-ising_energy_output = collect("ising_energy", ("training_context",))
-susceptibility_output = collect("susceptibility", ("training_contect",))
-zero_momentum_2pf_output = collect("zero_momentum_2pf_out", ("training_context",))
-effective_pole_mass_output = collect("effective_pole_mass", ("training_context",))
+#######################
+###     Collect     ###
+#######################
+# I was hoping that doing this would mean we could loop over plotting parameters
+# without having to re-run the sampling, but it's not achieved this aim.
+_two_point_function = collect("two_point_function", ("training_context",))
+_volume_averaged_2pf = collect("volume_averaged_2pf", ("training_context",))
+_zero_momentum_2pf = collect("zero_momentum_2pf_out", ("training_context",))
+_effective_pole_mass = collect("effective_pole_mass", ("training_context",))
+_ising_energy = collect("ising_energy", ("training_context",))
+_susceptibility = collect("susceptibility", ("training_context",))
+_autocorrelation_2pf = collect("autocorrelation_2pf", ("training_context",))
+
+def Autocorrelation_2pf(_two_point_function): return _two_point_function[0]
+def Volume_Averaged_2pf(_volume_averaged_2pf): return _volume_averaged_2pf[0]
+def Zero_Momentum_2pf(_zero_momentum_2pf): return _zero_momentum_2pf[0]
+def Effective_Pole_Mass(_effective_pole_mass): return _effective_pole_mass[0]
+def Ising_Energy(_ising_energy): return _ising_energy[0]
+def Susceptibility(_susceptibility): return _susceptibility[0]
+def Autocorrelation_2pf(_autocorrelation_2pf): return _autocorrelation_2pf[0]
+

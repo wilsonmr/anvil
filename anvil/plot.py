@@ -11,7 +11,7 @@ from tqdm import tqdm
 from reportengine.table import table
 from reportengine.figure import figure
 
-def print_format(val, err):
+def print_to_precision(val, err):
     """Given a value and associated error, returns two strings - the value and error rounded to
     a precision dictated by the first nonzero"""
     val = float(val)
@@ -39,10 +39,10 @@ def print_format(val, err):
 
 @table
 def ising_observables_table(
-    ising_energy, susceptibility, bootstrap, training_output
+    Ising_Energy, Susceptibility, bootstrap, training_output
 ):
-    IE, IE_std = print_format(ising_energy[0], bootstrap(ising_energy))
-    S, S_std = print_format(susceptibility[0], bootstrap(susceptibility))
+    IE, IE_std = print_to_precision(Ising_Energy[0], bootstrap(Ising_Energy))
+    S, S_std = print_to_precision(Susceptibility[0], bootstrap(Susceptibility))
     res = [[IE, IE_std], [S, S_std]]
     df = pd.DataFrame(
         res,
@@ -53,13 +53,13 @@ def ising_observables_table(
 
 
 @figure
-def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
+def plot_zero_momentum_2pf(Zero_Momentum_2pf, training_geometry, bootstrap):
     print("Computing zero-momentum two point function...")
-    error = bootstrap(zero_momentum_2pf)
+    error = bootstrap(Zero_Momentum_2pf)
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(training_geometry.length),
-        y=zero_momentum_2pf[0],
+        y=Zero_Momentum_2pf[0],
         yerr=error,
         fmt="-r",
         label=f"L = {training_geometry.length}",
@@ -72,13 +72,13 @@ def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
 
 
 @figure
-def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
+def plot_effective_pole_mass(training_geometry, Effective_Pole_Mass, bootstrap):
     print("Computing effective pole mass...")
-    error = bootstrap(effective_pole_mass)
+    error = bootstrap(Effective_Pole_Mass)
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(1, training_geometry.length - 1),
-        y=effective_pole_mass[0],
+        y=Effective_Pole_Mass[0],
         yerr=error,
         fmt="-b",
         label=f"L = {training_geometry.length}",
@@ -90,15 +90,15 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
 
 
 @figure
-def plot_2pf(training_geometry, two_point_function, bootstrap):
+def plot_2pf(training_geometry, Two_Point_Function, bootstrap):
     print("Computing two point function and error...")
     corr = np.empty((training_geometry.length, training_geometry.length))
     std = np.empty((training_geometry.length, training_geometry.length))
     pbar = tqdm(total=training_geometry.length**2, desc="(x,t)")
     for t in range(training_geometry.length):
         for x in range(training_geometry.length):
-            corr[x, t] = float(two_point_function(t, x)[0])
-            std[x, t] = float(bootstrap(two_point_function(t, x)))
+            corr[x, t] = float(Two_Point_Function(t, x)[0])
+            std[x, t] = float(bootstrap(Two_Point_Function(t, x)))
             pbar.update(1)
     pbar.close()
 
@@ -127,20 +127,24 @@ def plot_2pf(training_geometry, two_point_function, bootstrap):
 ###     Time-series plots     ###
 #################################
 @figure
-def plot_volume_averaged_2pf(volume_averaged_2pf):
+def plot_volume_averaged_2pf(Volume_Averaged_2pf):
     print("Computing volume-averaged two point function for each step...")
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
     ax.set_ylabel("$G_k(0,0)$")
     ax.set_xlabel("$t$")
-    ax.plot(volume_averaged_2pf(0, 0), "-")
+    ax.plot(Volume_Averaged_2pf(0, 0), "-")
     return fig
 
 
 @figure
-def plot_autocorrelation_2pf(autocorrelation_2pf):
+def plot_autocorrelation_2pf(Autocorrelation_2pf):
+    """Plot autocorrelation as a function of Monte Carlo time,  and
+    integrated autocorrelation, exponential autocorrelation, and the "g" function
+    whose minimum corresponds to a window size where errors in the integrated
+    autocorrelation are minimised."""
     print("Computing autocorrelation...")
-    autocorrelation, tau_int_W, tau_exp_W, g_W, W_opt = autocorrelation_2pf
+    autocorrelation, tau_int_W, tau_exp_W, g_W, W_opt = Autocorrelation_2pf
     W = np.arange(1, tau_int_W.size + 1)
 
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, figsize=(6,10))
@@ -212,20 +216,20 @@ def plot_bootstrap_dist(bootstrap, observable, title):
     return fig
 
 @figure
-def plot_bootstrap_2pf(bootstrap, two_point_function):
+def plot_bootstrap_2pf(bootstrap, Two_Point_Function):
     x = t = 0
-    data_to_plot = two_point_function(x, t)
+    data_to_plot = Two_Point_Function(x, t)
     return plot_bootstrap_dist(bootstrap, data_to_plot, rf"$G$({x},{t})")
 @figure
-def plot_bootstrap_susceptibility(bootstrap, susceptibility):
-    return plot_bootstrap_dist(bootstrap, susceptibility, r"$\chi$")
+def plot_bootstrap_susceptibility(bootstrap, Susceptibility):
+    return plot_bootstrap_dist(bootstrap, Susceptibility, r"$\chi$")
 @figure
-def plot_bootstrap_ising_energy(bootstrap, ising_energy):
-    return plot_bootstrap_dist(bootstrap, ising_energy, r"Ising $E$")
+def plot_bootstrap_ising_energy(bootstrap, Ising_Energy):
+    return plot_bootstrap_dist(bootstrap, Ising_Energy, r"Ising $E$")
 @figure
-def plot_bootstrap_zero_momentum_2pf(bootstrap, zero_momentum_2pf):
-    return plot_bootstrap_dist(bootstrap, zero_momentum_2pf, r"$\tilde G(0,t)$")
+def plot_bootstrap_zero_momentum_2pf(bootstrap, Zero_Momentum_2pf):
+    return plot_bootstrap_dist(bootstrap, Zero_Momentum_2pf, r"$\tilde G(0,t)$")
 @figure
-def plot_bootstrap_effective_pole_mass(bootstrap, effective_pole_mass):
-    return plot_bootstrap_dist(bootstrap, effective_pole_mass, r"$m_p^{eff}$")
+def plot_bootstrap_effective_pole_mass(bootstrap, Effective_Pole_Mass):
+    return plot_bootstrap_dist(bootstrap, Effective_Pole_Mass, r"$m_p^{eff}$")
 
