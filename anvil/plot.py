@@ -123,6 +123,9 @@ def plot_2pf(training_geometry, two_point_function, bootstrap):
     return fig
 
 
+#################################
+###     Time-series plots     ###
+#################################
 @figure
 def plot_volume_averaged_2pf(volume_averaged_2pf):
     print("Computing volume-averaged two point function for each step...")
@@ -137,19 +140,34 @@ def plot_volume_averaged_2pf(volume_averaged_2pf):
 @figure
 def plot_autocorrelation_2pf(autocorrelation_2pf):
     print("Computing autocorrelation...")
-    autocorrelation, integrated_autocorrelation = autocorrelation_2pf
-    autocorrelation = autocorrelation
-    fig, ax = plt.subplots()
-    # ax.set_yscale("log")
-    ax.set_title("Autocorrelation of volume-averaged two point function")
-    ax.set_xlabel("$t$")
-    ax.set_ylabel("$\Gamma_{G(s)}(t)$")
-    ax.plot(autocorrelation, "-")
-    x = 0.8 * (1 + len(autocorrelation))
-    y = 0.8
-    ax.text(
-        x, y, r"$\tau_{int} = $ %.3g" % integrated_autocorrelation, fontsize="large"
-    )
+    autocorrelation, tau_int_W, tau_exp_W, g_W, W_opt = autocorrelation_2pf
+    W = np.arange(1, tau_int_W.size + 1)
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, figsize=(6,10))
+    # Autocorrelation
+    ax1.set_title("Autocorrelation of volume-averaged two point function")
+    ax1.set_ylabel("$\Gamma_{G(s)}(t)$")
+    ax1.set_xlabel("$t$")
+    ax1.plot(autocorrelation)
+    ax1.plot([W_opt+1,]*2, [autocorrelation.min(), autocorrelation.max()], 'r-')
+    # Integrated autocorrelation time
+    ax2.set_title("Integrated autocorrelation time")
+    ax2.set_ylabel(r"$\tau_{int}(W)$")
+    ax2.plot(W, tau_int_W)
+    ax2.plot([W_opt,]*2, [tau_int_W.min(), tau_int_W.max()], 'r-')
+    # Exponential autocorrelation time
+    ax3.set_title("Exponential autocorrelation time")
+    ax3.set_ylabel(r"$\tau_{exp}(W)$")
+    ax3.plot(W, tau_exp_W)
+    ax3.plot([W_opt,]*2, [tau_exp_W.min(), tau_exp_W.max()], 'r-')
+    # "g" function
+    ax4.set_title("g")
+    ax4.set_ylabel("$g$")
+    ax4.set_xlabel("$W$")
+    ax4.plot(W, g_W)
+    ax4.plot([W_opt,]*2, [g_W.min(), g_W.max()], 'r-', label=r"$W_{opt}$")
+    ax4.legend()
+
     return fig
 
 

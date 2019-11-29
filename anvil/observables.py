@@ -18,6 +18,9 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import matplotlib.pyplot as plt
+from matplotlib import use
+use("TkAgg")
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -29,7 +32,9 @@ def arcosh(x):
     c1 = torch.log1p(torch.sqrt(x * x - 1) / x)
     return c0 + c1
 
-
+###############################
+#####     Observables     #####
+###############################
 class TwoPointFunction:
     def __init__(self, states, geometry, bootstrap_n_samples, bootstrap_sample_size):
         self.geometry = geometry
@@ -86,6 +91,22 @@ class TwoPointFunction:
         g_func_boot = torch.mean(
             phi_shift_phi_boot_mean - phi_shift_boot_mean * phi_boot_mean, dim=1
         )
+        """
+        t1 = torch.sum(phi_shift_phi_boot_mean, dim=1) * n_states
+        t2 = torch.sum(phi_shift_boot_mean * phi_boot_mean, dim=1) * 4 * n_states**2
+        t1 /= t1.sum()
+        t2 /= t2.sum()
+
+        fig, (ax1, ax2) = plt.subplots(2)
+        ax1.hist(t1,bins=100)
+        ax1.set_title("first term")
+        ax2.hist(t2,bins=100)
+        ax2.set_title("second term")
+        plt.tight_layout()
+        plt.show()
+        print(f"{x_0}, {x_1}. Boostrap means: first term: {t1.mean()}, second term: {t2.mean()}")
+        """
+
         return torch.cat((g_func.view(1), g_func_boot))
 
 
@@ -137,6 +158,7 @@ def two_point_function(
 
 
 def volume_averaged_2pf(sample_training_output, training_geometry):
+    r"""Return instance ot VolumeAveraged2pf"""
     return VolumeAveraged2pf(sample_training_output, training_geometry)
 
 
@@ -152,8 +174,8 @@ def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples
         Zero momentum green function as function of t, where t runs from 0 to
             length - 1
         Tensor of size (bootstrap_n_samples + 1, training_geometry.length),
-        where the 0th element is the mean value, and the others are values
-        computed using bootstrap samples.
+        where the 0th element is the estimate based on the full sample,
+        and the others are values computed using bootstrap samples.
 
     Notes
     -----
@@ -186,8 +208,8 @@ def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples):
     m_t: torch.Tensor
         effective pole mass as a function of t
         Tensor of size (bootstrap_n_samples + 1, training_geometry.length - 2),
-        where the 0th element is the mean value, and the others are values
-        computed using bootstrap samples.
+        where the 0th element is the estimate based on the full sample,
+        and the others are values computed using bootstrap samples.
 
     Notes
     -----
@@ -217,8 +239,8 @@ def susceptibility(training_geometry, two_point_function, bootstrap_n_samples):
     chi: torch.Tensor
         value for the susceptibility
         Tensor of size (bootstrap_n_samples + 1),
-        where the 0th element is the mean value, and the others are values
-        computed using bootstrap samples.
+        where the 0th element is the estimate based on the full sample,
+        and the others are values computed using bootstrap samples.
 
     Notes
     -----
@@ -251,8 +273,8 @@ def ising_energy(two_point_function, bootstrap_n_samples):
     E: torch.Tensor
         value for the Ising energy
         Tensor of size (bootstrap_n_samples + 1),
-        where the 0th element is the mean value, and the others are values
-        computed using bootstrap samples.
+        where the 0th element is the estimate based on the full sample,
+        and the others are values computed using bootstrap samples.
 
     Notes
     -----
@@ -274,10 +296,11 @@ class Bootstrap:
         self.n_samples = bootstrap_n_samples
 
     def __call__(self, observable):
-        mean = observable[0]
-        bootstrap_results = observable[1:]
+        obs_full = observable[0]
+        obs_bootstrap = observable[1:]
 
-        variance = torch.sum((bootstrap_results - mean) ** 2, axis=0)
+        variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
+        bias = torch.mean(obs_bootstrap) - obs_full  # not sure exactly what to do with this
 
         return variance.sqrt()
 
@@ -312,21 +335,27 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf):
     G_series -= G_series.mean()
     autocorrelation = correlate(
         G_series, G_series, mode="same"
-    )  # converts in numpy array
+    )  # converts to numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
 
-    ##################################
-    ##  To do: automatic windowing  ##
-    ##################################
-    """
-    for W in [50, 100, 200, 400, 700, 1000]:
-        integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:W])
-        print(f"tau_int = {integrated_autocorrelation} for W = {W}")
-    """
-    integrated_autocorrelation = 0.5 + np.sum(autocorrelation[1:200])
+    ###############################################
+    ##  To do: automatic windowing using batches ##
+    ###############################################
+    N = int(G_series.size()[0])
+    tau_int_W = 0.5 + np.cumsum(autocorrelation[1:])
+    valid = np.where(tau_int_W > 0.5)[0]
+    tau_exp_W = np.ones(tau_int_W.size) * 0.00001
+    
+    S = 2.0
+    tau_exp_W[valid] =  S / (np.log( (2 * tau_int_W[valid] + 1) / (2 * tau_int_W[valid] - 1) ))
+    W = np.arange(1, tau_int_W.size + 1)
+    g_W = np.exp( - W / tau_exp_W ) - tau_exp_W / np.sqrt(W * N)
 
-    return autocorrelation, integrated_autocorrelation
+    W_opt = np.where(g_W < 0)[0][0]
+    w = 4*W_opt  # where to cut the plot off
+
+    return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
 
 
 ##############################################################################
