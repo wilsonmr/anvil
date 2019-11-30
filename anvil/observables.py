@@ -373,14 +373,14 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
 # without having to re-run the sampling, but it's not achieved this aim.
 _two_point_function = collect("two_point_function", ("training_context",))
 _volume_averaged_2pf = collect("volume_averaged_2pf", ("training_context",))
-_zero_momentum_2pf = collect("zero_momentum_2pf_out", ("training_context",))
+_zero_momentum_2pf = collect("zero_momentum_2pf", ("training_context",))
 _effective_pole_mass = collect("effective_pole_mass", ("training_context",))
 _ising_energy = collect("ising_energy", ("training_context",))
 _susceptibility = collect("susceptibility", ("training_context",))
 _autocorrelation_2pf = collect("autocorrelation_2pf", ("training_context",))
 
 
-def Autocorrelation_2pf(_two_point_function):
+def Two_Point_Function(_two_point_function):
     return _two_point_function[0]
 
 

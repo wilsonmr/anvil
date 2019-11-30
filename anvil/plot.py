@@ -177,7 +177,7 @@ def plot_autocorrelation_2pf(Autocorrelation_2pf):
 #######################################
 ###     Bootstrap distributions     ###
 #######################################
-def plot_bootstrap_dist(bootstrap, observable, title):
+def plot_bootstrap_dist(bootstrap, observable, label):
     """Plot the distribution of some observable calculated using many bootstrap samples"""
 
     def do_plot(ax, full_data, bootstrap_data, std):
@@ -196,7 +196,7 @@ def plot_bootstrap_dist(bootstrap, observable, title):
     obs_full = observable[0]
     obs_bootstrap = observable[1:]
     std = bootstrap(observable)
-    title = "Bootstrap distribution: " + title
+    title = "Bootstrap distribution: " + label
 
     if len(obs_bootstrap.shape) == 2:
         nax = obs_bootstrap.shape[1]
@@ -206,12 +206,18 @@ def plot_bootstrap_dist(bootstrap, observable, title):
             ax = do_plot(ax, obs_full[i], obs_bootstrap[:, i], std[i])
             if i == 0:
                 ax.set_title(title)
-            elif i == 1:
+            if i == 1:
                 ax.legend()
+            if i % 2 == 0:
+                ax.set_ylabel("Counts")
+            if i > nax - 3:
+                ax.set_xlabel(label)
 
     else:
         fig, ax = plt.subplots()
         ax = do_plot(ax, obs_full, obs_bootstrap, std)
+        ax.set_xlabel(label)
+        ax.set_ylabel("Counts")
         ax.legend()
         ax.set_title(title)
 
