@@ -69,6 +69,21 @@ def plot_zero_momentum_2pf(Zero_Momentum_2pf, training_geometry, bootstrap):
     ax.set_title("Zero momentum two point function")
     return fig
 
+@table
+def table_zero_momentum_2pf(Zero_Momentum_2pf, training_geometry, bootstrap):
+    zm2pf = Zero_Momentum_2pf[0,:]
+    zm2pf_std = bootstrap(Zero_Momentum_2pf)
+    g_tilde = []
+    for t in range(training_geometry.length):
+        g_tilde.append(print_to_precision(zm2pf[t], zm2pf_std[t]))
+    
+    df = pd.DataFrame(
+            g_tilde,
+            columns=["Mean", "Standard deviation"],
+            index=range(training_geometry.length),
+    )
+    return df
+    
 
 @figure
 def plot_effective_pole_mass(training_geometry, Effective_Pole_Mass, bootstrap):
@@ -87,6 +102,20 @@ def plot_effective_pole_mass(training_geometry, Effective_Pole_Mass, bootstrap):
     ax.set_title("Effective pole mass")
     return fig
 
+@table
+def table_effective_pole_mass(Effective_Pole_Mass, training_geometry, bootstrap):
+    epm = Effective_Pole_Mass[0,:]
+    epm_std = bootstrap(Effective_Pole_Mass)
+    m_eff = []
+    for t in range(training_geometry.length - 2):
+        m_eff.append(print_to_precision(epm[t], epm_std[t]))
+    
+    df = pd.DataFrame(
+            m_eff,
+            columns=["Mean", "Standard deviation"],
+            index=range(1, training_geometry.length-1),
+    )
+    return df
 
 @figure
 def plot_2pf(training_geometry, Two_Point_Function, bootstrap):
@@ -121,6 +150,31 @@ def plot_2pf(training_geometry, Two_Point_Function, bootstrap):
 
     return fig
 
+@table
+def table_2pf(training_geometry, Two_Point_Function, bootstrap):
+    print("Computing two point function and error...")
+    corr = []
+    pbar = tqdm(total=training_geometry.length ** 2, desc="(x,t)")
+    for j in range(training_geometry.length**2):
+            corr.append(
+                    print_to_precision(
+                float(Two_Point_Function(
+                    j//training_geometry.length,        # t
+                    j%training_geometry.length)[0]),    # x
+                float(bootstrap(Two_Point_Function(
+                    j//training_geometry.length,        # t
+                    j%training_geometry.length)))       # x
+            )
+            )
+            pbar.update(1)
+    pbar.close()
+
+    df = pd.DataFrame(
+        corr,
+        columns=["Mean", "Standard deviation"],
+        index=[(j//training_geometry.length, j%training_geometry.length) for j in range(training_geometry.length**2)],
+)
+    return df
 
 #################################
 ###     Time-series plots     ###
@@ -172,6 +226,18 @@ def plot_autocorrelation_2pf(Autocorrelation_2pf):
     ax4.legend()
 
     return fig
+
+@table
+def table_autocorrelation_2pf(Autocorrelation_2pf):
+    autocorrelation, _, _, _, _ = Autocorrelation_2pf
+    
+    df = pd.DataFrame(
+        autocorrelation,
+        columns=["Autocorrelation"],
+        index=range(len(autocorrelation)),
+    )
+    return df
+
 
 
 #######################################
