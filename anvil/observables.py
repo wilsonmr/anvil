@@ -36,11 +36,16 @@ def arcosh(x):
 #####     Observables     #####
 ###############################
 class TwoPointFunction:
-    def __init__(self, states, geometry, bootstrap_n_samples, bootstrap_sample_size):
+    def __init__(self, states, geometry, bootstrap_n_samples):
         self.geometry = geometry
         self.states = states
         self.n_samples = bootstrap_n_samples
-        self.sample_size = bootstrap_sample_size
+        self.sample_size = states.size(0)
+        
+        # Bootstrap samples of size (n_samples, sample_size, n_states)
+        self.sample_indices = np.random.choice(
+            self.sample_size, (self.n_samples, self.sample_size), replace=True
+        )
 
     def __call__(self, x_0: int, x_1: int):
         r"""Calculates the two point connected green function given a set of
@@ -70,12 +75,7 @@ class TwoPointFunction:
         phi = self.states
         phi_shift = phi[:, shift]
 
-        # Bootstrap samples of size (n_samples, sample_size, n_states)
-        n_states = self.states.size(0)
-        sample_indices = np.random.choice(
-            n_states, (self.n_samples, self.sample_size), replace=True
-        )
-        phi_boot = self.states[sample_indices, :]
+        phi_boot = self.states[self.sample_indices, :]
         phi_shift_boot = phi_boot[:, :, shift]
 
         #  Average over stack of states
@@ -130,7 +130,6 @@ def two_point_function(
     sample_training_output,
     training_geometry,
     bootstrap_n_samples,
-    bootstrap_sample_size,
 ):
     r"""Return instance of TwoPointFunction which can be used to calculate the
     two point green function for a given seperation
@@ -139,7 +138,6 @@ def two_point_function(
         sample_training_output,
         training_geometry,
         bootstrap_n_samples,
-        bootstrap_sample_size,
     )
 
 
@@ -248,11 +246,6 @@ def ising_energy(two_point_function, bootstrap_n_samples):
 
     where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
     in 2D
-
-    Parameters
-    ----------
-    sample_size: int
-        calculation done based on a subsample of states. See TwoPointFunction
 
     Returns
     -------
