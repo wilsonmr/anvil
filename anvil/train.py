@@ -84,4 +84,4 @@ def train(
         },
         f"{outpath}/checkpoint_{train_range[-1]}.pt",
     )
-    #log.info(f"Final loss: {current_loss}")
+    #print(f"Final loss: {float(current_loss)}")

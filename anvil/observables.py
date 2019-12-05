@@ -10,7 +10,6 @@ version: https://arxiv.org/pdf/1904.12072.pdf
 
 """
 import numpy as np
-import pandas as pd
 from scipy.signal import correlate
 import torch
 
@@ -129,7 +128,7 @@ class VolumeAveraged2pf:
 def two_point_function(
     sample_training_output,
     training_geometry,
-    bootstrap_n_samples,
+    bootstrap_n_samples=100,
 ):
     r"""Return instance of TwoPointFunction which can be used to calculate the
     two point green function for a given seperation
@@ -146,7 +145,7 @@ def volume_averaged_2pf(sample_training_output, training_geometry):
     return VolumeAveraged2pf(sample_training_output, training_geometry)
 
 
-def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples):
+def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples=100):
     r"""Calculate the zero momentum green function as a function of t
     \tilde{G}(t, 0) which is assumed to be in the first dimension defined as
 
@@ -178,7 +177,7 @@ def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples
     return torch.stack(g_func_zeromom).transpose(0, 1)
 
 
-def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples):
+def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples=100):
     r"""Calculate the effective pole mass m^eff(t) defined as
 
         m^eff(t) = arcosh(
@@ -212,7 +211,7 @@ def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples):
     return torch.stack(m_t).transpose(0, 1)
 
 
-def susceptibility(training_geometry, two_point_function, bootstrap_n_samples):
+def susceptibility(training_geometry, two_point_function, bootstrap_n_samples=100):
     r"""Calculate the susceptibility, which is the sum of two point connected
     green functions over all seperations
 
@@ -239,7 +238,7 @@ def susceptibility(training_geometry, two_point_function, bootstrap_n_samples):
     return chi
 
 
-def ising_energy(two_point_function, bootstrap_n_samples):
+def ising_energy(two_point_function, bootstrap_n_samples=100):
     r"""Ising energy defined as
 
         E = 1/d sum_{\mu} G(\mu)
@@ -281,19 +280,19 @@ class Bootstrap:
         variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
         bias = (
             torch.mean(obs_bootstrap) - obs_full
-        )  # not sure exactly what to do with this
+        )  # not sure whether to use this
 
         return variance.sqrt()
 
 
-def bootstrap(bootstrap_n_samples):
+def bootstrap(bootstrap_n_samples=100):
     return Bootstrap(bootstrap_n_samples)
 
 
 ###############################
 ###     Autocorrelation     ###
 ###############################
-def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
+def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
     r"""Computes the autocorrelation of the volume-averaged two point function,
     the integrated autocorrelation time, and two other functions related to the
     computation of an optimal window size for the integrated autocorrelation.
@@ -333,20 +332,20 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
     All numpy arrays are truncated at a point 4*W_opt for the sake of plotting.
     """
     x = t = 0  # Should really look at more than one separation
-    G_series = volume_averaged_2pf(x, t)
-    G_series -= G_series.mean()
+    va_2pf = volume_averaged_2pf(x, t)
+    va_2pf -= va_2pf.mean()
     autocorrelation = correlate(
-        G_series, G_series, mode="same"
+        va_2pf, va_2pf, mode="same"
     )  # converts to numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
 
-    n_states = int(G_series.size()[0])
+    n_states = va_2pf.size(0)
     tau_int_W = 0.5 + np.cumsum(autocorrelation[1:])
     valid = np.where(tau_int_W > 0.5)[0]
     tau_exp_W = np.ones(tau_int_W.size) * 0.00001  # to prevent domain error in log
 
-    S = window_S  # read from runcard parameter
+    S = window  # read from runcard parameter
     tau_exp_W[valid] = S / (
         np.log((2 * tau_int_W[valid] + 1) / (2 * tau_int_W[valid] - 1))
     )
@@ -358,44 +357,3 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window_S):
 
     return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
 
-
-#######################
-###     Collect     ###
-#######################
-# I was hoping that doing this would mean we could loop over plotting parameters
-# without having to re-run the sampling, but it's not achieved this aim.
-_two_point_function = collect("two_point_function", ("training_context",))
-_volume_averaged_2pf = collect("volume_averaged_2pf", ("training_context",))
-_zero_momentum_2pf = collect("zero_momentum_2pf", ("training_context",))
-_effective_pole_mass = collect("effective_pole_mass", ("training_context",))
-_ising_energy = collect("ising_energy", ("training_context",))
-_susceptibility = collect("susceptibility", ("training_context",))
-_autocorrelation_2pf = collect("autocorrelation_2pf", ("training_context",))
-
-
-def Two_Point_Function(_two_point_function):
-    return _two_point_function[0]
-
-
-def Volume_Averaged_2pf(_volume_averaged_2pf):
-    return _volume_averaged_2pf[0]
-
-
-def Zero_Momentum_2pf(_zero_momentum_2pf):
-    return _zero_momentum_2pf[0]
-
-
-def Effective_Pole_Mass(_effective_pole_mass):
-    return _effective_pole_mass[0]
-
-
-def Ising_Energy(_ising_energy):
-    return _ising_energy[0]
-
-
-def Susceptibility(_susceptibility):
-    return _susceptibility[0]
-
-
-def Autocorrelation_2pf(_autocorrelation_2pf):
-    return _autocorrelation_2pf[0]

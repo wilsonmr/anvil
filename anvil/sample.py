@@ -159,6 +159,9 @@ def chain_autocorrelation(
 
     # Sample some states
     _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
+    
+    accepted = float(torch.sum(history))
+    #print(f"Acceptance: {accepted / batch_size}")
 
     n_states = len(history)
     autocorrelations = torch.zeros(
@@ -184,7 +187,7 @@ def chain_autocorrelation(
     integrated_autocorrelation = 0.5 + torch.sum(
         autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
     )
-    log.info(f"Integrated autocorrelation time: {integrated_autocorrelation}")
+    #print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
 
     sample_interval = ceil(2 * integrated_autocorrelation)
     log.info(
@@ -263,14 +266,18 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
 
 _sample_training_output = collect("sample", ("training_context",))
 
-
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""
     return _sample_training_output[0]
+
+_short_sample = collect("chain_autocorrelation", ("training_context",))
+
+def short_sample(_short_sample):
+    return _short_sample[0]

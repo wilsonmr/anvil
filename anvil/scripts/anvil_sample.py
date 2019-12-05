@@ -10,7 +10,7 @@ from anvil.config import ConfigParser
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.sample", "anvil.observables", "anvil.plot", "anvil.checkpoint", "reportengine.report"]
+PROVIDERS = ["anvil.sample", "anvil.observables", "anvil.plot", "anvil.table", "anvil.checkpoint", "reportengine.report"]
 
 
 class SampleApp(App):
