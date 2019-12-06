@@ -161,7 +161,7 @@ def chain_autocorrelation(
     _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
     
     accepted = float(torch.sum(history))
-    #print(f"Acceptance: {accepted / batch_size}")
+    print(f"Acceptance: {accepted / batch_size}")
 
     n_states = len(history)
     autocorrelations = torch.zeros(
@@ -187,7 +187,7 @@ def chain_autocorrelation(
     integrated_autocorrelation = 0.5 + torch.sum(
         autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
     )
-    #print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
+    print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
 
     sample_interval = ceil(2 * integrated_autocorrelation)
     log.info(

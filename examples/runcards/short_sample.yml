@@ -1,0 +1,17 @@
+training_output: test_parallel
+
+cp_id: -1
+target_length: 1000
+
+thermalisation: 1000
+sample_interval: null
+
+window_S: 2.0
+
+meta:
+  author: Joe
+  title: Training Report
+  keywords: [example]
+
+actions_:
+   - short_sample
