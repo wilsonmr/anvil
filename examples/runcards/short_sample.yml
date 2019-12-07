@@ -1,4 +1,4 @@
-training_output: test_parallel
+training_output: training_output
 
 cp_id: -1
 target_length: 1000

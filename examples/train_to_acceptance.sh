@@ -7,8 +7,8 @@ TRAIN_RUNCARD=$1
 SAMPLE_RUNCARD=$2
 
 # Parameters to be set by user
-TARGET_ACCEPTANCE=0.25
-N_SAMPLE=5
+TARGET_ACCEPTANCE=0.7
+N_SAMPLE=10
 
 
 RUN_ID=$(grep "training_output:" $SAMPLE_RUNCARD | awk '{print $2}')
