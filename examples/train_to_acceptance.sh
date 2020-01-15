@@ -1,6 +1,12 @@
 #!/bin/bash
 
-trap "echo ' Aborting...'; exit;" SIGINT
+exit_gracefully () {
+    echo "Exiting..."
+    echo "Iterations completed: $N_ITERS"
+    echo "Final train time: $( ((train_time / 60)) ) mins"
+}
+trap exit_gracefully EXIT
+trap "echo ' Aborting!'; exit;" SIGINT
 
 # Runcards
 TRAIN_RUNCARD=$1
@@ -22,17 +28,25 @@ ACCEPTANCE=0.0
 IFS="
 "
 
+train_time=0
+
 ########## First run ############
 
+start_time=$(date +%s)
 anvil-train $TRAIN_RUNCARD -o $RUN_ID
+end_time=$(date +%s)
 ((N_ITERS++))
+((train_time+=(end_time-start_time) ))
 
 ######### Loop until acceptance ##########
 
 while (( $(echo "$ACCEPTANCE < $TARGET_ACCEPTANCE" | bc -l) ))
 do
     
+    start_time=$(date +%s)
     anvil-train $RUN_ID -r -1 > "$LOG_FILE" # overwrite
+    end_time=$(date +%s)
+    ((train_time+=(end_time-start_time) ))
     
     for s in `seq 1 $N_SAMPLE`
     do
