@@ -135,8 +135,9 @@ class AffineLayer(nn.Module):
         partition b are set to zero
 
         """
-        for t_layer in self.t_layers:
+        for t_layer in self.t_layers[:-1]:
             x_input = ACTIVATION_FUNC(t_layer(x_input))
+        x_input = self.t_layers[-1](x_input)
         return x_input
 
     def coupling_layer(self, phi_input) -> torch.Tensor:
