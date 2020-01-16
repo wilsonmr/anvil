@@ -1,77 +1,76 @@
 #!/bin/bash
+# bash train_to_acceptance.sh ./runcards/train.yml ./runcards/short_sample.yml
 
 exit_gracefully () {
     echo "Exiting..."
-    echo "Iterations completed: $N_ITERS"
-    echo "Final train time: $( ((train_time / 60)) ) mins"
+    echo "Iterations completed: $n_iters"
+    echo "Final train time: $((train_time / 60)) mins"
 }
 trap exit_gracefully EXIT
 trap "echo ' Aborting!'; exit;" SIGINT
 
 # Runcards
-TRAIN_RUNCARD=$1
-SAMPLE_RUNCARD=$2
+train_runcard=$1
+sample_runcard=$2
 
 # Parameters to be set by user
-TARGET_ACCEPTANCE=0.7
-N_SAMPLE=10
+target_acceptance=0.7
+n_sample=10
 
+run_id=$(grep "training_output:" $sample_runcard | awk '{print $2}')
+log_file=$run_id/training_log.out
+data_file=$run_id/training_data.out
 
-RUN_ID=$(grep "training_output:" $SAMPLE_RUNCARD | awk '{print $2}')
-LOG_FILE=$RUN_ID/training_log.out
-DATA_FILE=$RUN_ID/training_data.out
-
-EPOCHS=$(grep "epochs:" $TRAIN_RUNCARD | awk '{print $2}')
-N_ITERS=0
-ACCEPTANCE=0.0
+epochs=$(grep "epochs:" $train_runcard | awk '{print $2}')
+n_iters=0
+acceptance=0.0
+train_time=0
 
 IFS="
 "
 
-train_time=0
-
 ########## First run ############
 
 start_time=$(date +%s)
-anvil-train $TRAIN_RUNCARD -o $RUN_ID
+anvil-train $train_runcard -o $run_id
 end_time=$(date +%s)
-((N_ITERS++))
+((n_iters++))
 ((train_time+=(end_time-start_time) ))
 
 ######### Loop until acceptance ##########
 
-while (( $(echo "$ACCEPTANCE < $TARGET_ACCEPTANCE" | bc -l) ))
+while (( $(echo "$acceptance < $target_acceptance" | bc -l) ))
 do
     
     start_time=$(date +%s)
-    anvil-train $RUN_ID -r -1 > "$LOG_FILE" # overwrite
+    anvil-train $run_id -r -1 > "$log_file" # overwrite
     end_time=$(date +%s)
     ((train_time+=(end_time-start_time) ))
     
-    for s in `seq 1 $N_SAMPLE`
+    for s in `seq 1 $n_sample`
     do
-        anvil-sample $SAMPLE_RUNCARD >> "$LOG_FILE"
+        anvil-sample $sample_runcard >> "$log_file"
     done
 
-    ((N_ITERS++))
-    echo "Completed $N_ITERS iterations"
-    TOTAL_EPOCHS=$(echo "$EPOCHS * $N_ITERS" | bc -l)
+    ((n_iters++))
+    echo "Completed $n_iters iterations"
+    total_epochs=$(echo "$epochs * $n_iters" | bc -l)
 
-    LOSS=$(grep "Final loss:" "$LOG_FILE" | awk '{print $3}')
+    loss=$(grep "Final loss:" "$log_file" | awk '{print $3}')
    
-    arr=$(grep "Acceptance:" "$LOG_FILE" | awk '{print $2}')
+    arr=$(grep "Acceptance:" "$log_file" | awk '{print $2}')
     sum=$(echo $(for a in ${arr[@]}; do echo -n "$a+"; done; echo -n 0) | bc -l)
-    ACCEPTANCE=$(echo "$sum / $N_SAMPLE" | bc -l)
-    sum=$(echo $(for a in ${arr[@]}; do echo -n "($a - $ACCEPTANCE)^2+"; done; echo -n 0) | bc -l)
-    STD_ACCEPTANCE=$(echo "sqrt($sum / ($N_SAMPLE-1))" | bc -l)
+    acceptance=$(echo "$sum / $n_sample" | bc -l)
+    sum=$(echo $(for a in ${arr[@]}; do echo -n "($a - $acceptance)^2+"; done; echo -n 0) | bc -l)
+    std_acceptance=$(echo "sqrt($sum / ($n_sample-1))" | bc -l)
 
-    arr=$(grep "Integrated autocorrelation time:" "$LOG_FILE" | awk '{print $4}')
+    arr=$(grep "Integrated autocorrelation time:" "$log_file" | awk '{print $4}')
     sum=$(echo $(for a in ${arr[@]}; do echo -n "$a+"; done; echo -n 0) | bc -l)
-    TAUINT=$(echo "$sum / $N_SAMPLE" | bc -l)
-    sum=$(echo $(for a in ${arr[@]}; do echo -n "($a-$TAUINT)^2+"; done; echo -n 0) | bc -l)
-    STD_TAUINT=$(echo "sqrt($sum / ($N_SAMPLE-1))" | bc -l)
+    tauint=$(echo "$sum / $n_sample" | bc -l)
+    sum=$(echo $(for a in ${arr[@]}; do echo -n "($a-$tauint)^2+"; done; echo -n 0) | bc -l)
+    std_tauint=$(echo "sqrt($sum / ($n_sample-1))" | bc -l)
     
-    echo "$TOTAL_EPOCHS $LOSS $ACCEPTANCE $STD_ACCEPTANCE $TAUINT $STD_TAUINT" >> "$DATA_FILE"
+    echo "$total_epochs $LOSS $acceptance $std_acceptance $tauint $std_tauint" >> "$data_file"
 
 done
 
