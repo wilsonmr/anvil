@@ -2,6 +2,7 @@
 # bash train_to_acceptance.sh ./runcards/train.yml ./runcards/short_sample.yml
 
 exit_gracefully () {
+    rm ${run_id}/tmp
     echo "Exiting..."
     echo "Iterations completed: $n_iters"
     echo "Final train time: $((train_time / 60)) mins"
@@ -43,28 +44,30 @@ while (( $(echo "$acceptance < $target_acceptance" | bc -l) ))
 do
     
     start_time=$(date +%s)
-    anvil-train $run_id -r -1 > "$log_file" # overwrite
+    anvil-train $run_id -r -1 > ${run_id}/tmp # overwrite
     end_time=$(date +%s)
     ((train_time+=(end_time-start_time) ))
     
     for s in `seq 1 $n_sample`
     do
-        anvil-sample $sample_runcard >> "$log_file"
+        anvil-sample $sample_runcard >> ${run_id}/tmp
     done
+    echo "<<<<<<<<< ITERATION $n_iters >>>>>>>>>" >> $log_file
+    cat ${run_id}/tmp >> $log_file
 
     ((n_iters++))
     echo "Completed $n_iters iterations"
     total_epochs=$(echo "$epochs * $n_iters" | bc -l)
 
-    loss=$(grep "Final loss:" "$log_file" | awk '{print $3}')
+    loss=$(grep "Final loss:" "${run_id}/tmp" | awk '{print $3}')
    
-    arr=$(grep "Acceptance:" "$log_file" | awk '{print $2}')
+    arr=$(grep "Acceptance:" "${run_id}/tmp" | awk '{print $2}')
     sum=$(echo $(for a in ${arr[@]}; do echo -n "$a+"; done; echo -n 0) | bc -l)
     acceptance=$(echo "$sum / $n_sample" | bc -l)
     sum=$(echo $(for a in ${arr[@]}; do echo -n "($a - $acceptance)^2+"; done; echo -n 0) | bc -l)
     std_acceptance=$(echo "sqrt($sum / ($n_sample-1))" | bc -l)
 
-    arr=$(grep "Integrated autocorrelation time:" "$log_file" | awk '{print $4}')
+    arr=$(grep "Integrated autocorrelation time:" "${run_id}/tmp" | awk '{print $4}')
     sum=$(echo $(for a in ${arr[@]}; do echo -n "$a+"; done; echo -n 0) | bc -l)
     tauint=$(echo "$sum / $n_sample" | bc -l)
     sum=$(echo $(for a in ${arr[@]}; do echo -n "($a-$tauint)^2+"; done; echo -n 0) | bc -l)
