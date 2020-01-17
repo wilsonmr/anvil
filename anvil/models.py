@@ -22,7 +22,6 @@ import torch.nn.functional as F
 
 ACTIVATION_FUNC = F.leaky_relu  # Globally define activation function
 
-
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
@@ -99,6 +98,7 @@ class AffineLayer(nn.Module):
         self.t_layers = nn.ModuleList(
             [nn.Linear(t_in, t_out) for t_in, t_out in zip(t_shape[:-1], t_shape[1:])]
         )
+        #print([ (s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])])
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -112,6 +112,12 @@ class AffineLayer(nn.Module):
             self.join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
+        self.s_bn_layers = nn.ModuleList(
+            [nn.BatchNorm1d(num_features=s_out) for s_out in s_shape[1:] ]
+        )
+        self.t_bn_layers = nn.ModuleList(
+            [nn.BatchNorm1d(num_features=t_out) for t_out in t_shape[1:] ]
+        )
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
@@ -122,6 +128,8 @@ class AffineLayer(nn.Module):
         partition b are set to zero
 
         """
+        """for l in range(len(self.s_layers)):
+            x_input = ACTIVATION_FUNC( self.s_bn_layers[l](self.s_layers[l](x_input)) )"""
         for s_layer in self.s_layers:
             x_input = ACTIVATION_FUNC(s_layer(x_input))
         return x_input
@@ -135,6 +143,9 @@ class AffineLayer(nn.Module):
         partition b are set to zero
 
         """
+        """for l in range(len(self.t_layers) - 1):
+            x_input = ACTIVATION_FUNC( self.t_bn_layers[l](self.t_layers[l](x_input)) )
+        x_input = self.t_bn_layers[-1](self.t_layers[-1](x_input))"""
         for t_layer in self.t_layers[:-1]:
             x_input = ACTIVATION_FUNC(t_layer(x_input))
         x_input = self.t_layers[-1](x_input)
