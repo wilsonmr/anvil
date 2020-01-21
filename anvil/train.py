@@ -43,7 +43,8 @@ def train(
     loaded_optimizer,
     patience=500,
     factor=0.1,
-    cooldown=0
+    cooldown=0,
+    eps=1e-8
 ):
     """training loop of model"""
     # create your optimizer and a scheduler
@@ -52,6 +53,7 @@ def train(
             factor=factor,
             patience=patience,
             cooldown=cooldown,
+            eps=eps,
             verbose=True)
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")

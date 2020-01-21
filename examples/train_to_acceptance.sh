@@ -73,7 +73,7 @@ do
     sum=$(echo $(for a in ${arr[@]}; do echo -n "($a-$tauint)^2+"; done; echo -n 0) | bc -l)
     std_tauint=$(echo "sqrt($sum / ($n_sample-1))" | bc -l)
     
-    echo "$total_epochs $LOSS $acceptance $std_acceptance $tauint $std_tauint" >> "$data_file"
+    echo "$total_epochs $loss $acceptance $std_acceptance $tauint $std_tauint" >> "$data_file"
 
 done
 
