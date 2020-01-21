@@ -30,7 +30,7 @@ def loaded_model(loaded_checkpoint, model):
 
 def loaded_optimizer(loaded_model, loaded_checkpoint):
     #TODO: implement optimizer input
-    new_optimizer = optim.Adadelta(loaded_model.parameters())
+    new_optimizer = optim.Adam(loaded_model.parameters(), lr=0.01)
     if loaded_checkpoint is not None:
         new_optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
     return new_optimizer

@@ -31,7 +31,6 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     """
     return torch.mean(log_tilde_p + action, dim=0)
 
-
 def train(
     loaded_model,
     action,
@@ -42,11 +41,18 @@ def train(
     outpath,
     current_loss,
     loaded_optimizer,
-    patience=500
+    patience=500,
+    factor=0.1,
+    cooldown=0
 ):
     """training loop of model"""
     # create your optimizer and a scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(loaded_optimizer, patience=patience, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            loaded_optimizer,
+            factor=factor,
+            patience=patience,
+            cooldown=cooldown,
+            verbose=True)
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
     n_units = loaded_model.size_in
