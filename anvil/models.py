@@ -20,13 +20,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-#ACTIVATION_FUNC = F.leaky_relu  # Globally define activation function
+bias = True  # TODO define network in runcard
 
 def block(f_in, f_out):
-    """
+    """To do
     """
     return nn.Sequential(
-        nn.Linear(f_in, f_out, bias=False),
+        nn.Linear(f_in, f_out, bias=bias),
         nn.LeakyReLU(),
     )
 
@@ -114,7 +114,7 @@ class AffineLayer(nn.Module):
         self.t_layers = nn.ModuleList(
             [block(t_in, t_out) for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])]
         )
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1], bias=False)]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1], bias=bias)]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
