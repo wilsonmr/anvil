@@ -18,17 +18,13 @@ from math import sqrt, pi, log
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-bias = True  # TODO define network in runcard
 
-def block(f_in, f_out):
-    """To do
+def block(f_in, f_out, bias):
+    """A single block in the network, which can be stacked
     """
-    return nn.Sequential(
-        nn.Linear(f_in, f_out, bias=bias),
-        nn.LeakyReLU(),
-    )
+    return nn.Sequential(nn.Linear(f_in, f_out, bias=bias), nn.LeakyReLU(),)
+
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -63,6 +59,9 @@ class AffineLayer(nn.Module):
     t_hidden_shape: tuple
         tuple which gives the number of nodes in the hidden layers of neural
         network t_i.
+    bias: tuple
+        tuple of bools specifying whether a given Linear transformation should
+        include a shift (bias)
     i_affine: int
         index of this affine layer in full set of affine transformations,
         dictates which half of the data is transformed as a and b, since
@@ -93,28 +92,31 @@ class AffineLayer(nn.Module):
     """
 
     def __init__(
-        self, size_in: int, s_hidden_shape: tuple, t_hidden_shape: tuple, i_affine: int
+        self,
+        size_in: int,
+        s_hidden_shape: tuple,
+        t_hidden_shape: tuple,
+        bias: tuple,
+        i_affine: int,
     ):
         super(AffineLayer, self).__init__()
         size_half = int(size_in / 2)
         s_shape = [size_half, *s_hidden_shape, size_half]
         t_shape = [size_half, *t_hidden_shape, size_half]
 
-        """self.s_layers = nn.ModuleList(
-            [nn.Linear(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
-        )
-        self.t_layers = nn.ModuleList(
-            [nn.Linear(t_in, t_out) for t_in, t_out in zip(t_shape[:-1], t_shape[1:])]
-        )
-        #print([ (s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])])"""
-
         self.s_layers = nn.ModuleList(
-            [block(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
+            [
+                block(s_in, s_out, bias[ib])
+                for s_in, s_out, ib in zip(s_shape[:-1], s_shape[1:], bias)
+            ]
         )
         self.t_layers = nn.ModuleList(
-            [block(t_in, t_out) for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])]
+            [
+                block(t_in, t_out, bias[ib])
+                for t_in, t_out, ib in zip(t_shape[:-2], t_shape[1:-1], bias[:-1])
+            ]
         )
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1], bias=bias)]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1], bias[-1])]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -138,7 +140,6 @@ class AffineLayer(nn.Module):
         partition b are set to zero
 
         """
-        #x_input = (x_input - x_input.mean(axis=0)) / x_input.std(axis=0)
         for s_layer in self.s_layers:
             x_input = s_layer(x_input)
         return x_input
@@ -152,7 +153,6 @@ class AffineLayer(nn.Module):
         partition b are set to zero
 
         """
-        #x_input = (x_input - x_input.mean(axis=0)) / x_input.std(axis=0)
         for t_layer in self.t_layers:
             x_input = t_layer(x_input)
         return x_input
@@ -268,6 +268,9 @@ class RealNVP(nn.Module):
         given with shape (N_states, `size_in`)
     affine_hidden_shape: tuple
         tuple defining the number of nodes in the hidden layers of s and t.
+    bias: tuple
+        tuple of bools specifying whether a given Linear transformation should
+        include a shift (bias)
 
     Attributes
     ----------
@@ -277,7 +280,7 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
+        self, *, n_affine: int, size_in: int, affine_hidden_shape: tuple, bias: tuple
     ):
         super(RealNVP, self).__init__()
         self.size_in = size_in
@@ -285,7 +288,7 @@ class RealNVP(nn.Module):
         self._log_gauss_norm = log(sqrt(pow(2 * pi, size_in)))
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, bias, i)
                 for i in range(n_affine)
             ]
         )
