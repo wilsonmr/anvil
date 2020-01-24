@@ -1,42 +1,64 @@
 """
 plot_training.py
 """
-
 import numpy as np
 import matplotlib.pyplot as plt
 import yaml
 from sys import argv, exit
 from os.path import exists
+from os import mkdir
 
 # --- Gloal parameters to be set by user --- #
-# Choose x data from 'epochs' or 'minutes'
+# Choose x data from 'epochs' or 'time'
 xdata_type = "epochs"
 # Choose y data from 'loss', 'acceptance', 'tauint'
 ydata_type = "acceptance"
 # Choose y error bars from 'std_acceptance', 'std_tauint', None
 yerr_type = None
 # Which parameters are we comparing?
-params_to_compare = ("hidden_nodes", "n_batch")
+params_to_compare = ("lattice_length","hidden_nodes")
+# Choose units of time from 'seconds', 'minutes', 'hours'
+time_units = "hours"
+
+# --- Save figures to file --- #
+save = False
 # Name of output directory from anvil-train (don't include '/' !)
 train_dir = "training_output"
+# Path for output file, including extension (None to not save)
+save_dir = "figures/"
+save_name = save_dir \
+        + ydata_type[:3] + "-" + xdata_type[:3] + "_" \
+        + '-'.join(param[:3] for param in params_to_compare) \
+        + ".png"
 
-col_dict = {  # corresponds with columns of training_data.out, set in train_to_acceptance.sh
+
+# --- Specify data directories here or as command line args --- #
+data_dirs = [
+    "L6",
+    "L8",
+    "L10"
+]
+if len(argv) > 1:  # Overwrite if command line args
+        data_dirs = argv[1:]
+
+for i in range(len(data_dirs)):
+    if data_dirs[i][-1] != '/': data_dirs[i] += '/'
+
+# --- Dicts --- #
+col_dict = {  # corresponds to columns of training_data.out, set in train_to_acceptance.sh
     "epochs": 0,
-    "minutes": 1,
+    "time": 1,
     "loss": 2,
     "acceptance": 3,
     "std_acceptance": 4,
     "tauint": 5,
     "std_tauint": 6,
 }
-
-# --- Specify data directories here or as command line args --- #
-data_dirs = [
-    "dir1",
-    "dir2"
-]
-if len(argv) > 1:  # Overwrite if command line args
-    data_dirs = argv[1:]
+time_dict = {
+    "seconds": 1,
+    "minutes": 60,
+    "hours": 3600
+}
 
 # --- Bad input handling --- #
 def nae_exists(target):
@@ -72,6 +94,8 @@ def get_data(data_dir):
     data = np.loadtxt(data_dir + train_dir + "/training_data.out")
     xdata = data[:, col_dict[xdata_type]]
     ydata = data[:, col_dict[ydata_type]]
+    if xdata_type == 'time':
+        xdata = xdata / time_dict[time_units]  # time in sec/min/hour
     if yerr_type == None:
         return xdata, ydata
     else:
@@ -95,6 +119,7 @@ def get_label(data_dir):
 
 
 # --- Create plot --- #
+plt.rcParams.update({'font.size': 13, 'axes.linewidth': 2})
 fig, ax = plt.subplots(figsize=(12, 8))
 ax.set_title("Training data")
 
@@ -102,13 +127,14 @@ if ydata_type == "tauint":
     ydata_label = r"\tau_{int}"
 else:
     ydata_label = ydata_type
-ax.set_xlabel(xdata_type)
+if xdata_type == "time":
+    xdata_label = f"time ({time_units})"
+else:
+    xdata_label = xdata_type
+ax.set_xlabel(xdata_label)
 ax.set_ylabel(ydata_label)
 
 for data_dir in data_dirs:
-    if isdir(data_dir) == False:
-        print(f"Error: no such directory {data_dir}"); exit(1)
-    if data_dir[-1] != '/': data_dir += '/'
     label = get_label(data_dir)
     if yerr_type == None:
         xdata, ydata = get_data(data_dir)
@@ -119,4 +145,8 @@ for data_dir in data_dirs:
 
 ax.legend()
 fig.tight_layout()
+if save == True:
+    if not exists(save_dir):
+        mkdir(save_dir)
+    plt.savefig(save_name)
 plt.show()

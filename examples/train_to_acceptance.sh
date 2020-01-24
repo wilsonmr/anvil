@@ -28,7 +28,6 @@ sample_runcard=$2
 run_id=$(grep "training_output:" $sample_runcard | awk '{print $2}')
 log_file=$run_id/training_log.out
 data_file=$run_id/training_data.out
-meta_file=$run_id/ # to do
 
 epochs_iter=$(grep "epochs:" $train_runcard | awk '{print $2}')
 n_iters=0  # local
@@ -42,6 +41,11 @@ if [ -d $run_id ]; then
     epochs=$( tail -1 "${run_id}/training_data.out" | awk '{print $1}' )
     train_time=$( tail -1 "${run_id}/training_data.out" | awk '{print $2}' )
     acceptance=$( tail -1 "${run_id}/training_data.out" | awk '{print $4}' )
+    echo "
+      #################################################################
+      #####                         NEW RUN                       #####
+      #################################################################
+     " >> $log_file
 else
     epochs=0
     acceptance=0
@@ -52,11 +56,6 @@ else
     ((n_iters++))
     train_time=$((end_time-start_time))
 fi
-echo "
-      #################################################################
-      #####                         NEW RUN                       #####
-      #################################################################
-     " >> $log_file
 
 # --- Loop until target acceptance achieved --- #
 while (( $(echo "$acceptance < $target_acceptance" | bc -l) ))
