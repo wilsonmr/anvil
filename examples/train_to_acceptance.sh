@@ -3,7 +3,6 @@
 
 # --- Exit gracefully --- #
 exit_gracefully () {
-    rm ${run_id}/tmp
     echo "Exiting..."
     echo "Iterations completed: $n_iters ($epochs epochs)"
     echo "Current train time: $((train_time / 60)) mins"
@@ -51,7 +50,7 @@ else
     acceptance=0
     # Run an iteration without attempting sampling
     start_time=$(date +%s)
-    anvil-train $train_runcard -o $run_id
+    anvil-train $train_runcard -o $run_id || exit
     end_time=$(date +%s)
     ((n_iters++))
     train_time=$((end_time-start_time))
@@ -69,7 +68,7 @@ do
     # Run sampling n_sample times
     for s in `seq 1 $n_sample`
     do
-        anvil-sample $sample_runcard >> ${run_id}/tmp
+        anvil-sample $sample_runcard >> ${run_id}/tmp || exit
     done
     echo "<<<<<<<<< ITERATION $n_iters >>>>>>>>>" >> $log_file
     cat ${run_id}/tmp >> $log_file

@@ -56,16 +56,12 @@ class ConfigParser(Config):
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
 
-    def parse_bias(self, b: (bool, list), hidden_nodes):
-        """Boolean list of length hidden_nodes + 1 corresponding to bias for that link"""
-        if type(b) == bool:
-            bias = [b,] * (len(hidden_nodes) + 1)
-        else:
-            if len(b) != len(hidden_nodes) + 1:
-                raise ConfigError(
-                    "Network 'bias' parameter should be either type(bool) or a boolean list of length one greater than the number of hidden_nodes."
-                )
-            bias = b
+    def parse_bias(self, bias: list, hidden_nodes):
+        """Boolean list of length hidden_nodes + 1 corresponding to bias for that layer"""
+        if len(bias) != len(hidden_nodes) + 1:
+            raise ConfigError(
+                "'bias' parameter should be a boolean list of length one greater than the number of hidden_nodes."
+            )
         return bias
 
     def produce_network_kwargs(self, hidden_nodes, bias):

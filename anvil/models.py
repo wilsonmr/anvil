@@ -23,7 +23,7 @@ import torch.nn as nn
 def block(f_in, f_out, bias):
     """A single block in the network, which can be stacked
     """
-    return nn.Sequential(nn.Linear(f_in, f_out, bias=bias), nn.LeakyReLU(),)
+    return nn.Sequential(nn.Linear(f_in, f_out, bias=bias), nn.LeakyReLU())
 
 
 class AffineLayer(nn.Module):
