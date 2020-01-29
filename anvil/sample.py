@@ -7,7 +7,7 @@ Module containing functions related to sampling from a trained model
 from math import exp, isfinite, ceil
 import logging
 
-import numpy as np
+from numpy.random import uniform
 import torch
 
 from tqdm import tqdm
@@ -71,10 +71,11 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
             "could run into nans based on minimum and maximum log of ratio of probabilities"
         )
 
+    rand_batch = uniform(size=batch_size+1)  # gen batch of random uniform numbers
     i = 0  # phi index of current state
     for j in range(1, batch_size + 1):  # j = phi index of proposed state
         condition = min(1, exp(float(log_ratio[i] - log_ratio[j])))
-        if np.random.uniform() <= condition:  # accepted
+        if rand_batch[j] <= condition:  # accepted
             chain_indices[j - 1] = j
             history[j - 1] = True
             i = j
@@ -159,10 +160,8 @@ def chain_autocorrelation(
 
     # Sample some states
     _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
-    
-    accepted = float(torch.sum(history))
-    #print(f"Acceptance: {accepted / batch_size}")
 
+    accepted = float(torch.sum(history))
     n_states = len(history)
     autocorrelations = torch.zeros(
         n_states + 1, dtype=torch.float
@@ -187,8 +186,6 @@ def chain_autocorrelation(
     integrated_autocorrelation = 0.5 + torch.sum(
         autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
     )
-    #print(f"Integrated autocorrelation time: {integrated_autocorrelation}")
-
     sample_interval = ceil(2 * integrated_autocorrelation)
     log.info(
         f"Guess for sampling interval: {sample_interval}, based on {batch_size} configurations."
@@ -273,11 +270,8 @@ def sample(
 
 _sample_training_output = collect("sample", ("training_context",))
 
+
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""
     return _sample_training_output[0]
 
-_short_sample = collect("chain_autocorrelation", ("training_context",))
-
-def short_sample(_short_sample):
-    return _short_sample[0]

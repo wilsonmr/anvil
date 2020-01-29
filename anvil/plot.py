@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from reportengine.figure import figure
 
+
 @figure
 def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
     print("Computing zero-momentum two point function...")
@@ -24,6 +25,7 @@ def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
     ax.set_title("Zero momentum two point function")
     return fig
 
+
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
     print("Computing effective pole mass...")
@@ -40,6 +42,7 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
     ax.set_xlabel("$t$")
     ax.set_title("Effective pole mass")
     return fig
+
 
 @figure
 def plot_2pf(training_geometry, two_point_function, bootstrap):
@@ -202,4 +205,3 @@ def plot_bootstrap_zero_momentum_2pf(bootstrap, zero_momentum_2pf):
 @figure
 def plot_bootstrap_effective_pole_mass(bootstrap, effective_pole_mass):
     return plot_bootstrap_dist(bootstrap, effective_pole_mass, r"$m_p^{eff}$")
-

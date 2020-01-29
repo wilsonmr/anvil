@@ -13,12 +13,6 @@ import numpy as np
 from scipy.signal import correlate
 import torch
 
-from tqdm import tqdm
-
-from reportengine import collect
-
-import matplotlib.pyplot as plt
-
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -40,7 +34,7 @@ class TwoPointFunction:
         self.states = states
         self.n_samples = bootstrap_n_samples
         self.sample_size = states.size(0)
-        
+
         # Bootstrap samples of size (n_samples, sample_size, n_states)
         self.sample_indices = np.random.choice(
             self.sample_size, (self.n_samples, self.sample_size), replace=True
@@ -122,21 +116,18 @@ class VolumeAveraged2pf:
         va_2pf = (self.states[:, shift] * self.states).mean(dim=1) - self.states.mean(
             dim=1
         ).pow(2)
+
         return va_2pf
 
 
 def two_point_function(
-    sample_training_output,
-    training_geometry,
-    bootstrap_n_samples=100,
+    sample_training_output, training_geometry, bootstrap_n_samples=100,
 ):
     r"""Return instance of TwoPointFunction which can be used to calculate the
     two point green function for a given seperation
     """
     return TwoPointFunction(
-        sample_training_output,
-        training_geometry,
-        bootstrap_n_samples,
+        sample_training_output, training_geometry, bootstrap_n_samples,
     )
 
 
@@ -278,9 +269,7 @@ class Bootstrap:
         obs_bootstrap = observable[1:]
 
         variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-        bias = (
-            torch.mean(obs_bootstrap) - obs_full
-        )  # not sure whether to use this
+        #bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
 
         return variance.sqrt()
 
@@ -292,7 +281,7 @@ def bootstrap(bootstrap_n_samples=100):
 ###############################
 ###     Autocorrelation     ###
 ###############################
-def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
+def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window=2.0):
     r"""Computes the autocorrelation of the volume-averaged two point function,
     the integrated autocorrelation time, and two other functions related to the
     computation of an optimal window size for the integrated autocorrelation.
@@ -334,9 +323,7 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
     x = t = 0  # Should really look at more than one separation
     va_2pf = volume_averaged_2pf(x, t)
     va_2pf -= va_2pf.mean()
-    autocorrelation = correlate(
-        va_2pf, va_2pf, mode="same"
-    )  # converts to numpy array
+    autocorrelation = correlate(va_2pf, va_2pf, mode="same")  # converts to numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
 
@@ -356,4 +343,3 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
     w = 4 * W_opt  # where to cut the plot off
 
     return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
-

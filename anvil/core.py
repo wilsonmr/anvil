@@ -84,14 +84,15 @@ class PhiFourAction(nn.Module):
         see class Notes for details on definition of action.
         """
         action = (
-            self.version_factor*(2 + 0.5 * self.m_sq) * phi_state ** 2 # phi^2 terms
+            self.version_factor * (2 + 0.5 * self.m_sq) * phi_state ** 2  # phi^2 terms
             + self.lam * phi_state ** 4  # phi^4 term
-            - self.version_factor*torch.sum(
+            - self.version_factor
+            * torch.sum(
                 phi_state[:, self.shift] * phi_state.view(-1, 1, self.length ** 2),
                 dim=1,
             )  # derivative
         ).sum(
-            dim=1, keepdim=True # sum across sites
+            dim=1, keepdim=True  # sum across sites
         )
         return action
 
@@ -135,7 +136,9 @@ class TrainingOutput:
             raise TrainingRuncardNotFound(
                 f"Invalid training output, no runcard found at: {self.config}"
             )
-        self.checkpoints = [Checkpoint(cp_path) for cp_path in glob(f"{self.path}/checkpoints/*")]
+        self.checkpoints = [
+            Checkpoint(cp_path) for cp_path in glob(f"{self.path}/checkpoints/*")
+        ]
         self.cp_ids = [cp.epoch for cp in self.checkpoints]
         self.name = self.path.name
 
