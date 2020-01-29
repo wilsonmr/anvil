@@ -12,7 +12,7 @@ version: https://arxiv.org/pdf/1904.12072.pdf
 import numpy as np
 from scipy.signal import correlate
 import torch
-
+from tqdm import tqdm
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -40,7 +40,17 @@ class TwoPointFunction:
             self.sample_size, (self.n_samples, self.sample_size), replace=True
         )
 
-    def __call__(self, x_0: int, x_1: int):
+        self.value = []
+        pbar = tqdm(total=self.geometry.length**2, desc="G(x,t)")
+        for x_0 in range(self.geometry.length):
+            tmp = []
+            for x_1 in range(self.geometry.length):
+                tmp.append(self.calc(x_0, x_1))
+                pbar.update(1)
+            self.value.append(tmp)
+        pbar.close()
+
+    def calc(self, x_0: int, x_1: int):
         r"""Calculates the two point connected green function given a set of
         states G(x) where x = (x_0, x_1) refers to a shift applied to the fields
         \phi
@@ -87,13 +97,24 @@ class TwoPointFunction:
 
         return torch.cat((g_func.view(1), g_func_boot))
 
+    def __call__(self, x_0: int, x_1: int):
+        return self.value[x_0][x_1]
+
 
 class VolumeAveraged2pf:
     def __init__(self, states, geometry):
         self.geometry = geometry
         self.states = states
 
-    def __call__(self, x_0: int, x_1: int):
+        self.value = []
+        for x_0 in range(self.geometry.length):
+            tmp = []
+            for x_1 in range(self.geometry.length):
+                tmp.append(self.calc(x_0, x_1))
+            self.value.append(tmp)
+
+
+    def calc(self, x_0: int, x_1: int):
         """
         Return torch Tensor of volume-averaged two point functions, i.e.
         where <\phi(x)> is a mean over points within a single configuration.
@@ -118,6 +139,9 @@ class VolumeAveraged2pf:
         ).pow(2)
 
         return va_2pf
+
+    def __call__(self, x_0: int, x_1: int):
+        return self.value[x_0][x_1]
 
 
 def two_point_function(

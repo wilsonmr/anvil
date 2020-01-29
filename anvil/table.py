@@ -2,7 +2,6 @@ from math import ceil, floor, log10, fabs
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from reportengine.table import table
 
@@ -52,9 +51,7 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry, bootstrap)
 
 @table
 def table_2pf(training_geometry, two_point_function, bootstrap):
-    print("Computing two point function and error...")
     corr = []
-    pbar = tqdm(total=training_geometry.length ** 2, desc="(x,t)")
     for j in range(training_geometry.length ** 2):
         corr.append(
             [
@@ -73,9 +70,6 @@ def table_2pf(training_geometry, two_point_function, bootstrap):
                 ),
             ],
         )
-        pbar.update(1)
-    pbar.close()
-
     df = pd.DataFrame(
         corr,
         columns=["Mean", "Standard deviation"],
