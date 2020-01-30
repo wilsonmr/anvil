@@ -36,8 +36,7 @@ def loaded_model(loaded_checkpoint, model):
     return new_model
 
 
-def loaded_optimizer(loaded_model, loaded_checkpoint, optimizer, optimizer_kwargs):
-    # TODO: implement optimizer input
+def loaded_optimizer(loaded_model, loaded_checkpoint, optimizer='adam', optimizer_kwargs={}):
     new_optimizer = valid_optimizers[optimizer](loaded_model.parameters(), **optimizer_kwargs)
     if loaded_checkpoint is not None:
         new_optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])

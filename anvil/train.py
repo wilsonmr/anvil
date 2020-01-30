@@ -42,7 +42,7 @@ def train(
     outpath,
     current_loss,
     loaded_optimizer,
-    scheduler_kwargs,
+    scheduler_kwargs={'patience': 500},
 ):
     """training loop of model"""
     # create your optimizer and a scheduler

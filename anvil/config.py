@@ -126,6 +126,7 @@ class ConfigParser(Config):
         return optim
 
     def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+        # This will only be executed if optimizer is defined in the runcard
         if optimizer == "adam":
             valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
         if optimizer == "adadelta":
@@ -138,11 +139,6 @@ class ConfigParser(Config):
         return kwargs
 
     def parse_scheduler_kwargs(self, kwargs: dict):
-        if "factor" in kwargs:
-            if not 0 < kwargs["factor"] <= 1:
-                raise ConfigError(
-                    "The learning rate reduction factor should be between 0 < factor < 1"
-                )
         if "patience" not in kwargs:
             kwargs["patience"] = 500  # problem setting default in config parser?
         return kwargs
