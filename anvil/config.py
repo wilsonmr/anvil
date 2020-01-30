@@ -16,10 +16,11 @@ log = logging.getLogger(__name__)
 
 
 class ConfigParser(Config):
-    """Extend the reportengine Config class for <project name> specific
+    """Extend the reportengine Config class for anvil-specific
     objects
     """
 
+    # --- Lattice --- #
     def parse_lattice_length(self, length: int):
         return length
 
@@ -33,19 +34,61 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
+    def produce_geometry(self, lattice_length):
+        return Geometry2D(lattice_length)
+
+    # --- Action --- #
+    def parse_m_sq(self, m: (float, int)):
+        return m
+
+    def parse_lam(self, lam: (float, int)):
+        return lam
+
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
+
+    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
+        return PhiFourAction(
+            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
+        )
+
+    # --- Neural networks --- #
+    def parse_hidden_nodes(self, hid_spec):
+        return hid_spec
+
+    def produce_network_kwargs(self, hidden_nodes):
+        """Returns a dictionary that is the necessary kwargs for the NVP class
+        This means in the future if we change the class to have more flexibility
+        with regard to network spec then we can use this function to bridge
+        backwards compatibility"""
+        hidden_nodes = tuple(hidden_nodes)
+        return dict(affine_hidden_shape=hidden_nodes)
+
+    # --- Normalising flow model --- #
     def parse_n_affine(self, n: int):
         return n
 
+    def parse_n_batch(self, nb: int):
+        return nb
+
+    def produce_model(self, lattice_size, n_affine, network_kwargs):
+        model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
+        return model
+
+    # --- Training --- #
     def parse_epochs(self, epochs: int):
         return epochs
 
-    @element_of("cp_ids")
-    def parse_cp_id(self, cp: (int, type(None))):
-        return cp
+    def parse_save_interval(self, save_int: int):
+        return save_int
 
     @element_of("training_outputs")
     def parse_training_output(self, path: str):
         return TrainingOutput(path)
+
+    @element_of("cp_ids")
+    def parse_cp_id(self, cp: (int, type(None))):
+        return cp
 
     @element_of("checkpoints")
     def produce_checkpoint(self, cp_id=None, training_output=None):
@@ -58,41 +101,36 @@ class ConfigParser(Config):
         # get index from training_output class
         return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
 
-    def parse_hidden_nodes(self, hid_spec):
-        return hid_spec
+    def produce_training_context(self, training_output):
+        """Given a training output produce the context of that training"""
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+            _, model = self.parse_from_(None, "model", write=False)
+            _, action = self.parse_from_(None, "action", write=False)
+            _, cps = self.parse_from_(None, "checkpoints", write=False)
 
-    def produce_network_kwargs(self, hidden_nodes):
-        """Returns a dictionary that is the necessary kwargs for the NVP class
-        This means in the future if we change the class to have more flexibility
-        with regard to network spec then we can use this function to bridge
-        backwards compatibility"""
-        hidden_nodes = tuple(hidden_nodes)
-        return dict(affine_hidden_shape=hidden_nodes)
+        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
-        return model
+    def produce_training_geometry(self, training_output):
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+        return geometry
 
-    def parse_optimiser_input(self, optim):
+    # --- Optimizer and scheduler --- #
+    def parse_optimizer_input(self, optim):
         raise NotImplementedError
 
-    def parse_m_sq(self, m: (float, int)):
-        return m
+    def parse_scheduler_kwargs(self, kwargs: dict):
+        if 'factor' in kwargs:
+            if not 0 < kwargs['factor'] <= 1:
+                raise ConfigError(
+                    "The learning rate reduction factor should be between 0 < factor < 1"
+                )
+        if 'patience' not in kwargs:
+            kwargs['patience'] = 500  # problem setting default in config parser?
+        return kwargs
 
-    def parse_lam(self, lam: (float, int)):
-        return lam
-
-    def parse_use_arxiv_version(self, do_use: bool):
-        return do_use
-
-    def produce_geometry(self, lattice_length):
-        return Geometry2D(lattice_length)
-
-    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
-        return PhiFourAction(
-            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
-        )
-
+    # --- Sampling --- #
     def parse_target_length(self, targ: int):
         return targ
 
@@ -126,18 +164,3 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
-
-    def produce_training_context(self, training_output):
-        """Given a training output produce the context of that training"""
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-            _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
-            _, cps = self.parse_from_(None, "checkpoints", write=False)
-
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
-
-    def produce_training_geometry(self, training_output):
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-        return geometry
