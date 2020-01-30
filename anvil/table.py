@@ -5,9 +5,10 @@ import pandas as pd
 
 from reportengine.table import table
 
+from anvil.observables import bootstrap
 
 @table
-def ising_observables_table(ising_energy, susceptibility, bootstrap, training_output):
+def ising_observables_table(ising_energy, susceptibility, training_output):
     IE, IE_std = float(ising_energy[0]), float(bootstrap(ising_energy))
     S, S_std = float(susceptibility[0]), float(bootstrap(susceptibility))
     res = [[IE, IE_std], [S, S_std]]
@@ -20,7 +21,7 @@ def ising_observables_table(ising_energy, susceptibility, bootstrap, training_ou
 
 
 @table
-def table_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
+def table_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
     zm2pf, zm2pf_std = zero_momentum_2pf[0, :], bootstrap(zero_momentum_2pf)
     g_tilde = []
     for t in range(training_geometry.length):
@@ -35,7 +36,7 @@ def table_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
 
 
 @table
-def table_effective_pole_mass(effective_pole_mass, training_geometry, bootstrap):
+def table_effective_pole_mass(effective_pole_mass, training_geometry):
     epm, epm_std = effective_pole_mass[0, :], bootstrap(effective_pole_mass)
     m_eff = []
     for t in range(training_geometry.length - 2):
@@ -50,7 +51,7 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry, bootstrap)
 
 
 @table
-def table_2pf(training_geometry, two_point_function, bootstrap):
+def table_2pf(training_geometry, two_point_function):
     corr = []
     for j in range(training_geometry.length ** 2):
         corr.append(
