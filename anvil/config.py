@@ -20,7 +20,6 @@ class ConfigParser(Config):
     objects
     """
 
-    # --- Lattice --- #
     def parse_lattice_length(self, length: int):
         return length
 
@@ -37,7 +36,6 @@ class ConfigParser(Config):
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    # --- Action --- #
     def parse_m_sq(self, m: (float, int)):
         return m
 
@@ -52,7 +50,6 @@ class ConfigParser(Config):
             m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
         )
 
-    # --- Neural networks --- #
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
 
@@ -64,7 +61,6 @@ class ConfigParser(Config):
         hidden_nodes = tuple(hidden_nodes)
         return dict(affine_hidden_shape=hidden_nodes)
 
-    # --- Normalising flow model --- #
     def parse_n_affine(self, n: int):
         return n
 
@@ -75,7 +71,6 @@ class ConfigParser(Config):
         model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
         return model
 
-    # --- Training --- #
     def parse_epochs(self, epochs: int):
         return epochs
 
@@ -116,7 +111,6 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    # --- Optimizer and scheduler --- #
     def parse_optimizer(self, optim: str):
         valid_optimizers = ("adam", "adadelta")
         if optim not in valid_optimizers:
@@ -143,7 +137,6 @@ class ConfigParser(Config):
             kwargs["patience"] = 500  # problem setting default in config parser?
         return kwargs
 
-    # --- Sampling --- #
     def parse_target_length(self, targ: int):
         return targ
 
