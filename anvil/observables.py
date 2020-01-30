@@ -14,6 +14,7 @@ from scipy.signal import correlate
 import torch
 from tqdm import tqdm
 
+
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
 
@@ -32,7 +33,7 @@ def bootstrap(observable):
     obs_bootstrap = observable[1:]
 
     variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-    #bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
+    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
 
     return variance.sqrt()
 
@@ -50,7 +51,7 @@ class TwoPointFunction:
         )
 
         self.value = []
-        pbar = tqdm(total=self.geometry.length**2, desc="G(x,t)")
+        pbar = tqdm(total=self.geometry.length ** 2, desc="G(x,t)")
         for x_0 in range(self.geometry.length):
             tmp = []
             for x_1 in range(self.geometry.length):
@@ -121,7 +122,6 @@ class VolumeAveraged2pf:
             for x_1 in range(self.geometry.length):
                 tmp.append(self.calc(x_0, x_1))
             self.value.append(tmp)
-
 
     def calc(self, x_0: int, x_1: int):
         """

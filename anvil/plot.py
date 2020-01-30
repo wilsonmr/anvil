@@ -7,6 +7,7 @@ from reportengine.figure import figure
 
 from anvil.observables import bootstrap
 
+
 @figure
 def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
     error = bootstrap(zero_momentum_2pf)

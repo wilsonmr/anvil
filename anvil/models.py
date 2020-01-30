@@ -94,9 +94,14 @@ class AffineLayer(nn.Module):
             [self._block(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
         )
         self.t_layers = nn.ModuleList(
-            [self._block(t_in, t_out) for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])]
+            [
+                self._block(t_in, t_out)
+                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
+            ]
         )
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]  # no ReLU on last t layer
+        self.t_layers += [
+            nn.Linear(t_shape[-2], t_shape[-1])
+        ]  # no ReLU on last t layer
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -113,14 +118,11 @@ class AffineLayer(nn.Module):
 
     def _block(self, f_in, f_out):
         """Defines a single block within the neural networks.
-        
+
         Currently hard coded to be a dense layed followed by a leaky ReLU,
         but could potentially specify in runcard.
         """
-        return nn.Sequential(
-                nn.Linear(f_in, f_out),
-                nn.LeakyReLU(),
-                )
+        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network

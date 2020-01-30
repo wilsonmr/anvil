@@ -7,6 +7,7 @@ from reportengine.table import table
 
 from anvil.observables import bootstrap
 
+
 @table
 def ising_observables_table(ising_energy, susceptibility, training_output):
     IE, IE_std = float(ising_energy[0]), float(bootstrap(ising_energy))
