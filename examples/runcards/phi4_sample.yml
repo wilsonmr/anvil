@@ -1,0 +1,35 @@
+training_output: train
+
+cp_id: -1
+target_length: 10000
+
+thermalisation: 1000
+sample_interval: null
+
+bootstrap_n_samples: 1000
+window: 2.0
+
+meta:
+  author: Author
+  title: Training Report
+  keywords: [example]
+
+template_text: |
+ # Ising observables
+ {@ising_observables_table@}
+ # Zero momentum two point function
+ {@plot_zero_momentum_2pf@}
+ {@table_zero_momentum_2pf@}
+ # Effective pole mass
+ {@plot_effective_pole_mass@}
+ {@table_effective_pole_mass@}
+ # Two Point Function
+ {@plot_2pf@}
+ {@table_2pf@}
+ # Autocorrelation
+ {@plot_volume_averaged_2pf@}
+ {@plot_autocorrelation_2pf@}
+ {@table_autocorrelation_2pf@}
+
+actions_:
+  - report(main=True)
