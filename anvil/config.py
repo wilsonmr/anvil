@@ -117,17 +117,34 @@ class ConfigParser(Config):
         return geometry
 
     # --- Optimizer and scheduler --- #
-    def parse_optimizer_input(self, optim):
-        raise NotImplementedError
+    def parse_optimizer(self, optim: str):
+        valid_optimizers = ("adam", "adadelta")
+        if optim not in valid_optimizers:
+            raise ConfigError(
+                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
+            )
+        return optim
+
+    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+        if optimizer == "adam":
+            valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
+        if optimizer == "adadelta":
+            valid_kwargs = ("lr", "rho", "weight_decay", "eps")
+
+        if not all([arg in valid_kwargs for arg in kwargs]):
+            raise ConfigError(
+                f"Valid optimizer_kwargs for {optimizer} are {', '.join([arg for arg in valid_kwargs])}"
+            )
+        return kwargs
 
     def parse_scheduler_kwargs(self, kwargs: dict):
-        if 'factor' in kwargs:
-            if not 0 < kwargs['factor'] <= 1:
+        if "factor" in kwargs:
+            if not 0 < kwargs["factor"] <= 1:
                 raise ConfigError(
                     "The learning rate reduction factor should be between 0 < factor < 1"
                 )
-        if 'patience' not in kwargs:
-            kwargs['patience'] = 500  # problem setting default in config parser?
+        if "patience" not in kwargs:
+            kwargs["patience"] = 500  # problem setting default in config parser?
         return kwargs
 
     # --- Sampling --- #
