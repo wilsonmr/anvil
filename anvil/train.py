@@ -42,12 +42,12 @@ def train(
     outpath,
     current_loss,
     loaded_optimizer,
-    scheduler_kwargs,
+    scheduler_kwargs={"patience": 500},
 ):
     """training loop of model"""
     # create your optimizer and a scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        loaded_optimizer, **scheduler_kwargs, verbose=True
+        loaded_optimizer, **scheduler_kwargs
     )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")

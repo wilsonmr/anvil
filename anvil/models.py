@@ -20,12 +20,6 @@ import torch
 import torch.nn as nn
 
 
-def block(f_in, f_out, bias):
-    """A single block in the network, which can be stacked
-    """
-    return nn.Sequential(nn.Linear(f_in, f_out, bias=bias), nn.LeakyReLU())
-
-
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
@@ -59,9 +53,6 @@ class AffineLayer(nn.Module):
     t_hidden_shape: tuple
         tuple which gives the number of nodes in the hidden layers of neural
         network t_i.
-    bias: tuple
-        tuple of bools specifying whether a given Linear transformation should
-        include a shift (bias)
     i_affine: int
         index of this affine layer in full set of affine transformations,
         dictates which half of the data is transformed as a and b, since
@@ -92,12 +83,7 @@ class AffineLayer(nn.Module):
     """
 
     def __init__(
-        self,
-        size_in: int,
-        s_hidden_shape: tuple,
-        t_hidden_shape: tuple,
-        bias: tuple,
-        i_affine: int,
+        self, size_in: int, s_hidden_shape: tuple, t_hidden_shape: tuple, i_affine: int
     ):
         super(AffineLayer, self).__init__()
         size_half = int(size_in / 2)
@@ -105,18 +91,17 @@ class AffineLayer(nn.Module):
         t_shape = [size_half, *t_hidden_shape, size_half]
 
         self.s_layers = nn.ModuleList(
-            [
-                block(s_in, s_out, bias[ib])
-                for s_in, s_out, ib in zip(s_shape[:-1], s_shape[1:], bias)
-            ]
+            [self._block(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
         )
         self.t_layers = nn.ModuleList(
             [
-                block(t_in, t_out, bias[ib])
-                for t_in, t_out, ib in zip(t_shape[:-2], t_shape[1:-1], bias[:-1])
+                self._block(t_in, t_out)
+                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
             ]
         )
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1], bias[-1])]
+        self.t_layers += [
+            nn.Linear(t_shape[-2], t_shape[-1])
+        ]  # no ReLU on last t layer
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -130,6 +115,14 @@ class AffineLayer(nn.Module):
             self.join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
+
+    def _block(self, f_in, f_out):
+        """Defines a single block within the neural networks.
+
+        Currently hard coded to be a dense layed followed by a leaky ReLU,
+        but could potentially specify in runcard.
+        """
+        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
@@ -268,9 +261,6 @@ class RealNVP(nn.Module):
         given with shape (N_states, `size_in`)
     affine_hidden_shape: tuple
         tuple defining the number of nodes in the hidden layers of s and t.
-    bias: tuple
-        tuple of bools specifying whether a given Linear transformation should
-        include a shift (bias)
 
     Attributes
     ----------
@@ -280,7 +270,7 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, n_affine: int, size_in: int, affine_hidden_shape: tuple, bias: tuple
+        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
     ):
         super(RealNVP, self).__init__()
         self.size_in = size_in
@@ -288,7 +278,7 @@ class RealNVP(nn.Module):
         self._log_gauss_norm = log(sqrt(pow(2 * pi, size_in)))
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, bias, i)
+                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
                 for i in range(n_affine)
             ]
         )

@@ -20,7 +20,6 @@ class ConfigParser(Config):
     objects
     """
 
-    # --- Lattice --- #
     def parse_lattice_length(self, length: int):
         return length
 
@@ -37,7 +36,6 @@ class ConfigParser(Config):
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    # --- Theory parameters --- #
     def parse_m_sq(self, m: (float, int)):
         return m
 
@@ -52,28 +50,17 @@ class ConfigParser(Config):
             m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
         )
 
-    # --- Neural networks --- #
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
 
-    def parse_bias(self, bias: list, hidden_nodes):
-        """Boolean list of length hidden_nodes + 1 corresponding to bias for that layer"""
-        if len(bias) != len(hidden_nodes) + 1:
-            raise ConfigError(
-                "'bias' parameter should be a boolean list of length one greater than the number of hidden_nodes."
-            )
-        return bias
-
-    def produce_network_kwargs(self, hidden_nodes, bias):
+    def produce_network_kwargs(self, hidden_nodes):
         """Returns a dictionary that is the necessary kwargs for the NVP class
         This means in the future if we change the class to have more flexibility
         with regard to network spec then we can use this function to bridge
         backwards compatibility"""
         hidden_nodes = tuple(hidden_nodes)
-        bias = tuple(bias)
-        return dict(affine_hidden_shape=hidden_nodes, bias=bias)
+        return dict(affine_hidden_shape=hidden_nodes)
 
-    # --- Normalising flow model --- #
     def parse_n_affine(self, n: int):
         return n
 
@@ -84,7 +71,6 @@ class ConfigParser(Config):
         model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
         return model
 
-    # --- Training --- #
     def parse_epochs(self, epochs: int):
         return epochs
 
@@ -117,7 +103,6 @@ class ConfigParser(Config):
             _, model = self.parse_from_(None, "model", write=False)
             _, action = self.parse_from_(None, "action", write=False)
             _, cps = self.parse_from_(None, "checkpoints", write=False)
-
         return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
 
     def produce_training_geometry(self, training_output):
@@ -125,46 +110,32 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    # --- Optimizer and scheduler --- #
-    def parse_optimizer_input(self, optim):
-        raise NotImplementedError
-
-    def parse_factor(self, factor: (float, int)):
-        if factor < 0:
-            log.warning(
-                "Using default value of scheduler learning rate reduction factor"
-            )
-        elif factor > 1:
+    def parse_optimizer(self, optim: str):
+        valid_optimizers = ("adam", "adadelta")
+        if optim not in valid_optimizers:
             raise ConfigError(
-                "The learning rate reduction factor should be between 0 < factor < 1"
+                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
             )
-        return factor
+        return optim
 
-    def parse_patience(self, patience: int):
-        if patience < 0:
-            log.warning("Using default value of scheduler patience")
-        return patience
+    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+        # This will only be executed if optimizer is defined in the runcard
+        if optimizer == "adam":
+            valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
+        if optimizer == "adadelta":
+            valid_kwargs = ("lr", "rho", "weight_decay", "eps")
 
-    def parse_cooldown(self, cooldown: int):
-        if cooldown < 0:
-            log.warning("Using default value of scheduler cooldown")
-        return cooldown
+        if not all([arg in valid_kwargs for arg in kwargs]):
+            raise ConfigError(
+                f"Valid optimizer_kwargs for {optimizer} are {', '.join([arg for arg in valid_kwargs])}"
+            )
+        return kwargs
 
-    def parse_min_lr(self, min_lr: (int, float)):
-        if min_lr < 0:
-            log.warning("Using default value of scheduler minimum learning rate")
-        return min_lr
+    def parse_scheduler_kwargs(self, kwargs: dict):
+        if "patience" not in kwargs:
+            kwargs["patience"] = 500  # problem setting default in config parser?
+        return kwargs
 
-    def produce_scheduler_kwargs(self, factor, patience, cooldown, min_lr):
-        scheduler_kwargs = {
-            "factor": factor,
-            "patience": patience,
-            "cooldown": cooldown,
-            "min_lr": min_lr,
-        }
-        return {k: v for k, v in scheduler_kwargs.items() if v != -1}
-
-    # --- Sampling --- #
     def parse_target_length(self, targ: int):
         return targ
 

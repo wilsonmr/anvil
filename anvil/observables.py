@@ -12,12 +12,7 @@ version: https://arxiv.org/pdf/1904.12072.pdf
 import numpy as np
 from scipy.signal import correlate
 import torch
-
 from tqdm import tqdm
-
-from reportengine import collect
-
-import matplotlib.pyplot as plt
 
 
 def arcosh(x):
@@ -31,22 +26,41 @@ def arcosh(x):
     return c0 + c1
 
 
-###############################
-#####     Observables     #####
-###############################
+def bootstrap(observable):
+    """Return the standard deviation for an observable based on a number of
+    'bootstrap' samples."""
+    obs_full = observable[0]
+    obs_bootstrap = observable[1:]
+
+    variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
+    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
+
+    return variance.sqrt()
+
+
 class TwoPointFunction:
     def __init__(self, states, geometry, bootstrap_n_samples):
         self.geometry = geometry
         self.states = states
         self.n_samples = bootstrap_n_samples
         self.sample_size = states.size(0)
-        
+
         # Bootstrap samples of size (n_samples, sample_size, n_states)
         self.sample_indices = np.random.choice(
             self.sample_size, (self.n_samples, self.sample_size), replace=True
         )
 
-    def __call__(self, x_0: int, x_1: int):
+        self.value = []
+        pbar = tqdm(total=self.geometry.length ** 2, desc="G(x,t)")
+        for x_0 in range(self.geometry.length):
+            tmp = []
+            for x_1 in range(self.geometry.length):
+                tmp.append(self.calc(x_0, x_1))
+                pbar.update(1)
+            self.value.append(tmp)
+        pbar.close()
+
+    def calc(self, x_0: int, x_1: int):
         r"""Calculates the two point connected green function given a set of
         states G(x) where x = (x_0, x_1) refers to a shift applied to the fields
         \phi
@@ -93,13 +107,23 @@ class TwoPointFunction:
 
         return torch.cat((g_func.view(1), g_func_boot))
 
+    def __call__(self, x_0: int, x_1: int):
+        return self.value[x_0][x_1]
+
 
 class VolumeAveraged2pf:
     def __init__(self, states, geometry):
         self.geometry = geometry
         self.states = states
 
-    def __call__(self, x_0: int, x_1: int):
+        self.value = []
+        for x_0 in range(self.geometry.length):
+            tmp = []
+            for x_1 in range(self.geometry.length):
+                tmp.append(self.calc(x_0, x_1))
+            self.value.append(tmp)
+
+    def calc(self, x_0: int, x_1: int):
         """
         Return torch Tensor of volume-averaged two point functions, i.e.
         where <\phi(x)> is a mean over points within a single configuration.
@@ -122,21 +146,21 @@ class VolumeAveraged2pf:
         va_2pf = (self.states[:, shift] * self.states).mean(dim=1) - self.states.mean(
             dim=1
         ).pow(2)
+
         return va_2pf
+
+    def __call__(self, x_0: int, x_1: int):
+        return self.value[x_0][x_1]
 
 
 def two_point_function(
-    sample_training_output,
-    training_geometry,
-    bootstrap_n_samples=100,
+    sample_training_output, training_geometry, bootstrap_n_samples=100,
 ):
     r"""Return instance of TwoPointFunction which can be used to calculate the
     two point green function for a given seperation
     """
     return TwoPointFunction(
-        sample_training_output,
-        training_geometry,
-        bootstrap_n_samples,
+        sample_training_output, training_geometry, bootstrap_n_samples,
     )
 
 
@@ -145,7 +169,7 @@ def volume_averaged_2pf(sample_training_output, training_geometry):
     return VolumeAveraged2pf(sample_training_output, training_geometry)
 
 
-def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples=100):
+def zero_momentum_2pf(training_geometry, two_point_function):
     r"""Calculate the zero momentum green function as a function of t
     \tilde{G}(t, 0) which is assumed to be in the first dimension defined as
 
@@ -169,7 +193,7 @@ def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples
     """
     g_func_zeromom = []
     for t in range(training_geometry.length):
-        g_tilde_t = torch.zeros(bootstrap_n_samples + 1, dtype=torch.float)
+        g_tilde_t = torch.zeros(two_point_function(0, 0).size(), dtype=torch.float)
         for x in range(training_geometry.length):
             g_tilde_t += two_point_function(t, x)
         g_func_zeromom.append(g_tilde_t / training_geometry.length)
@@ -177,7 +201,7 @@ def zero_momentum_2pf(training_geometry, two_point_function, bootstrap_n_samples
     return torch.stack(g_func_zeromom).transpose(0, 1)
 
 
-def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples=100):
+def effective_pole_mass(zero_momentum_2pf):
     r"""Calculate the effective pole mass m^eff(t) defined as
 
         m^eff(t) = arcosh(
@@ -211,7 +235,7 @@ def effective_pole_mass(zero_momentum_2pf, bootstrap_n_samples=100):
     return torch.stack(m_t).transpose(0, 1)
 
 
-def susceptibility(training_geometry, two_point_function, bootstrap_n_samples=100):
+def susceptibility(training_geometry, two_point_function):
     r"""Calculate the susceptibility, which is the sum of two point connected
     green functions over all seperations
 
@@ -230,7 +254,7 @@ def susceptibility(training_geometry, two_point_function, bootstrap_n_samples=10
     as defined in eq. (25) of https://arxiv.org/pdf/1904.12072.pdf
 
     """
-    chi = torch.zeros(bootstrap_n_samples + 1, dtype=torch.float)
+    chi = torch.zeros(two_point_function(0, 0).size(), dtype=torch.float)
     for t in range(training_geometry.length):
         for x in range(training_geometry.length):
             chi += two_point_function(t, x)
@@ -238,7 +262,7 @@ def susceptibility(training_geometry, two_point_function, bootstrap_n_samples=10
     return chi
 
 
-def ising_energy(two_point_function, bootstrap_n_samples=100):
+def ising_energy(two_point_function):
     r"""Ising energy defined as
 
         E = 1/d sum_{\mu} G(\mu)
@@ -263,36 +287,7 @@ def ising_energy(two_point_function, bootstrap_n_samples=100):
     return E
 
 
-#################################
-###       Bootstrapping       ###
-#################################
-class Bootstrap:
-    """Return the standard deviation for an observable based on a number of
-    'bootstrap' samples."""
-
-    def __init__(self, bootstrap_n_samples):
-        self.n_samples = bootstrap_n_samples
-
-    def __call__(self, observable):
-        obs_full = observable[0]
-        obs_bootstrap = observable[1:]
-
-        variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-        bias = (
-            torch.mean(obs_bootstrap) - obs_full
-        )  # not sure whether to use this
-
-        return variance.sqrt()
-
-
-def bootstrap(bootstrap_n_samples=100):
-    return Bootstrap(bootstrap_n_samples)
-
-
-###############################
-###     Autocorrelation     ###
-###############################
-def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
+def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window=2.0):
     r"""Computes the autocorrelation of the volume-averaged two point function,
     the integrated autocorrelation time, and two other functions related to the
     computation of an optimal window size for the integrated autocorrelation.
@@ -334,9 +329,7 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
     x = t = 0  # Should really look at more than one separation
     va_2pf = volume_averaged_2pf(x, t)
     va_2pf -= va_2pf.mean()
-    autocorrelation = correlate(
-        va_2pf, va_2pf, mode="same"
-    )  # converts to numpy array
+    autocorrelation = correlate(va_2pf, va_2pf, mode="same")  # converts to numpy array
     c = np.argmax(autocorrelation)
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
 
@@ -356,4 +349,3 @@ def autocorrelation_2pf(training_geometry, volume_averaged_2pf, window = 2.0):
     w = 4 * W_opt  # where to cut the plot off
 
     return autocorrelation[:w], tau_int_W[:w], tau_exp_W[:w], g_W[:w], W_opt
-

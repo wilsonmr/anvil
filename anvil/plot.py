@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import torch
-from tqdm import tqdm
 
 from reportengine.figure import figure
 
+from anvil.observables import bootstrap
+
+
 @figure
-def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
-    print("Computing zero-momentum two point function...")
+def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
     error = bootstrap(zero_momentum_2pf)
     fig, ax = plt.subplots()
     ax.errorbar(
@@ -24,9 +25,9 @@ def plot_zero_momentum_2pf(zero_momentum_2pf, training_geometry, bootstrap):
     ax.set_title("Zero momentum two point function")
     return fig
 
+
 @figure
-def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
-    print("Computing effective pole mass...")
+def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     error = bootstrap(effective_pole_mass)
     fig, ax = plt.subplots()
     ax.errorbar(
@@ -41,18 +42,15 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass, bootstrap):
     ax.set_title("Effective pole mass")
     return fig
 
+
 @figure
-def plot_2pf(training_geometry, two_point_function, bootstrap):
-    print("Computing two point function and error...")
+def plot_2pf(training_geometry, two_point_function):
     corr = np.empty((training_geometry.length, training_geometry.length))
     std = np.empty((training_geometry.length, training_geometry.length))
-    pbar = tqdm(total=training_geometry.length ** 2, desc="(x,t)")
     for t in range(training_geometry.length):
         for x in range(training_geometry.length):
             corr[x, t] = float(two_point_function(t, x)[0])
             std[x, t] = float(bootstrap(two_point_function(t, x)))
-            pbar.update(1)
-    pbar.close()
 
     fractional_std = std / corr
 
@@ -75,12 +73,8 @@ def plot_2pf(training_geometry, two_point_function, bootstrap):
     return fig
 
 
-#################################
-###     Time-series plots     ###
-#################################
 @figure
 def plot_volume_averaged_2pf(volume_averaged_2pf):
-    print("Computing volume-averaged two point function for each step...")
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
     ax.set_ylabel("$G_k(0,0)$")
@@ -95,7 +89,6 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
     integrated autocorrelation, exponential autocorrelation, and the "g" function
     whose minimum corresponds to a window size where errors in the integrated
     autocorrelation are minimised."""
-    print("Computing autocorrelation...")
     autocorrelation, tau_int_W, tau_exp_W, g_W, W_opt = autocorrelation_2pf
     W = np.arange(1, tau_int_W.size + 1)
 
@@ -127,10 +120,7 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
     return fig
 
 
-#######################################
-###     Bootstrap distributions     ###
-#######################################
-def plot_bootstrap_dist(bootstrap, observable, label):
+def plot_bootstrap_dist(observable, label):
     """Plot the distribution of some observable calculated using many bootstrap samples"""
 
     def do_plot(ax, full_data, bootstrap_data, std):
@@ -178,28 +168,27 @@ def plot_bootstrap_dist(bootstrap, observable, label):
 
 
 @figure
-def plot_bootstrap_2pf(bootstrap, two_point_function):
+def plot_bootstrap_2pf(two_point_function):
     x = t = 0
     data_to_plot = two_point_function(x, t)
-    return plot_bootstrap_dist(bootstrap, data_to_plot, rf"$G$({x},{t})")
+    return plot_bootstrap_dist(data_to_plot, rf"$G$({x},{t})")
 
 
 @figure
-def plot_bootstrap_susceptibility(bootstrap, susceptibility):
-    return plot_bootstrap_dist(bootstrap, susceptibility, r"$\chi$")
+def plot_bootstrap_susceptibility(susceptibility):
+    return plot_bootstrap_dist(susceptibility, r"$\chi$")
 
 
 @figure
-def plot_bootstrap_ising_energy(bootstrap, ising_energy):
-    return plot_bootstrap_dist(bootstrap, ising_energy, r"Ising $E$")
+def plot_bootstrap_ising_energy(ising_energy):
+    return plot_bootstrap_dist(ising_energy, r"Ising $E$")
 
 
 @figure
-def plot_bootstrap_zero_momentum_2pf(bootstrap, zero_momentum_2pf):
-    return plot_bootstrap_dist(bootstrap, zero_momentum_2pf, r"$\tilde G(0,t)$")
+def plot_bootstrap_zero_momentum_2pf(zero_momentum_2pf):
+    return plot_bootstrap_dist(zero_momentum_2pf, r"$\tilde G(0,t)$")
 
 
 @figure
-def plot_bootstrap_effective_pole_mass(bootstrap, effective_pole_mass):
-    return plot_bootstrap_dist(bootstrap, effective_pole_mass, r"$m_p^{eff}$")
-
+def plot_bootstrap_effective_pole_mass(effective_pole_mass):
+    return plot_bootstrap_dist(effective_pole_mass, r"$m_p^{eff}$")
