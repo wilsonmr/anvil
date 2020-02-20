@@ -13,16 +13,17 @@ import numpy as np
 from scipy.signal import correlate
 import torch
 
+
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
 
         arcosh(x) = log_e (x + sqrt(x^2 - 1) )
                   = log_e (x) + log_e (1 + sqrt(x^2 - 1) / x)
     """
-    #c0 = torch.log(x)
-    #c1 = torch.log1p(torch.sqrt(x * x - 1) / x)
-    #return c0 + c1
-    #NOTE: might need stable version here
+    # c0 = torch.log(x)
+    # c1 = torch.log1p(torch.sqrt(x * x - 1) / x)
+    # return c0 + c1
+    # NOTE: might need stable version here
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
 
@@ -33,9 +34,10 @@ def bootstrap(observable):
     obs_bootstrap = observable[1:]
 
     variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-    #bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
+    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
 
     return variance.sqrt()
+
 
 def calc_two_point_function(sample_training_output, training_geometry):
     r"""Calculates the two point connected green function, G(x), given a set of
@@ -81,8 +83,11 @@ def calc_two_point_function(sample_training_output, training_geometry):
             phi_shift_phi_mean = (phi_shift * phi).mean(dim=0)
 
             # Average over coordinates
-            g_func[i, j] = torch.mean(phi_shift_phi_mean - phi_shift_mean * phi_mean, dim=0)
+            g_func[i, j] = torch.mean(
+                phi_shift_phi_mean - phi_shift_mean * phi_mean, dim=0
+            )
     return g_func
+
 
 def volume_avg_two_point_function(sample_training_output, training_geometry):
     """
@@ -110,20 +115,19 @@ def volume_avg_two_point_function(sample_training_output, training_geometry):
     """
 
     va_2pf = torch.empty_like(sample_training_output).view(
-        -1,
-        training_geometry.length,
-        training_geometry.length
+        -1, training_geometry.length, training_geometry.length
     )
     for i in range(training_geometry.length):
         for j in range(training_geometry.length):
-            shift = training_geometry.get_shift(
-                shifts=((i, j),), dims=((0, 1),)).view(-1)
+            shift = training_geometry.get_shift(shifts=((i, j),), dims=((0, 1),)).view(
+                -1
+            )
 
             va_2pf[:, i, j] = (
-                (sample_training_output[:, shift] * sample_training_output).mean(dim=1)
-                - sample_training_output.mean(dim=1).pow(2)
-            )
+                sample_training_output[:, shift] * sample_training_output
+            ).mean(dim=1) - sample_training_output.mean(dim=1).pow(2)
     return va_2pf
+
 
 def bootstrap_function(func, states, *args, n_boot=100):
     """Take a func which expects N_batch on the first dimension and can handle
@@ -150,26 +154,24 @@ def bootstrap_function(func, states, *args, n_boot=100):
         dimension
 
     """
-    boot_index = torch.randint(
-        0,
-        states.shape[0],
-        size=(states.shape[0], n_boot)
-    )
+    boot_index = torch.randint(0, states.shape[0], size=(states.shape[0], n_boot))
     # put boot index on final dimension
     resampled_states = states[boot_index, :].transpose(1, 2)
     res = func(resampled_states, *args)
     return res
 
+
 def two_point_function(
-    sample_training_output, training_geometry, bootstrap_n_samples=100,
+    sample_training_output, training_geometry, bootstrap_n_samples=100
 ):
     """Bootstrap calc_two_point_function, using bootstrap_function"""
     return bootstrap_function(
         calc_two_point_function,
         sample_training_output,
         training_geometry,
-        n_boot=bootstrap_n_samples
+        n_boot=bootstrap_n_samples,
     )
+
 
 def zero_momentum_two_point(two_point_function):
     r"""Calculate the zero momentum green function as a function of t
@@ -219,12 +221,10 @@ def effective_pole_mass(zero_momentum_two_point):
     inner_indices = torch.tensor(range(1, zero_momentum_two_point.shape[0] - 1))
     res = arcosh(
         (
-            zero_momentum_two_point[inner_indices - 1] +
-            zero_momentum_two_point[inner_indices + 1]
-        ) /
-        (
-            2 * zero_momentum_two_point[inner_indices]
+            zero_momentum_two_point[inner_indices - 1]
+            + zero_momentum_two_point[inner_indices + 1]
         )
+        / (2 * zero_momentum_two_point[inner_indices])
     )
     return res
 
@@ -269,9 +269,7 @@ def ising_energy(two_point_function):
     return (two_point_function[1, 0] + two_point_function[0, 1]) / 2
 
 
-def autocorr_two_point(
-    volume_avg_two_point_function,
-    window=2.0):
+def autocorr_two_point(volume_avg_two_point_function, window=2.0):
     r"""Computes the autocorrelation of the volume-averaged two point function,
     the integrated autocorrelation time, and two other functions related to the
     computation of an optimal window size for the integrated autocorrelation.
@@ -322,6 +320,7 @@ def autocorr_two_point(
     autocorrelation = autocorrelation[c:] / autocorrelation[c]
     return autocorrelation
 
+
 def integrated_autocorr_two_point(autocorr_two_point):
     r"""Calculate the integrated autocorrelation of the two point function.
 
@@ -331,6 +330,7 @@ def integrated_autocorr_two_point(autocorr_two_point):
 
     """
     return 0.5 + np.cumsum(autocorr_two_point[1:])
+
 
 def exp_autocorr_two_point(integrated_autocorr_two_point, window=2.0):
     """Calculate the exponential autocorrelation of the two point function.
@@ -349,12 +349,13 @@ def exp_autocorr_two_point(integrated_autocorr_two_point, window=2.0):
     )
     return tau_exp_W
 
+
 def automatic_windowing_function(
-        integrated_autocorr_two_point,
-        exp_autocorr_two_point,
-        volume_avg_two_point_function,
-        window=2.0
-    ):
+    integrated_autocorr_two_point,
+    exp_autocorr_two_point,
+    volume_avg_two_point_function,
+    window=2.0,
+):
     r"""Return the function for estimating optimal window size for integrated
     autocorrelation as defined in equation (52), section 3.3 of
     https://arxiv.org/pdf/hep-lat/0306017.pdf
@@ -370,6 +371,7 @@ def automatic_windowing_function(
     tau_exp = exp_autocorr_two_point
     windows = np.arange(1, tau_int.size + 1)
     return np.exp(-windows / tau_exp) - tau_exp / np.sqrt(windows * n_states)
+
 
 def optimal_window(automatic_windowing_function):
     """using automatic_windowing_function, estimate optimal window, which

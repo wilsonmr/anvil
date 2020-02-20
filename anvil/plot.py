@@ -10,6 +10,7 @@ from matplotlib.ticker import MaxNLocator
 
 from reportengine.figure import figure, figuregen
 
+
 @figure
 def plot_zero_momentum_two_point(zero_momentum_two_point, training_geometry):
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
@@ -89,7 +90,7 @@ def plot_two_point_function(two_point_function):
 def plot_volume_averaged_two_point(volume_avg_two_point_function):
     """Plot the volumn averaged two point function for the shift (0, 0)
     """
-    #TODO: do we want to plot this for all shifts?
+    # TODO: do we want to plot this for all shifts?
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
     ax.set_ylabel("$G_k(0,0)$")
@@ -108,10 +109,11 @@ def plot_autocorr_two_point(autocorr_two_point, optimal_window):
     ax.set_title("Autocorrelation of volume-averaged two point function")
     ax.set_ylabel(r"$\Gamma_{G(s)}(t)$")
     ax.set_xlabel("$t$")
-    ax.plot(autocorr_two_point[:4*optimal_window])
+    ax.plot(autocorr_two_point[: 4 * optimal_window])
     ax.axvline(optimal_window + 1, linestyle="-", color="r", label="Optimal window")
     ax.legend()
     return fig
+
 
 @figure
 def plot_integrated_autocorr_two_point(integrated_autocorr_two_point, optimal_window):
@@ -120,7 +122,7 @@ def plot_integrated_autocorr_two_point(integrated_autocorr_two_point, optimal_wi
     verticle line
 
     """
-    tau_int = integrated_autocorr_two_point[:4*optimal_window]
+    tau_int = integrated_autocorr_two_point[: 4 * optimal_window]
     windows = np.arange(1, tau_int.size + 1)
     fig, ax = plt.subplots()
     # Integrated autocorrelation time
@@ -131,6 +133,7 @@ def plot_integrated_autocorr_two_point(integrated_autocorr_two_point, optimal_wi
     ax.legend()
     return fig
 
+
 @figure
 def plot_exp_autocorr_two_point(exp_autocorr_two_point, optimal_window):
     """plot exp_autocorr_two_point as a function of w, up until 4 x the
@@ -139,7 +142,7 @@ def plot_exp_autocorr_two_point(exp_autocorr_two_point, optimal_window):
 
     """
     fig, ax = plt.subplots()
-    tau_exp = exp_autocorr_two_point[:4*optimal_window]
+    tau_exp = exp_autocorr_two_point[: 4 * optimal_window]
     windows = np.arange(1, tau_exp.size + 1)
     ax.set_title("Exponential autocorrelation time")
     ax.set_ylabel(r"$\tau_{exp}(W)$")
@@ -147,6 +150,7 @@ def plot_exp_autocorr_two_point(exp_autocorr_two_point, optimal_window):
     ax.axvline(optimal_window, linestyle="-", color="r", label="Optimal window")
     ax.legend()
     return fig
+
 
 @figure
 def plot_automatic_windowing_function(automatic_windowing_function, optimal_window):
@@ -156,7 +160,7 @@ def plot_automatic_windowing_function(automatic_windowing_function, optimal_wind
 
     """
     fig, ax = plt.subplots()
-    g_func = automatic_windowing_function[:4*optimal_window]
+    g_func = automatic_windowing_function[: 4 * optimal_window]
     windows = np.arange(1, g_func.size + 1)
     ax.set_title("g")
     ax.set_ylabel("$g$")
@@ -165,6 +169,7 @@ def plot_automatic_windowing_function(automatic_windowing_function, optimal_wind
     ax.axvline(optimal_window, linestyle="-", color="r", label="Optimal window")
     ax.legend()
     return fig
+
 
 def plot_bootstrap_single_number(observable, label):
     """Given a 1 dimensional tensor of observables, plot a histogram of the
@@ -175,7 +180,7 @@ def plot_bootstrap_single_number(observable, label):
     ax.hist(
         observable,
         bins=30,
-        label=f"mean: {observable.mean()}, std dev.: {observable.std()}"
+        label=f"mean: {observable.mean()}, std dev.: {observable.std()}",
     )
     title = "Bootstrap distribution: " + label
     ax.set_xlabel(label)
@@ -184,6 +189,7 @@ def plot_bootstrap_single_number(observable, label):
     ax.set_title(title)
     return fig
 
+
 def plot_bootstrap_multiple_numbers(observable, labels):
     """Given a 2D tensor with boostrap sample on the final axis, yield a figure
     with a histogram for each element's bootstrap sample
@@ -191,6 +197,7 @@ def plot_bootstrap_multiple_numbers(observable, labels):
     """
     for i in range(observable.shape[0]):
         yield plot_bootstrap_single_number(observable[i], labels[i])
+
 
 @figure
 def plot_bootstrap_two_point(two_point_function):
@@ -219,7 +226,7 @@ def plot_bootstrap_zero_momentum_2pf(zero_momentum_two_point):
 
     """
     labels = [
-        r"$\tilde{G}$"+f"$(0,{t})$" for t in range(zero_momentum_two_point.shape[0])
+        r"$\tilde{G}$" + f"$(0,{t})$" for t in range(zero_momentum_two_point.shape[0])
     ]
     yield from plot_bootstrap_multiple_numbers(zero_momentum_two_point, labels)
 
@@ -230,7 +237,5 @@ def plot_bootstrap_effective_pole_mass(effective_pole_mass):
     effective_pole_mass[t]
 
     """
-    labels = [
-        r"$m_p^{eff}$"+f"$({t})$" for t in range(effective_pole_mass.shape[0])
-    ]
+    labels = [r"$m_p^{eff}$" + f"$({t})$" for t in range(effective_pole_mass.shape[0])]
     yield from plot_bootstrap_multiple_numbers(effective_pole_mass, labels)

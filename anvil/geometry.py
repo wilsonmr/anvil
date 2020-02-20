@@ -17,6 +17,7 @@ class Geometry2D:
     returning shifted flattened states, where the shift is some shift on the
     original lattice
     """
+
     def __init__(self, length):
         self.length = length
         # Hard code the checkerboard pattern, could be passed to class.
@@ -29,9 +30,9 @@ class Geometry2D:
         self.flat_ind_like_split = torch.cat(
             [
                 torch.where(checkerboard.flatten())[0],
-                torch.where(~checkerboard.flatten())[0]
+                torch.where(~checkerboard.flatten())[0],
             ],
-            dim=0
+            dim=0,
         )
         self.split_ind_like_state = self._split_indices_like_state()
 
@@ -137,7 +138,5 @@ class Geometry2D:
             # each shift, roll the 2d state-like indices and then flatten and split
             shift_index[i, :] = self.split_ind_like_state.roll(
                 shift, dims=dim
-            ).flatten()[
-                self.flat_ind_like_split
-            ]
+            ).flatten()[self.flat_ind_like_split]
         return shift_index

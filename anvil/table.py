@@ -9,6 +9,7 @@ import pandas as pd
 
 from reportengine.table import table
 
+
 @table
 def ising_observables_table(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken
@@ -17,7 +18,7 @@ def ising_observables_table(ising_energy, susceptibility):
     # annoying that tensors have to be cast to float
     res = [
         [float(ising_energy.mean()), float(ising_energy.std())],
-        [float(susceptibility.mean()), float(susceptibility.std())]
+        [float(susceptibility.mean()), float(susceptibility.std())],
     ]
     df = pd.DataFrame(
         res,
@@ -76,11 +77,7 @@ def table_two_point_function(training_geometry, two_point_function):
         for j in range(training_geometry.length):
             corr.append([float(means[i, j]), float(stds[i, j])])
             index.append((i, j))
-    df = pd.DataFrame(
-        corr,
-        columns=["Mean", "Standard deviation"],
-        index=index
-    )
+    df = pd.DataFrame(corr, columns=["Mean", "Standard deviation"], index=index)
     return df
 
 
