@@ -114,6 +114,19 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
+    def parse_bootstrap_n_samples(self, n_samples: int):
+        if n_samples < 2:
+            raise ConfigError("bootstrap_n_samples must be greater than 1")
+        log.warning(f"Using user specified bootstrap_n_samples: {n_samples}")
+        return n_samples
+
+    @element_of("windows")
+    def parse_window(self, window: float):
+        if window < 0:
+            raise ConfigError("window must be positive")
+        log.warning(f"Using user specified window 'S': {window}")
+        return window
+
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
