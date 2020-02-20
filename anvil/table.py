@@ -14,9 +14,10 @@ def ising_observables_table(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken
     across boostrap samples
     """
+    # annoying that tensors have to be cast to float
     res = [
-        [ising_energy.mean(), ising_energy.std()],
-        [susceptibility.mean(), susceptibility.std()]
+        [float(ising_energy.mean()), float(ising_energy.std())],
+        [float(susceptibility.mean()), float(susceptibility.std())]
     ]
     df = pd.DataFrame(
         res,
