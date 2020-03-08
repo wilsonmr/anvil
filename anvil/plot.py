@@ -114,7 +114,7 @@ def plot_autocorrelation_2pf(autocorrelation_2pf):
     ax4.set_ylabel("$g$")
     ax4.set_xlabel("$W$")
     ax4.plot(W, g_W)
-    ax4.plot([W_opt,] * 2, [g_W.min(), g_W.max()], "r-", label=r"$W_{opt}$")
+    ax4.plot([W_opt,] * 2, [g_W.min(), g_W.max()], "r-", label="$W_{opt}$")
     ax4.legend()
 
     return fig
@@ -133,7 +133,7 @@ def plot_bootstrap_dist(observable, label):
         ax.plot([full_data - std,] * 2, [0, m], "m-", lw=2)
         ax.plot([full_data + std,] * 2, [0, m], "m-", lw=2, label=r"$\pm 1 \sigma$")
         bmean = torch.mean(bootstrap_data)
-        ax.plot([bmean,] * 2, [0, m], "b-", lw=2, label=r"bootstrap mean")
+        ax.plot([bmean,] * 2, [0, m], "b-", lw=2, label="bootstrap mean")
         return ax
 
     obs_full = observable[0]
@@ -171,7 +171,7 @@ def plot_bootstrap_dist(observable, label):
 def plot_bootstrap_2pf(two_point_function):
     x = t = 0
     data_to_plot = two_point_function(x, t)
-    return plot_bootstrap_dist(data_to_plot, rf"$G$({x},{t})")
+    return plot_bootstrap_dist(data_to_plot, f"$G$({x},{t})")
 
 
 @figure
@@ -181,7 +181,7 @@ def plot_bootstrap_susceptibility(susceptibility):
 
 @figure
 def plot_bootstrap_ising_energy(ising_energy):
-    return plot_bootstrap_dist(ising_energy, r"Ising $E$")
+    return plot_bootstrap_dist(ising_energy, "Ising $E$")
 
 
 @figure
@@ -191,4 +191,4 @@ def plot_bootstrap_zero_momentum_2pf(zero_momentum_2pf):
 
 @figure
 def plot_bootstrap_effective_pole_mass(effective_pole_mass):
-    return plot_bootstrap_dist(effective_pole_mass, r"$m_p^{eff}$")
+    return plot_bootstrap_dist(effective_pole_mass, "$m_p^{eff}$")

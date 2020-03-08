@@ -19,6 +19,8 @@ from math import sqrt, pi, log
 import torch
 import torch.nn as nn
 
+from sys import exit
+
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -94,14 +96,8 @@ class AffineLayer(nn.Module):
             [self._block(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
         )
         self.t_layers = nn.ModuleList(
-            [
-                self._block(t_in, t_out)
-                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
-            ]
+            [self._block(t_in, t_out) for t_in, t_out in zip(t_shape[:-1], t_shape[1:])]
         )
-        self.t_layers += [
-            nn.Linear(t_shape[-2], t_shape[-1])
-        ]  # no ReLU on last t layer
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -122,7 +118,7 @@ class AffineLayer(nn.Module):
         Currently hard coded to be a dense layed followed by a leaky ReLU,
         but could potentially specify in runcard.
         """
-        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
+        return nn.Sequential(nn.Linear(f_in, f_out), nn.Tanh(),)
 
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
@@ -135,6 +131,12 @@ class AffineLayer(nn.Module):
         """
         for s_layer in self.s_layers:
             x_input = s_layer(x_input)
+        if torch.isinf(x_input).sum() > 0:
+            print("infs in s network")
+            exit(1)
+        if torch.isnan(x_input).sum() > 0:
+            print("nans in s network")
+            exit(1)
         return x_input
 
     def _t_forward(self, x_input: torch.Tensor) -> torch.Tensor:
@@ -148,6 +150,12 @@ class AffineLayer(nn.Module):
         """
         for t_layer in self.t_layers:
             x_input = t_layer(x_input)
+        if torch.isinf(x_input).sum() > 0:
+            print("infs in t network")
+            exit(1)
+        if torch.isnan(x_input).sum() > 0:
+            print("nans in t network")
+            exit(1)
         return x_input
 
     def coupling_layer(self, phi_input) -> torch.Tensor:
@@ -282,6 +290,8 @@ class RealNVP(nn.Module):
                 for i in range(n_affine)
             ]
         )
+        self.scalar_a = nn.Parameter(torch.rand(1))
+        self.scalar_b = nn.Parameter(torch.rand(1))
 
     def map(self, x_input: torch.Tensor):
         """Function that maps field configuration to simple distribution"""
@@ -307,6 +317,10 @@ class RealNVP(nn.Module):
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out = layer.inverse_coupling_layer(phi_out)
             # TODO: make this yield, then make a yield from wrapper?
+        mod = torch.ones(phi_out.shape) * pi * 0.5
+        mod[:, 1::2] *= 2
+        phi_out = nn.Tanh()(self.scalar_a * phi_out - self.scalar_b) * mod
+
         return phi_out
 
     def log_probability_normal(self, x_tensor):
@@ -329,6 +343,29 @@ class RealNVP(nn.Module):
         exponent = -torch.sum(pow(x_tensor, 2) / 2, dim=-1, keepdim=True)
         return exponent - self._log_gauss_norm
 
+    def log_probability_uniform(self, x_tensor):
+        return torch.zeros((x_tensor.size(0), 1))
+
+    def log_jacobian_param(self, x_tensor):
+        """Log of the jacobian from the change of variables in O(N) / CPN-1 models"""
+        jacobian = torch.log(
+            torch.abs(torch.sin(x_tensor[:, ::2])) + 0.0000001  # numerical stability
+        ).sum(dim=1, keepdim=True)
+        return jacobian
+
+    def log_jacobian_tanh(self, x_tensor):
+        """Log of the jacobian from the tanh function."""
+        vol = x_tensor.size(1) // 2  # O(3) only!!
+        jacobian = (
+            # log(vol * 0.5 * pi)  # from theta -> [-pi/2, pi/2]
+            # + log(vol * pi)  # from phi -> [-pi, pi)
+            torch.log(vol * 2 * torch.abs(self.scalar_a))  # from tanh
+            + torch.log(
+                1.0000001 - nn.Tanh()(self.scalar_a * x_tensor - self.scalar_b) ** 2
+            ).sum(dim=1, keepdim=True)
+        )
+        return jacobian
+
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
         r"""Returns the log of the exact probability (of model) associated with
         each of the input states according to eq. (8) of
@@ -345,13 +382,16 @@ class RealNVP(nn.Module):
             column of log(\tilde p) associated with each of input states
 
         """
-        log_jacob_contr = torch.zeros(phi_input.size()[0], 1)
+        # log_jacob_contr = torch.zeros(phi_input.size()[0], 1)
+        log_simple_prob = self.log_probability_normal(phi_input)
+        log_param = self.log_jacobian_param(phi_input)
+        log_jacob_contr = self.log_jacobian_tanh(phi_input)
+
         z_out = phi_input
         for layer in self.affine_layers:
             log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
-        log_simple_prob = self.log_probability_normal(z_out)
-        return log_simple_prob + log_jacob_contr
+        return log_simple_prob + log_jacob_contr + log_param
 
 
 if __name__ == "__main__":

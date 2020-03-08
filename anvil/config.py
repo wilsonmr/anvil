@@ -8,7 +8,7 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
 
-from anvil.core import PhiFourAction, TrainingOutput
+from anvil.core import PhiFourAction, TrainingOutput, HeisenbergAction
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
 
@@ -44,11 +44,17 @@ class ConfigParser(Config):
 
     def parse_use_arxiv_version(self, do_use: bool):
         return do_use
+    
+    def parse_n_coords(self, n_coords: int):
+        """Number of coordinates needed to describe the field at each lattice site.
+        
+        E.g. n_coords = 2 for CP1, O(3)."""
+        return n_coords
 
-    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
-        return PhiFourAction(
-            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
-        )
+    #def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
+    #    #return PhiFourAction(
+    def produce_action(self, geometry, beta):
+        return HeisenbergAction(geometry, beta)
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -67,8 +73,8 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
+    def produce_model(self, lattice_size, n_affine, network_kwargs, n_coords):
+        model = RealNVP(n_affine=n_affine, size_in=n_coords*lattice_size, **network_kwargs)
         return model
 
     def parse_epochs(self, epochs: int):
@@ -119,8 +125,10 @@ class ConfigParser(Config):
             )
         return optim
 
-    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+    def parse_optimizer_kwargs(self, kwargs: (dict, type(None)), optimizer):
         # This will only be executed if optimizer is defined in the runcard
+        if kwargs == None:
+            return {}
         if optimizer == "adam":
             valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
         if optimizer == "adadelta":

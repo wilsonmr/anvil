@@ -4,7 +4,7 @@ sample.py
 Module containing functions related to sampling from a trained model
 """
 
-from math import exp, isfinite, ceil
+from math import exp, isfinite, ceil, pi
 import logging
 
 from numpy.random import uniform
@@ -14,6 +14,8 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import numpy as np
+
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class LogRatioNanError(Exception):
     pass
 
 
-def sample_batch(loaded_model, action, batch_size, current_state=None):
+def sample_batch(loaded_model, action, batch_size, n_coords, current_state=None):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -55,16 +57,13 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = torch.randn(
-            (batch_size + 1, loaded_model.size_in)
-        )  # random z configurations
+        z = torch.randn((batch_size + 1, n_coords * loaded_model.size_in)) # random z configurations
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
         if current_state is not None:
             phi[0] = current_state
         log_ptilde = loaded_model(phi)
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
-
     log_ratio = log_ptilde + action(phi)
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
@@ -85,7 +84,7 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
     return phi[chain_indices, :], history
 
 
-def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
+def thermalised_state(loaded_model, action, thermalisation, n_coords) -> torch.Tensor:
     r"""
     A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -105,13 +104,13 @@ def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
     if thermalisation is None:
         return thermalisation
 
-    states, _ = sample_batch(loaded_model, action, thermalisation)
+    states, _ = sample_batch(loaded_model, action, n_coords, thermalisation)
     log.info(f"Thermalisation: discarded {thermalisation} configurations.")
     return states[-1]
 
 
 def chain_autocorrelation(
-    loaded_model, action, thermalised_state, sample_interval=None
+    loaded_model, action, n_coords, thermalised_state, sample_interval=None
 ) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
@@ -159,7 +158,7 @@ def chain_autocorrelation(
     batch_size = 10000
 
     # Sample some states
-    _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
+    _, history = sample_batch(loaded_model, action, batch_size, n_coords, thermalised_state)
 
     accepted = float(torch.sum(history))
     n_states = len(history)
@@ -195,7 +194,7 @@ def chain_autocorrelation(
 
 
 def sample(
-    loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation
+    loaded_model, action, target_length, n_coords, thermalised_state, chain_autocorrelation
 ) -> torch.Tensor:
     r"""
     Produces a Markov chain with approximately target_length decorrelated configurations,
@@ -238,7 +237,7 @@ def sample(
     )
     accepted = 0
 
-    log.debug(
+    log.info(
         f"Generating {n_batches * batch_size} configurations "
         f"in {n_batches} batches of size {batch_size}"
     )
@@ -247,7 +246,7 @@ def sample(
     for batch in pbar:
         # Generate sub-chain of batch_size configurations
         batch_chain, batch_history = sample_batch(
-            loaded_model, action, batch_size, current_state
+            loaded_model, action, batch_size, n_coords, current_state
         )
         current_state = batch_chain[-1]
 
@@ -263,8 +262,10 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
-    log.debug(f"Returning a decorrelated chain of length: {actual_length}")
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.info(f"Returning a decorrelated chain of length: {actual_length}")
+
+    np.savetxt("anvil_state.txt", decorrelated_chain)
     return decorrelated_chain
 
 

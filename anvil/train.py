@@ -43,6 +43,7 @@ def train(
     current_loss,
     loaded_optimizer,
     scheduler_kwargs={"patience": 500},
+    n_coords,
 ):
     """training loop of model"""
     # create your optimizer and a scheduler
@@ -64,7 +65,7 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z = torch.randn((n_batch, n_units))
+        z = torch.randn((n_batch, n_coords * n_units))
         phi = loaded_model.inverse_map(z)
         target = action(phi)
         output = loaded_model(phi)
