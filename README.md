@@ -8,7 +8,7 @@ At present installing the code into a conda environment is supported. First
 create a new environment and install conda dependencies
 
 ```bash
-conda create -n anvil-dev -y
+conda create -n anvil-dev reportengine -y
 conda install pytorch torchvision -c pytorch
 conda install reportengine -c https://packages.nnpdf.science/conda
 conda install tqdm, scipy
