@@ -9,6 +9,7 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
+from math import pi
 
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
@@ -61,7 +62,7 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z = torch.randn((n_batch, n_units))
+        z = torch.rand((n_batch, n_units)) * 2 * pi
         phi = loaded_model.inverse_map(z)
         target = action(phi)
         output = loaded_model(phi)

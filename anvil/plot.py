@@ -93,9 +93,9 @@ def plot_volume_averaged_two_point(volume_avg_two_point_function):
     # TODO: do we want to plot this for all shifts?
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
-    ax.set_ylabel("$G_k(0,0)$")
+    ax.set_ylabel("$G_k(0,1)$")
     ax.set_xlabel("$t$")
-    ax.plot(volume_avg_two_point_function[:, 0, 0], "-")
+    ax.plot(volume_avg_two_point_function[0, 1, :], "-")
     return fig
 
 

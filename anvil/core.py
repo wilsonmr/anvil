@@ -97,6 +97,40 @@ class PhiFourAction(nn.Module):
         return action
 
 
+class XYAction(nn.Module):
+    def __init__(self, beta, geometry, shift_action=True):
+        super().__init__()
+        self.beta = beta
+        self.geometry = geometry
+        self.volume = self.geometry.length ** 2
+        self.shift = self.geometry.get_shift()
+
+        if shift_action is True:
+            self.action_shift = 2 * self.beta * self.volume
+        else:
+            self.action_shift = 0
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Compute XY action from a stack of angles (not field components) with shape
+        (N_states, volume).
+        """
+        cos_theta = torch.cos(state)
+        sin_theta = torch.sin(state)
+        action = (
+            -1
+            * self.beta
+            * (
+                cos_theta[:, self.shift] * cos_theta.view(-1, 1, self.volume)
+                + sin_theta[:, self.shift] * sin_theta.view(-1, 1, self.volume)
+            )
+            .sum(dim=1,)  # sum over two shift directions (+ve nearest neighbours)
+            .sum(dim=1, keepdim=True)  # sum over lattice sites
+            + self.action_shift
+        )
+        return action
+
+
 class Checkpoint:
     """Class which saves and loads checkpoints and allows checkpoints to be
     sorted"""

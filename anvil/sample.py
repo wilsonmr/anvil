@@ -4,7 +4,7 @@ sample.py
 Module containing functions related to sampling from a trained model
 """
 
-from math import exp, isfinite, ceil
+from math import exp, isfinite, ceil, pi
 import logging
 
 from numpy.random import uniform
@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -55,10 +56,12 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = torch.randn(
+        z = torch.rand(
             (batch_size + 1, loaded_model.size_in)
-        )  # random z configurations
+        ) * 2 * pi # random z configurations
+        np.savetxt("base.txt", z)
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
+        np.savetxt("target.txt", phi)
         if current_state is not None:
             phi[0] = current_state
         log_ptilde = loaded_model(phi)
@@ -263,7 +266,7 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
