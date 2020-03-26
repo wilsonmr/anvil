@@ -1,0 +1,14 @@
+lattice_length: 6
+lattice_dimension: 2
+
+beta: 0.5
+shift_action: false
+
+n_affine: 2
+hidden_nodes: [36]
+
+epochs: 3000
+save_interval: 1000
+n_batch: 2000
+
+
