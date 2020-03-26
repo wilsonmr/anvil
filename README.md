@@ -11,7 +11,8 @@ create a new environment and install conda dependencies
 conda create -n anvil-dev reportengine -y
 conda install pytorch torchvision -c pytorch
 conda install reportengine -c https://packages.nnpdf.science/conda
-conda install tqdm, scipy
+conda install -c conda-forge tqdm
+conda install scipy
 ```
 
 These are the minimal requirements for running the code, however if you plan
