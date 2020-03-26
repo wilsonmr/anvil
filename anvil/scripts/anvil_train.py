@@ -16,6 +16,7 @@ TRAINING_ACTIONS = ["train"]
 
 RUNCARD_COPY_FILENAME = "runcard.yml"
 
+INPUT_FOLDER_NAME = "input"
 
 class TrainError(Exception):
     pass
@@ -77,6 +78,8 @@ class TrainEnv(Environment):
         self.output_path.mkdir()
         (self.output_path / "checkpoints").mkdir()
         (self.output_path / "logs").mkdir()
+        self.input_folder = self.output_path / INPUT_FOLDER_NAME
+        self.input_folder.mkdir()
 
         shutil.copy2(self.config_yml, self.output_path / RUNCARD_COPY_FILENAME)
 
