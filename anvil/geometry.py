@@ -13,42 +13,63 @@ class ShiftsMismatchError(Exception):
 
 
 class Geometry2D:
-    """Define the 2D geometry, which can return shifts which index flattened
-    returning shifted flattened states, where the shift is some shift on the
-    original lattice
+    """Define the 2D geometry and the shifts in the two Cartesian
+       directions. The fields are stored in a one-dimensional array of size
+       length*length, assuming that the first Na entries correspond to the sites
+       that are updated by the affine transformation, and the remaining Nb
+       entries correspond to the sites that are left unchanged. 
+
+       phi = |... phiA ...|... phiB ...| 
+
+       using the notation in https://arxiv.org/pdf/2003.06413.pdf We call this
+       representation of the field a 'partitioned' representation. 
+
+       partcart (Partitioned to Cartesian) is a 2-D grid of integers of size
+       length*length. The element (x,y) of the grid contains the index that
+       identifies the position of the site (x,y) in the partitioned
+       representation.
+
+       partlexi (Partitioned to Lexicographic) is an array of integers of size
+       length*length. The element i of the array contains the index that identifies the position of the site i in the partitioned representation, where i is the lexicographic index of a site.
     """
 
     def __init__(self, length):
         self.length = length
         # Hard code the checkerboard pattern, could be passed to class.
+        # ok for now, but needs to be changed. 
+        # the change should be a simple one
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True
         checkerboard[::2, ::2] = True
         self.checkerboard = checkerboard
         self.flat_checker = self.checkerboard.flatten()
         # make split-flat state like object with corresponding indices in flat state
-        self.flat_ind_like_split = torch.cat(
+        self.partcart = self._partcart()
+        self.partlexi = self._partlexi()
+
+    def _partcart(self):
+        """ Internal function for calculating the partcart grid as described above
+        """
+        lpartcart = torch.zeros((self.length, self.length), dtype=torch.int) 
+        lpartcart[self.checkerboard] = torch.arange(
+            int(ceil(self.length ** 2 / 2)), dtype=torch.int
+        )
+        lpartcart[~self.checkerboard] = torch.arange(
+            int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
+        )
+        return lpartcart
+
+    def _partlexi(self):
+        """ Internal function for calculating the partlexi array as described above
+        """
+        lpartlexi = torch.cat(
             [
-                torch.where(checkerboard.flatten())[0],
-                torch.where(~checkerboard.flatten())[0],
+                torch.where(self.flat_checker)[0],
+                torch.where(~self.flat_checker)[0],
             ],
             dim=0,
         )
-        self.split_ind_like_state = self._split_indices_like_state()
-
-    def _split_indices_like_state(self):
-        """Internal function for calculating the split index like state, which
-        is the index of phi_a and phi_b in the flattened state, arranged in the
-        shape of the 2D state, used in get_shift
-        """
-        splitind_like_state = torch.zeros((self.length, self.length), dtype=torch.int)
-        splitind_like_state[self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), dtype=torch.int
-        )
-        splitind_like_state[~self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
-        )
-        return splitind_like_state
+        return lpartlexi
 
     def get_shift(self, shifts: tuple = (1, 1), dims: tuple = (0, 1)) -> torch.Tensor:
         r"""Given length, which refers to size of a 2D state (length * length)
