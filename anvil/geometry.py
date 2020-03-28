@@ -22,15 +22,14 @@ class Geometry2D:
        phi = |... phiA ...|... phiB ...| 
 
        using the notation in https://arxiv.org/pdf/2003.06413.pdf We call this
-       representation of the field a 'partitioned' representation. 
+       representation of the field a 'split' representation. 
 
-       partcart (Partitioned to Cartesian) is a 2-D grid of integers of size
+       splitcart (Split to Cartesian) is a 2-D grid of integers of size
        length*length. The element (x,y) of the grid contains the index that
-       identifies the position of the site (x,y) in the partitioned
-       representation.
+       identifies the position of the site (x,y) in the split representation.
 
-       partlexi (Partitioned to Lexicographic) is an array of integers of size
-       length*length. The element i of the array contains the index that identifies the position of the site i in the partitioned representation, where i is the lexicographic index of a site.
+       splitlexi (Split to Lexicographic) is an array of integers of size
+       length*length. The element i of the array contains the index that identifies the position of the site i in the split representation, where i is the lexicographic index of the site.
     """
 
     def __init__(self, length):
@@ -44,38 +43,38 @@ class Geometry2D:
         self.checkerboard = checkerboard
         self.flat_checker = self.checkerboard.flatten()
         # make split-flat state like object with corresponding indices in flat state
-        self.partcart = self._partcart()
-        self.partlexi = self._partlexi()
+        self.splitcart = self._splitcart()
+        self.splitlexi = self._splitlexi()
 
-    def _partcart(self):
-        """ Internal function for calculating the partcart grid as described above
+    def _splitcart(self):
+        """ Internal function for calculating the splitcart grid as described above
         """
-        lpartcart = torch.zeros((self.length, self.length), dtype=torch.int) 
-        lpartcart[self.checkerboard] = torch.arange(
+        lsplitcart = torch.zeros((self.length, self.length), dtype=torch.int) 
+        lsplitcart[self.checkerboard] = torch.arange(
             int(ceil(self.length ** 2 / 2)), dtype=torch.int
         )
-        lpartcart[~self.checkerboard] = torch.arange(
+        lsplitcart[~self.checkerboard] = torch.arange(
             int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
         )
-        return lpartcart
+        return lsplitcart
 
-    def _partlexi(self):
+    def _splitlexi(self):
         """ Internal function for calculating the partlexi array as described above
         """
-        lpartlexi = torch.cat(
+        lsplitlexi = torch.cat(
             [
                 torch.where(self.flat_checker)[0],
                 torch.where(~self.flat_checker)[0],
             ],
             dim=0,
         )
-        return lpartlexi
+        return lsplitlexi
 
     def get_shift(self, shifts: tuple = (1, 1), dims: tuple = (0, 1)) -> torch.Tensor:
-        r"""Given length, which refers to size of a 2D state (length * length)
+        """Given length, which refers to size of a 2D state (length * length)
         returns a Nx(length^2) tensor where N is the length of `shifts` and `dims`
-        (which must be equal). Each row of the returned tensor indexes a flattened
-        split state \phi = (\phi_even, \phi_odd) which is split according to a
+        (which must be equal). Each row of the returned tensor indexes a 
+        split state \phi = (\phiA, \phiB) which is split according to a
         checkerboard geometry (even and odd refer to parity of the site). The
         indices refer to shifts on the states in their original 2D form. By default
         N = 2 and get_shift simply returns the right and down nearest neighbours.
@@ -97,9 +96,9 @@ class Geometry2D:
         Returns
         -------
         shift: torch.Tensor
-            Tensor which can be used to index flattened, split states such that
+            Tensor which can be used to index split states such that
 
-                state = tensor([\phi_even, \phi_odd]),
+                state = tensor([\phiA, \phiB]),
 
             then state[shift] will return a 2xlength tensor:
 
@@ -117,10 +116,10 @@ class Geometry2D:
         even sites are [0, 3], odd sites are [1, 2]
 
         >>> state_split = torch.tensor([0, 3, 1, 2])
-        >>> shift = get_shift(2)
+        >>> shift = get_shift(2) ### why this argument 2?
         >>> state_split[shift]
         tensor([[1, 2, 0, 3],
-                [2, 1, 3, 0]])
+                [2, 1, 3, 0]])   ### I get them in the opposite order
 
         correct nearest neighbours in reference to the original `state_2d` (left and
         down) are given in each row respectively
@@ -157,7 +156,7 @@ class Geometry2D:
         )
         for i, (shift, dim) in enumerate(zip(shifts, dims)):
             # each shift, roll the 2d state-like indices and then flatten and split
-            shift_index[i, :] = self.split_ind_like_state.roll(
+            shift_index[i, :] = self.splitcart.roll(
                 shift, dims=dim
-            ).flatten()[self.flat_ind_like_split]
+            ).flatten()[self.splitlexi]
         return shift_index
