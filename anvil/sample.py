@@ -56,12 +56,12 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = torch.rand(
-            (batch_size + 1, loaded_model.size_in)
-        ) * 2 * pi # random z configurations
+        z = loaded_model.generator(batch_size + 1)
         np.savetxt("base.txt", z)
+        
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
         np.savetxt("target.txt", phi)
+        
         if current_state is not None:
             phi[0] = current_state
         log_ptilde = loaded_model(phi)

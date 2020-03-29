@@ -25,8 +25,10 @@ from sys import exit
 
 INVPI = 1.0 / pi
 
+
 def atanh(x):
     return torch.log1p(2 * x / (1 - x)) / 2
+
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -354,15 +356,41 @@ class RealNVP(nn.Module):
 
 class NonCompactProjection(nn.Module):
     def __init__(
-        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
+        self, *, generator, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
     ):
         super(NonCompactProjection, self).__init__()
-        self.size_in = size_in
+        self.generator = generator
+
+        # would be nice not to need these explicitly defined, since they are
+        # not directly relevant to the NCP model
+        self.n_coords = self.generator.dimension
+        self.volume = self.generator.lattice_volume
+
+        self.size_in = self.generator.dimension * self.generator.lattice_volume
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
                 for i in range(n_affine)
             ]
+        )
+
+        self.sin_pow = torch.arange(self.n_coords - 1, 0, -1).view(
+            1, -1, 1
+        )  # batch dim, coords, volume
+
+        ones = torch.ones((1, self.n_coords, self.volume))
+
+        self.halve_azimuth = (
+            torch.tensor([1,] * (self.n_coords - 1) + [0.5])
+            .view(1, -1, 1)
+            .repeat(1, 1, self.volume)
+            .view(1, -1)
+        )
+        self.double_azimuth = (
+            torch.tensor([1,] * (self.n_coords - 1) + [2])
+            .view(1, -1, 1)
+            .repeat(1, 1, self.volume)
+            .view(1, -1)
         )
 
     def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
@@ -381,19 +409,42 @@ class NonCompactProjection(nn.Module):
             of the target distribution, same shape as input.
 
         """
-        phi_out = torch.tan(0.5 * (z_input - pi))
+        # Pre-multiply azimuthal angle by 0.5 so we can feed the entire
+        # tensor through the same operations
+        z_input = z_input * self.halve_azimuth
+
+        # Projection
+        phi_out = torch.tan(z_input - 0.5 * pi)
+
+        if phi_out.requires_grad is False:
+            np.savetxt(f"projected.txt", phi_out)
+
+        # Affine transformations
+        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
+            phi_out = layer.inverse_coupling_layer(phi_out)
+            if phi_out.requires_grad is False:
+                np.savetxt(f"layer_{i}.txt", phi_out)
+
+        # Inverse projection
+        phi_out = (torch.atan(phi_out) + 0.5 * pi) * self.double_azimuth
+
+        return phi_out
+
+    def log_surf_area_element(self, states: torch.Tensor) -> torch.Tensor:
+        """Logarithm of the jacobian determinant for the surface area element
+        of the (N-1) sphere in spherical coordinates.
         
-        if phi_out.requires_grad is False:
-            np.savetxt(f"projected.txt", phi_out)
-
-        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
-            phi_out = layer.inverse_coupling_layer(phi_out)
-            if phi_out.requires_grad is False:
-                np.savetxt(f"layer_{i}.txt", phi_out)
-
-        phi_out = 2 * torch.atan(phi_out) + pi
-
-        return phi_out
+        Note that this is independent of the azimuthal angle."""
+        return (
+            (
+                self.sin_pow
+                * torch.log(
+                    torch.sin(states.view(-1, self.n_coords, self.volume)[:, :-1, :])
+                )
+            )
+            .sum(dim=1)
+            .sum(dim=1, keepdim=True)
+        )
 
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
         r"""Returns the log of the exact probability (of model) associated with
@@ -403,7 +454,7 @@ class NonCompactProjection(nn.Module):
         Parameters
         ----------
         phi_input: torch.Tensor
-            stack of input states, shape (N_states, D)
+            stack of input states, shape (N_states, n_coords * lattice_volume)
 
         Returns
         -------
@@ -411,175 +462,32 @@ class NonCompactProjection(nn.Module):
             column of log(\tilde p) associated with each of input states
 
         """
-        log_jacob_contr = (-2 * torch.log(torch.cos((phi_input - pi) * 0.5))).sum(
+        # Pre-multiply azimuthal angle by 0.5 so we can feed the entire
+        # tensor through the same operations
+        phi_input = phi_input * self.halve_azimuth
+
+        # Parameterisation
+        log_param = self.log_surf_area_element(phi_input)
+
+        # Projection to real line
+        log_jacob_contr = (-2 * torch.log(torch.cos(phi_input - pi * 0.5))).sum(
             dim=1, keepdim=True
         )
-        z_out = torch.tan((phi_input - pi) * 0.5)
+        z_out = torch.tan(phi_input - pi * 0.5)
 
+        # Affine transformations
         for layer in self.affine_layers:
             log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
 
+        # Inverse projection
         log_jacob_contr += (-1 * torch.log(1 + z_out ** 2)).sum(dim=1, keepdim=True)
+        z_out = torch.atan(z_out) + 0.5 * pi
 
-        return log_jacob_contr
+        # Base distribution
+        log_simple_prob = self.log_surf_area_element(z_out)
 
-
-class NonCompactProjection2(nn.Module):
-    def __init__(
-        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
-    ):
-        super(NonCompactProjection2, self).__init__()
-        self.size_in = size_in
-        self.affine_layers = nn.ModuleList(
-            [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
-                for i in range(n_affine)
-            ]
-        )
-
-    def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
-        r"""Function which maps simple distribution, z, to target distribution
-        \phi.
-
-        Parameters
-        ----------
-        z_input: torch.Tensor
-            stack of simple distribution state vectors, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            stack of transformed states, which are drawn from an approximation
-            of the target distribution, same shape as input.
-
-        """
-        arg = torch.clamp(INVPI * z_input - 1, -0.999, 0.999)
-        phi_out = atanh(arg)
-        if torch.any(torch.isinf(phi_out)):
-            print("inf in atanh")
-
-        if phi_out.requires_grad is False:
-            np.savetxt(f"projected.txt", phi_out)
-
-        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
-            phi_out = layer.inverse_coupling_layer(phi_out)
-            if phi_out.requires_grad is False:
-                np.savetxt(f"layer_{i}.txt", phi_out)
-
-        phi_out = (torch.tanh(phi_out) + 1) * pi
-        if torch.any(torch.isnan(phi_out)):
-            print("nan in inverse map")
-            exit(1)
-
-        return phi_out
-
-    def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
-        r"""Returns the log of the exact probability (of model) associated with
-        each of the input states according to eq. (8) of
-        https://arxiv.org/pdf/1904.12072.pdf.
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of input states, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            column of log(\tilde p) associated with each of input states
-
-        """
-        # Derivative of atanh(f) + 1 where f is the output of the affine transformation
-        # Comes from projecting R -> [0, 2pi) in the inverse map, using Tanh
-        # phi_input = torch.clamp(phi_input, 0.001, 2*pi - 0.001)
-        log_jacob_contr = (
-            -1
-            * torch.log(
-                INVPI * phi_input * ( 2 - INVPI * phi_input )
-            )
-        ).sum(dim=1, keepdim=True)
-        arg = torch.clamp(INVPI * phi_input - 1, -0.999, 0.999)
-        z_out = atanh(arg)
-
-        for layer in self.affine_layers:
-            log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
-            z_out = layer(z_out)
-
-        log_jacob_contr += (-2 * torch.log(torch.cosh(z_out))).sum(dim=1, keepdim=True)
-
-        return log_jacob_contr
-
-
-class NonCompactProjection0(nn.Module):
-    """Single transformation involving non-compact projection."""
-
-    def __init__(self, *, size_in: int):
-        super(NonCompactProjection, self).__init__()
-        self.size_in = size_in
-
-        self.alpha = nn.Parameter(torch.rand(self.size_in))
-        self.beta = nn.Parameter(torch.rand(size_in))
-
-    def gradient(self, phi_input: torch.Tensor) -> torch.Tensor:
-        """
-        gradient of inverse map d f^{-1} / d phi for phi in target dist.
-        """
-        inverse_gradient = (
-            (self.alpha ** 2 + self.beta ** 2) * torch.sin(0.5 * phi_input).pow(2)
-            + torch.cos(0.5 * phi_input).pow(2)
-            + self.beta * torch.sin(phi_input)
-        )
-        return torch.abs(self.alpha) / inverse_gradient
-
-    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
-        """
-        map f: base -> target
-        """
-        with open("parameters.txt", "a") as f:
-            f.write(
-                f"{' '.join([str(abs(float(self.alpha[i]))) for i in range(4)])} {' '.join([str(float(self.beta[i])) for i in range(4)])}\n"
-            )
-        phi_out = torch.tan(0.5 * z_input - 0.5 * pi)
-        phi_out = torch.abs(self.alpha) * phi_out + self.beta
-        phi_out = 2 * torch.atan(phi_out) + pi
-
-        return phi_out
-
-
-class ConvexCombination(nn.Module):
-    def __init__(self, *, n_combs: int = 2, size_in: int):
-        super(ConvexCombination, self).__init__()
-        self.size_in = size_in
-        self.layers = nn.ModuleList(
-            [NonCompactProjection(size_in=size_in) for i in range(n_combs)]
-        )
-
-        self.coeffs = torch.ones(n_combs) / float(n_combs)
-
-    def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
-        r"""Function which maps simple distribution, z, to target distribution
-        \phi.
-        """
-        phi_out = torch.zeros(self.size_in)
-        for i, layer in enumerate(self.layers):
-            phi_out = phi_out + self.coeffs[i] * layer.forward(z_input)
-            if phi_out.requires_grad is False:
-                np.savetxt(f"layer_{i}.txt", phi_out)
-        return phi_out
-
-    def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
-        r"""log target which is log det gradient of inverse map!
-        """
-        gradient_sum = torch.zeros(phi_input.size())
-        for a, layer in enumerate(self.layers):
-            gradient_sum += self.coeffs[a] * layer.gradient(phi_input)
-
-        log_jacob_contr = torch.log(gradient_sum).sum(
-            dim=1, keepdim=True
-        )  # sum over lattice sites (currently valid for 1 angle only)
-
-        return log_jacob_contr
+        return log_simple_prob + log_jacob_contr - log_param
 
 
 if __name__ == "__main__":

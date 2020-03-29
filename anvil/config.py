@@ -8,11 +8,13 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
 
-from anvil.core import PhiFourAction, XYAction, TrainingOutput
+from anvil.core import PhiFourAction, NVectorAction, TrainingOutput
 from anvil.models import RealNVP, NonCompactProjection
 from anvil.geometry import Geometry2D
 
 log = logging.getLogger(__name__)
+
+from anvil.utils import SphericalUniformDist
 
 
 class ConfigParser(Config):
@@ -75,8 +77,10 @@ class ConfigParser(Config):
         return model
     """
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = NonCompactProjection(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
+    def produce_model(self, generator, n_affine, network_kwargs):
+        model = NonCompactProjection(
+            generator=generator, n_affine=n_affine, **network_kwargs,
+        )
         return model
 
     def parse_optimiser_input(self, optim):
@@ -94,8 +98,14 @@ class ConfigParser(Config):
     def parse_beta(self, beta):
         return beta
 
+    def parse_n_coords(self, n: int):
+        return n
+
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
+
+    def produce_generator(self, n_coords, lattice_length):
+        return SphericalUniformDist(dimension=n_coords, lattice_length=lattice_length)
 
     """
     def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
@@ -104,8 +114,8 @@ class ConfigParser(Config):
         )
     """
 
-    def produce_action(self, beta, geometry, shift_action):
-        return XYAction(beta, geometry, shift_action)
+    def produce_action(self, n_coords, beta, geometry, shift_action):
+        return NVectorAction(n_coords, beta, geometry, shift_action)
 
     def parse_target_length(self, targ: int):
         return targ

@@ -62,7 +62,7 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z = torch.rand((n_batch, n_units)) * 2 * pi
+        z = loaded_model.generator(n_batch)
         phi = loaded_model.inverse_map(z)
         target = action(phi)
         output = loaded_model(phi)

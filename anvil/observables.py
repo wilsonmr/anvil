@@ -16,6 +16,7 @@ import torch
 
 def free_energy(sample_training_output, action, beta):
     S = action(sample_training_output)
+    print(f"Mean action: {S.mean()}")
     Z = torch.mean(torch.exp(-S))
     F = -1.0 / beta * torch.log(Z)
     print(f"Free energy: {F}")
@@ -47,18 +48,18 @@ def bootstrap(observable):
     return variance.sqrt()
 
 
-def field_ensemble(sample_training_output, training_geometry, n_vec=2):
+def field_ensemble(sample_training_output, training_geometry):
     """
     Return field components from hyperspherical parameterisation
     """
     coords = sample_training_output.transpose(0, 1).view(
-        n_vec - 1,  # num angles
+        -1,  # num angles
         training_geometry.length ** 2,  # volume
         sample_training_output.shape[0],  # batch dimension
     )
 
     field_dims = list(coords.shape)
-    field_dims[0] = n_vec
+    field_dims[0] += 1  # O(N) model
 
     field = torch.ones(field_dims)
     field[:-1, ...] = torch.cos(coords)

@@ -97,9 +97,10 @@ class PhiFourAction(nn.Module):
         return action
 
 
-class XYAction(nn.Module):
-    def __init__(self, beta, geometry, shift_action=True):
+class NVectorAction(nn.Module):
+    def __init__(self, n_coords, beta, geometry, shift_action=True):
         super().__init__()
+        self.n_coords = n_coords
         self.beta = beta
         self.geometry = geometry
         self.volume = self.geometry.length ** 2
@@ -110,23 +111,79 @@ class XYAction(nn.Module):
         else:
             self.action_shift = 0
 
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        if self.n_coords is 1:
+            self.forward = self.xy_action
+        elif self.n_coords is 2:
+            self.forward = self.heisenberg_action
+        else:
+            self.forward = self.n_vector_action
+
+    def xy_action(self, state: torch.Tensor) -> torch.Tensor:
         """
         Compute XY action from a stack of angles (not field components) with shape
         (N_states, volume).
         """
-        cos_theta = torch.cos(state)
-        sin_theta = torch.sin(state)
+        action = (
+            -1
+            * self.beta
+            * torch.cos(state[:, self.shift] - state.view(-1, 1, self.volume))
+            .sum(dim=1,)  # sum over two shift directions (+ve nearest neighbours)
+            .sum(dim=1, keepdim=True)  # sum over lattice sites
+            + self.action_shift
+        )
+        return action
+
+    def heisenberg_action(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Compute Heisenberg action from a stack of angles with shape (N_states, 2 * volume).
+
+        Reshapes state into shape (N_states, 2, volume), so must make sure to keep this
+        consistent with observables.
+        """
+        state = state.view(-1, 2, self.volume)  # (N_states, N_angles, volume)
+        cos_theta = torch.cos(state[:, 0, :])
+        sin_theta = torch.sin(state[:, 0, :])
+        phi = state[:, 1, :]
+
         action = (
             -1
             * self.beta
             * (
                 cos_theta[:, self.shift] * cos_theta.view(-1, 1, self.volume)
-                + sin_theta[:, self.shift] * sin_theta.view(-1, 1, self.volume)
+                + sin_theta[:, self.shift]
+                * sin_theta.view(-1, 1, self.volume)
+                * torch.cos(phi[:, self.shift] - phi.view(-1, 1, self.volume))
             )
             .sum(dim=1,)  # sum over two shift directions (+ve nearest neighbours)
             .sum(dim=1, keepdim=True)  # sum over lattice sites
             + self.action_shift
+        )
+        return action
+
+    def coords_to_field(self, state):
+        coords = state.view(
+            -1, self.coords, self.volume,  # batch dimension  # num angles  # volume
+        )
+
+        field = torch.empty(coords.shape[0], self.coords + 1, self.volume)
+        field[:, :-1, :] = torch.cos(coords)
+        field[:, 1:, :] *= torch.cumprod(torch.sin(coords), dim=1)
+
+        return field
+
+    def n_vector_action(self, state):
+        field = self.coords_to_field(state)
+
+        action = (
+            -1
+            * self.beta
+            * torch.sum(
+                field[:, :, self.shift] * field.view(-1, n_coords + 1, 1, self.volume),
+                dim=1,  # sum over vector components
+            )
+            .sum(dim=1,)  # sum over shift directions
+            .sum(dim=1, keepdim=True)  # sum over lattice sites
+            + self.action_shift  # -1 convention
         )
         return action
 
