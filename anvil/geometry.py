@@ -45,14 +45,14 @@ class Geometry2D:
         representation.
 
         """
-        lsplitcart = torch.zeros((self.length, self.length), dtype=torch.int) 
-        lsplitcart[self.checkerboard] = torch.arange(
+        splitcart = torch.zeros((self.length, self.length), dtype=torch.int)
+        splitcart[self.checkerboard] = torch.arange(
             int(ceil(self.length ** 2 / 2)), dtype=torch.int
         )
-        lsplitcart[~self.checkerboard] = torch.arange(
+        splitcart[~self.checkerboard] = torch.arange(
             int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
         )
-        return lsplitcart
+        return splitcart
 
     def _lexisplit(self):
         """Lexicographic to Split. Internal function that returns a 1-D tensor of
@@ -82,10 +82,7 @@ class Geometry2D:
 
         """
         lexisplit = torch.cat(
-            [
-                torch.where(self.flat_checker)[0],
-                torch.where(~self.flat_checker)[0],
-            ],
+            [torch.where(self.flat_checker)[0], torch.where(~self.flat_checker)[0]],
             dim=0,
         )
         return lexisplit
@@ -180,7 +177,7 @@ class Geometry2D:
         )
         for i, (shift, dim) in enumerate(zip(shifts, dims)):
             # each shift, roll the 2d state-like indices and then flatten and split
-            shift_index[i, :] = self.splitcart.roll(
-                shift, dims=dim
-            ).flatten()[self.lexisplit]
+            shift_index[i, :] = self.splitcart.roll(shift, dims=dim).flatten()[
+                self.lexisplit
+            ]
         return shift_index
