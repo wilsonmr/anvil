@@ -36,6 +36,22 @@ python projects. To get an idea of how to do this, look at the
 `examples/train_example.py` which is discussed in
 [this section](##using-objects-in-external-code.).
 
+## Running tests
+
+If you wish to run tests you will additionally need to install pytest
+
+```bash
+conda install pytest
+```
+
+the tests can be run from any location, provided the code is installed, with
+the command
+
+```
+pytest --pyargs anvil
+```
+
+Consider adding tests whenever modifying/adding to the code.
 
 ## phi^4 example
 
