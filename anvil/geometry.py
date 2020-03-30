@@ -14,29 +14,21 @@ class ShiftsMismatchError(Exception):
 
 class Geometry2D:
     """Define the 2D geometry and the shifts in the two Cartesian
-       directions. The fields are stored in a one-dimensional array of size
-       length*length, assuming that the first Na entries correspond to the sites
-       that are updated by the affine transformation, and the remaining Nb
-       entries correspond to the sites that are left unchanged. 
+    directions. The fields are stored in a one-dimensional array of size
+    length*length, assuming that the first Na entries correspond to the sites
+    that are updated by the affine transformation, and the remaining Nb
+    entries correspond to the sites that are left unchanged.
 
-       phi = |... phiA ...|... phiB ...| 
+    phi = |... phiA ...|... phiB ...|
 
-       using the notation in https://arxiv.org/pdf/2003.06413.pdf We call this
-       representation of the field a 'split' representation. 
+    using the notation in https://arxiv.org/pdf/2003.06413.pdf We call this
+    representation of the field a 'split' representation.
 
-       splitcart (Split to Cartesian) is a 2-D grid of integers of size
-       length*length. The element (x,y) of the grid contains the index that
-       identifies the position of the site (x,y) in the split representation.
-
-       splitlexi (Split to Lexicographic) is an array of integers of size
-       length*length. The element i of the array contains the index that identifies the position of the site i in the split representation, where i is the lexicographic index of the site.
     """
 
     def __init__(self, length):
         self.length = length
-        # Hard code the checkerboard pattern, could be passed to class.
-        # ok for now, but needs to be changed. 
-        # the change should be a simple one
+        # TODO: Make the split pattern flexible and controllable at level of instance
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True
         checkerboard[::2, ::2] = True
@@ -44,10 +36,14 @@ class Geometry2D:
         self.flat_checker = self.checkerboard.flatten()
         # make split-flat state like object with corresponding indices in flat state
         self.splitcart = self._splitcart()
-        self.splitlexi = self._splitlexi()
+        self.lexisplit = self._lexisplit()
 
     def _splitcart(self):
-        """ Internal function for calculating the splitcart grid as described above
+        """Split to Cartesian. Internal function which returns a 2-D grid of
+        integers of size length*length. The element (x,y) of the grid contains
+        the index that identifies the position of the site (x,y) in the split
+        representation.
+
         """
         lsplitcart = torch.zeros((self.length, self.length), dtype=torch.int) 
         lsplitcart[self.checkerboard] = torch.arange(
@@ -58,26 +54,57 @@ class Geometry2D:
         )
         return lsplitcart
 
-    def _splitlexi(self):
-        """ Internal function for calculating the partlexi array as described above
+    def _lexisplit(self):
+        """Lexicographic to Split. Internal function that returns a 1-D tensor of
+        integers of size length*length. The element i of the tensor contains the
+        index that identifies the position of the site i in the split
+        representation, where i is the lexicographic index of the site.
+
+        The element i of the tensor contains the lexicographic index of the
+        site i in the split representation. Where the lexicographic index refers
+        to the original 2-D state.
+
+        Consider for example the orignal 2-D state where each element is the
+        lexicographic index of that site.
+
+            phi_2D = [[0, 1],
+                      [2, 3]]
+
+        which is then split according to checkerboard pattern
+
+            phi_split = [phiA, phiB]
+                      = [0, 3, 1, 2]
+
+        Since each site's value is its lexicographic index, then we can write
+        down immediately what lexisplit will return.
+
+            lexisplit = [0, 3, 1, 2]
+
         """
-        lsplitlexi = torch.cat(
+        lexisplit = torch.cat(
             [
                 torch.where(self.flat_checker)[0],
                 torch.where(~self.flat_checker)[0],
             ],
             dim=0,
         )
-        return lsplitlexi
+        return lexisplit
 
     def get_shift(self, shifts: tuple = (1, 1), dims: tuple = (0, 1)) -> torch.Tensor:
-        """Given length, which refers to size of a 2D state (length * length)
-        returns a Nx(length^2) tensor where N is the length of `shifts` and `dims`
-        (which must be equal). Each row of the returned tensor indexes a 
-        split state \phi = (\phiA, \phiB) which is split according to a
-        checkerboard geometry (even and odd refer to parity of the site). The
-        indices refer to shifts on the states in their original 2D form. By default
-        N = 2 and get_shift simply returns the right and down nearest neighbours.
+        r"""Provided with a set of `shifts` and `dims` which are tuples of equal
+        length N, the number of shifts. For the given system length used to
+        instance Geometry2D, which refers to size of a 2D state (length * length)
+        returns a tensor, size (N, length^2). Row i of the returned tensor indexes a
+        split state \phi = (\phiA, \phiB) which has been shifted by shift[i] in
+        dimension dims[i]. The shifts are performed on the 2D cartesian states.
+
+        element i of shifts and dims can either both be an integer or both be a
+        tuple of equal length. In the case that the element is a tuple, it
+        represents multiple simultaneous shifts in multiple dimensions.
+
+        By default shifts = (1, 1) and dims = (0, 1) and the resulting tensor indexes
+        the nearest neighbours above and to the left respectively. This convention
+        is according to to torch.roll
 
         Parameters
         ----------
@@ -85,14 +112,15 @@ class Geometry2D:
             a tuple of shifts to be applied. Each element represents a shift and can
             either be an integer (if the shift is in a single dimension) or a tuple
             if the shift is applied simultaneously in multiple dimensions (see
-            Examples). By default it is set to have two shifts which give right and
-            down nearest neighbours
+            Examples).
+
         dims: tuple
             a tuple of dimensions to apply `shifts` to. As with shift, each element
             in dim can itself be a tuple which indicates that multiple shifts will
             be applied in multiple dimensions simultaneously. Note that
             corresponding entries of dims and shifts must also match (either both
             ints or both tuples of same length).
+
         Returns
         -------
         shift: torch.Tensor
@@ -113,32 +141,28 @@ class Geometry2D:
         tensor([[0, 1],
                 [2, 3]])
 
-        even sites are [0, 3], odd sites are [1, 2]
+        If we use a checkerboard pattern to split state into \phiA and \phiB
+        then \phiA = [0, 3] and \phiB = [1, 2]
 
-        >>> state_split = torch.tensor([0, 3, 1, 2])
-        >>> shift = get_shift(2) ### why this argument 2?
-        >>> state_split[shift]
-        tensor([[1, 2, 0, 3],
-                [2, 1, 3, 0]])   ### I get them in the opposite order
+        >>> phi = torch.tensor([0, 3, 1, 2])
+        >>> geom = Geometry2D(2)
+        >>> shift = geom.get_shift()
+        >>> phi[shift]
+        tensor([[2, 1, 3, 0],
+                [1, 2, 0, 3]])
 
-        correct nearest neighbours in reference to the original `state_2d` (left and
-        down) are given in each row respectively
+        to see how multiple shifts works, consider the shift (1, 1) in dimensions
+        (0, 1): up one, left one
 
-        to see how multiple shifts works, consider the shift (1, 1)
-        (left one, up one)
-
-        >>> shift = get_shift(2, shifts=((1, 1),), dims=((0, 1),))
-        >>> state_split[shift]
+        >>> shift = geom.get_shift(shifts=((1, 1),), dims=((0, 1),))
+        >>> phi[shift]
         tensor([[3, 0, 2, 1]])
-
-        we see that each element of shifts and dims can perform multiple shifts, in
-        different dimensions at once.
 
         Notes
         -----
         The conventions for how the shifts are applied are according the torch.roll
-        function, shift = +ve rolls the state left and so the indices will refer to
-        lattice sights to the right.
+        function, shift = +ve rolls the state in a direction that corresponds
+        to ascending index when using standard python indexing.
 
         See Also
         --------
@@ -158,5 +182,5 @@ class Geometry2D:
             # each shift, roll the 2d state-like indices and then flatten and split
             shift_index[i, :] = self.splitcart.roll(
                 shift, dims=dim
-            ).flatten()[self.splitlexi]
+            ).flatten()[self.lexisplit]
         return shift_index
