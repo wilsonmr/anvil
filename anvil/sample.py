@@ -57,10 +57,10 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
     """
     with torch.no_grad():  # don't track gradients
         z = loaded_model.generator(batch_size + 1)
-        np.savetxt("base.txt", z)
+        # np.savetxt("base.txt", z)
 
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
-        np.savetxt("target.txt", phi)
+        # np.savetxt("target.txt", phi)
 
         if current_state is not None:
             phi[0] = current_state

@@ -128,9 +128,11 @@ class AffineLayer(nn.Module):
         """
         for s_layer in self.s_layers[:-1]:
             x_input = torch.tanh(s_layer(x_input))
-        if torch.any(torch.isnan(x_input)):
-            print("nans in s networks")
         x_input = torch.tanh(self.s_layers[-1](x_input))
+
+        # if torch.any(torch.isnan(x_input)):
+        #    print("nans in s networks")
+
         return x_input
 
     def _t_forward(self, x_input: torch.Tensor) -> torch.Tensor:
@@ -411,14 +413,13 @@ class NonCompactProjection(nn.Module):
         # Projection
         phi_out = torch.tan(z_input - 0.5 * pi)
 
-        if phi_out.requires_grad is False:
-            np.savetxt(f"projected.txt", phi_out)
+        # np.savetxt("projected.txt", phi_out.detach().numpy())
 
         # Affine transformations
         for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
             phi_out = layer.inverse_coupling_layer(phi_out)
-            if phi_out.requires_grad is False:
-                np.savetxt(f"layer_{i}.txt", phi_out)
+
+            # np.savetxt(f"layer_{i}.txt", phi_out.detach().numpy())
 
         # Inverse projection
         phi_out = (torch.atan(phi_out) + 0.5 * pi) * self.double_azimuth
@@ -516,14 +517,12 @@ class StereographicProjection(nn.Module):
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
 
-        #if phi_out.requires_grad is False:
-        #    np.savetxt(f"projected.txt", phi_out)
+        # np.savetxt(f"projected.txt", phi_out)
 
         # Affine transformations
         for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
             phi_out = layer.inverse_coupling_layer(phi_out)
-            #if phi_out.requires_grad is False:
-            #    np.savetxt(f"layer_{i}.txt", phi_out)
+            # np.savetxt(f"layer_{i}.txt", phi_out)
 
         # Inverse projection
         phi_out = 2 * torch.atan(phi_out) + pi
@@ -557,14 +556,12 @@ class StereographicProjection(nn.Module):
             * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=1)
         ).view(-1, 2 * self.volume)
 
-        #if x_coords.requires_grad is False:
-        #    np.savetxt(f"projected.txt", x_coords.detach().numpy())
+        # np.savetxt(f"projected.txt", x_coords.detach().numpy())
 
         # Affine transformations
         for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
             x_coords = layer.inverse_coupling_layer(x_coords)
-            #if x_coords.requires_grad is False:
-            #    np.savetxt(f"layer_{i}.txt", x_coords.detach().numpy())
+            # np.savetxt(f"layer_{i}.txt", x_coords.detach().numpy())
         x_1, x_2 = x_coords.view(-1, 2, self.volume).split(1, dim=1)
 
         # Inverse projection

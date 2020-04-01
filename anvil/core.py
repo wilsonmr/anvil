@@ -162,10 +162,10 @@ class NVectorAction(nn.Module):
 
     def coords_to_field(self, state):
         coords = state.view(
-            -1, self.coords, self.volume,  # batch dimension  # num angles  # volume
+            -1, self.n_coords, self.volume,  # batch dimension  # num angles  # volume
         )
 
-        field = torch.empty(coords.shape[0], self.coords + 1, self.volume)
+        field = torch.empty(coords.shape[0], self.n_coords + 1, self.volume)
         field[:, :-1, :] = torch.cos(coords)
         field[:, 1:, :] *= torch.cumprod(torch.sin(coords), dim=1)
 
@@ -178,7 +178,7 @@ class NVectorAction(nn.Module):
             -1
             * self.beta
             * torch.sum(
-                field[:, :, self.shift] * field.view(-1, n_coords + 1, 1, self.volume),
+                field[:, :, self.shift] * field.view(-1, self.n_coords + 1, 1, self.volume),
                 dim=1,  # sum over vector components
             )
             .sum(dim=1,)  # sum over shift directions

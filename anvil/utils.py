@@ -45,7 +45,7 @@ class SphericalUniformDist:
         samples[:, 1, :] = torch.rand(n_samples, self.lattice_volume) * 2 * pi
         return samples.view(n_samples, 2 * self.lattice_volume)
 
-    def hyperspherical_unif(n_samples) -> torch.Tensor:
+    def hyperspherical_unif(self, n_samples) -> torch.Tensor:
         """Return samples distributed uniformly on the unit N-sphere.
         
         Uses Marsaglia's algorithm.
@@ -54,7 +54,8 @@ class SphericalUniformDist:
         points = rand_normal / rand_normal.norm(dim=1, keepdim=True)
 
         #TODO: convert to self.dimension angles. Kind of a faff and not urgent
-
         raise NotImplementedError
+        
+
 
         
