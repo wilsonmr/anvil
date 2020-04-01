@@ -10,7 +10,6 @@ import pandas as pd
 from reportengine.table import table
 
 
-
 @table
 def ising_observables_table(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken

@@ -11,7 +11,6 @@ from matplotlib.ticker import MaxNLocator
 from reportengine.figure import figure, figuregen
 
 
-
 @figure
 def plot_zero_momentum_two_point(zero_momentum_two_point, training_geometry):
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap

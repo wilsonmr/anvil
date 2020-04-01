@@ -91,7 +91,10 @@ class AffineLayer(nn.Module):
         t_shape = [size_half, *t_hidden_shape, size_half]
 
         self.s_layers = nn.ModuleList(
-            [self._block(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
+            [
+                self._block(s_in, s_out)
+                for s_in, s_out in zip(s_shape[:-2], s_shape[1:-1])
+            ]
         )
         self.t_layers = nn.ModuleList(
             [
@@ -99,9 +102,10 @@ class AffineLayer(nn.Module):
                 for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
             ]
         )
-        self.t_layers += [
-            nn.Linear(t_shape[-2], t_shape[-1])
-        ]  # no ReLU on last t layer
+        # No ReLU on final layers: need to be able to scale data by
+        # 0 < s, not 1 < s, and enact both +/- shifts
+        self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1])]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
