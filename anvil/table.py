@@ -1,18 +1,26 @@
-from math import ceil, floor, log10, fabs
+"""
+table.py
 
+Module containing all table actions
+
+"""
 import numpy as np
 import pandas as pd
 
 from reportengine.table import table
 
-from anvil.observables import bootstrap
 
 
 @table
-def ising_observables_table(ising_energy, susceptibility, training_output):
-    IE, IE_std = float(ising_energy[0]), float(bootstrap(ising_energy))
-    S, S_std = float(susceptibility[0]), float(bootstrap(susceptibility))
-    res = [[IE, IE_std], [S, S_std]]
+def ising_observables_table(ising_energy, susceptibility):
+    """Table of the ising observables, with mean and standard deviation taken
+    across boostrap samples
+    """
+    # annoying that tensors have to be cast to float
+    res = [
+        [float(ising_energy.mean()), float(ising_energy.std())],
+        [float(susceptibility.mean()), float(susceptibility.std())],
+    ]
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
@@ -22,14 +30,17 @@ def ising_observables_table(ising_energy, susceptibility, training_output):
 
 
 @table
-def table_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
-    zm2pf, zm2pf_std = zero_momentum_2pf[0, :], bootstrap(zero_momentum_2pf)
-    g_tilde = []
-    for t in range(training_geometry.length):
-        g_tilde.append([float(zm2pf[t]), float(zm2pf_std[t])])
+def table_zero_momentum_two_point(zero_momentum_two_point, training_geometry):
+    """Table of zero_momentum_two_point, with mean and standard deviation
+    from bootstrap
+    """
+    means = zero_momentum_two_point.mean(dim=-1).numpy()[:, np.newaxis]
+    stds = zero_momentum_two_point.std(dim=-1).numpy()[:, np.newaxis]
+
+    data = np.concatenate((means, stds), axis=1)
 
     df = pd.DataFrame(
-        g_tilde,
+        data,
         columns=["Mean", "Standard deviation"],
         index=range(training_geometry.length),
     )
@@ -38,13 +49,15 @@ def table_zero_momentum_2pf(zero_momentum_2pf, training_geometry):
 
 @table
 def table_effective_pole_mass(effective_pole_mass, training_geometry):
-    epm, epm_std = effective_pole_mass[0, :], bootstrap(effective_pole_mass)
-    m_eff = []
-    for t in range(training_geometry.length - 2):
-        m_eff.append([float(epm[t]), float(epm_std[t])])
+    """Table of effective_pole_mass, with mean and standard deviation
+    from bootstrap
+    """
+    means = effective_pole_mass.mean(dim=-1).numpy()[:, np.newaxis]
+    stds = effective_pole_mass.std(dim=-1).numpy()[:, np.newaxis]
 
+    data = np.concatenate((means, stds), axis=1)
     df = pd.DataFrame(
-        m_eff,
+        data,
         columns=["Mean", "Standard deviation"],
         index=range(1, training_geometry.length - 1),
     )
@@ -52,42 +65,29 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry):
 
 
 @table
-def table_2pf(training_geometry, two_point_function):
+def table_two_point_function(training_geometry, two_point_function):
+    """For each x and t, tabulate the mean and standard deviation of the two
+    point function, estimated from bootstrap sample
+    """
     corr = []
-    for j in range(training_geometry.length ** 2):
-        corr.append(
-            [
-                float(
-                    two_point_function(
-                        j // training_geometry.length, j % training_geometry.length  # t
-                    )[0]
-                ),  # x
-                float(
-                    bootstrap(
-                        two_point_function(
-                            j // training_geometry.length,
-                            j % training_geometry.length,  # t
-                        )
-                    )  # x
-                ),
-            ],
-        )
-    df = pd.DataFrame(
-        corr,
-        columns=["Mean", "Standard deviation"],
-        index=[
-            (j // training_geometry.length, j % training_geometry.length)
-            for j in range(training_geometry.length ** 2)
-        ],
-    )
+    index = []
+    means = two_point_function.mean(dim=-1)
+    stds = two_point_function.std(dim=-1)
+
+    for i in range(training_geometry.length):
+        for j in range(training_geometry.length):
+            corr.append([float(means[i, j]), float(stds[i, j])])
+            index.append((i, j))
+    df = pd.DataFrame(corr, columns=["Mean", "Standard deviation"], index=index)
     return df
 
 
 @table
-def table_autocorrelation_2pf(autocorrelation_2pf):
-    autocorrelation, _, _, _, _ = autocorrelation_2pf
-
+def table_autocorrelation_2pf(autocorr_two_point):
+    """Tabulate the autocorrelation of the two point function"""
     df = pd.DataFrame(
-        autocorrelation, columns=["Autocorrelation"], index=range(len(autocorrelation)),
+        autocorr_two_point,
+        columns=["Autocorrelation"],
+        index=range(len(autocorr_two_point)),
     )
     return df

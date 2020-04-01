@@ -13,12 +13,42 @@ class ShiftsMismatchError(Exception):
 
 
 class Geometry2D:
+    """Define the 2D geometry, which can return shifts which index flattened
+    returning shifted flattened states, where the shift is some shift on the
+    original lattice
+    """
+
     def __init__(self, length):
         self.length = length
+        # Hard code the checkerboard pattern, could be passed to class.
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True
         checkerboard[::2, ::2] = True
         self.checkerboard = checkerboard
+        self.flat_checker = self.checkerboard.flatten()
+        # make split-flat state like object with corresponding indices in flat state
+        self.flat_ind_like_split = torch.cat(
+            [
+                torch.where(checkerboard.flatten())[0],
+                torch.where(~checkerboard.flatten())[0],
+            ],
+            dim=0,
+        )
+        self.split_ind_like_state = self._split_indices_like_state()
+
+    def _split_indices_like_state(self):
+        """Internal function for calculating the split index like state, which
+        is the index of phi_a and phi_b in the flattened state, arranged in the
+        shape of the 2D state, used in get_shift
+        """
+        splitind_like_state = torch.zeros((self.length, self.length), dtype=torch.int)
+        splitind_like_state[self.checkerboard] = torch.arange(
+            int(ceil(self.length ** 2 / 2)), dtype=torch.int
+        )
+        splitind_like_state[~self.checkerboard] = torch.arange(
+            int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
+        )
+        return splitind_like_state
 
     def get_shift(self, shifts: tuple = (1, 1), dims: tuple = (0, 1)) -> torch.Tensor:
         r"""Given length, which refers to size of a 2D state (length * length)
@@ -101,27 +131,12 @@ class Geometry2D:
                 f"{len(shifts)} and {len(dims)} do not match."
             )
 
-        # make 2d state-like matrix filled with corresponding indices in split-flat state
-        splitind_like_state = torch.zeros((self.length, self.length), dtype=torch.int)
-        splitind_like_state[self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), dtype=torch.int
-        )
-        splitind_like_state[~self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
-        )
-
-        flat_checker = self.checkerboard.flatten()
-        # make split-flat state like object with corresponding indices in flat state
-        out_ind = torch.cat(
-            [torch.where(flat_checker)[0], torch.where(~flat_checker)[0]], dim=0
-        )
-
         shift_index = torch.zeros(
             len(shifts), self.length * self.length, dtype=torch.long
         )
         for i, (shift, dim) in enumerate(zip(shifts, dims)):
             # each shift, roll the 2d state-like indices and then flatten and split
-            shift_index[i, :] = splitind_like_state.roll(shift, dims=dim).flatten()[
-                out_ind
-            ]
+            shift_index[i, :] = self.split_ind_like_state.roll(
+                shift, dims=dim
+            ).flatten()[self.flat_ind_like_split]
         return shift_index

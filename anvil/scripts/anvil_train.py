@@ -16,6 +16,7 @@ TRAINING_ACTIONS = ["train"]
 
 RUNCARD_COPY_FILENAME = "runcard.yml"
 
+INPUT_FOLDER_NAME = "input"
 
 class TrainError(Exception):
     pass
@@ -45,7 +46,7 @@ class TrainConfig(ConfigParser):
         extra_input = {
             "training_output": str(kwargs["environment"].output_path),
             "cp_id": kwargs["environment"].extra_args["retrain"],
-            "outpath": kwargs["environment"].output_path / "checkpoints",
+            "outpath": str(kwargs["environment"].output_path / "checkpoints"),
             "actions_": ["train"],
         }
         for key, value in extra_input.items():
@@ -77,6 +78,8 @@ class TrainEnv(Environment):
         self.output_path.mkdir()
         (self.output_path / "checkpoints").mkdir()
         (self.output_path / "logs").mkdir()
+        self.input_folder = self.output_path / INPUT_FOLDER_NAME
+        self.input_folder.mkdir()
 
         shutil.copy2(self.config_yml, self.output_path / RUNCARD_COPY_FILENAME)
 
