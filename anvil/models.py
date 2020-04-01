@@ -21,9 +21,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
-from sys import exit
-
-INVPI = 1.0 / pi
 
 
 def atanh(x):
@@ -130,7 +127,7 @@ class AffineLayer(nn.Module):
 
         """
         for s_layer in self.s_layers[:-1]:
-            x_input = torch.sigmoid(s_layer(x_input))
+            x_input = torch.tanh(s_layer(x_input))
         if torch.any(torch.isnan(x_input)):
             print("nans in s networks")
         x_input = torch.tanh(self.s_layers[-1](x_input))
@@ -146,7 +143,7 @@ class AffineLayer(nn.Module):
 
         """
         for t_layer in self.t_layers[:-1]:
-            x_input = torch.sigmoid(t_layer(x_input))
+            x_input = torch.tanh(t_layer(x_input))
         x_input = self.t_layers[-1](x_input)
         return x_input
 
@@ -378,8 +375,6 @@ class NonCompactProjection(nn.Module):
             1, -1, 1
         )  # batch dim, coords, volume
 
-        ones = torch.ones((1, self.n_coords, self.volume))
-
         self.halve_azimuth = (
             torch.tensor([1,] * (self.n_coords - 1) + [0.5])
             .view(1, -1, 1)
@@ -481,11 +476,139 @@ class NonCompactProjection(nn.Module):
             z_out = layer(z_out)
 
         # Inverse projection
-        log_jacob_contr += (-1 * torch.log(1 + z_out ** 2)).sum(dim=1, keepdim=True)
+        log_jacob_contr += (-1 * torch.log1p(z_out ** 2)).sum(dim=1, keepdim=True)
         z_out = torch.atan(z_out) + 0.5 * pi
 
         # Base distribution
         log_simple_prob = self.log_surf_area_element(z_out)
+
+        return log_simple_prob + log_jacob_contr - log_param
+
+
+class StereographicProjection(nn.Module):
+    def __init__(
+        self, *, generator, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
+    ):
+        super().__init__()
+        self.generator = generator
+
+        self.n_coords = self.generator.dimension
+        self.volume = self.generator.lattice_volume
+
+        if self.n_coords is 1:
+            self.inverse_map = self.circle_diffeomorphism
+            self.forward = self.circle_density
+        elif self.n_coords is 2:
+            self.inverse_map = self.sphere_diffeomorphism
+            self.forward = self.sphere_density
+        else:
+            raise NotImplementedError
+
+        self.size_in = self.generator.dimension * self.generator.lattice_volume
+        self.affine_layers = nn.ModuleList(
+            [
+                AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
+                for i in range(n_affine)
+            ]
+        )
+
+    def circle_diffeomorphism(self, z_input: torch.Tensor) -> torch.Tensor:
+        # Projection
+        phi_out = torch.tan(0.5 * (z_input - pi))
+
+        #if phi_out.requires_grad is False:
+        #    np.savetxt(f"projected.txt", phi_out)
+
+        # Affine transformations
+        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
+            phi_out = layer.inverse_coupling_layer(phi_out)
+            #if phi_out.requires_grad is False:
+            #    np.savetxt(f"layer_{i}.txt", phi_out)
+
+        # Inverse projection
+        phi_out = 2 * torch.atan(phi_out) + pi
+
+        return phi_out
+
+    def circle_density(self, phi_input: torch.Tensor) -> torch.Tensor:
+        # Projection
+        log_jacob_contr = (-2 * torch.log(torch.cos(0.5 * (phi_input - pi)))).sum(
+            dim=1, keepdim=True
+        )
+        z_out = torch.tan(0.5 * (phi_input - pi))
+
+        # Affine transformations and Jacobian
+        for layer in self.affine_layers:
+            log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
+            z_out = layer(z_out)
+
+        # Inverse projection
+        log_jacob_contr += (-torch.log1p(z_out ** 2)).sum(dim=1, keepdim=True)
+
+        return log_jacob_contr
+
+    def sphere_diffeomorphism(self, z_input: torch.Tensor) -> torch.Tensor:
+        zenith, azimuth = z_input.view(-1, 2, self.volume).split(1, dim=1)
+
+        # Projection
+        # -1 factor because polar coordinate = azimuth - pi (*-1 is faster than shift)
+        x_coords = (
+            -torch.tan(0.5 * zenith)  # radial coordinate
+            * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=1)
+        ).view(-1, 2 * self.volume)
+
+        #if x_coords.requires_grad is False:
+        #    np.savetxt(f"projected.txt", x_coords.detach().numpy())
+
+        # Affine transformations
+        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
+            x_coords = layer.inverse_coupling_layer(x_coords)
+            #if x_coords.requires_grad is False:
+            #    np.savetxt(f"layer_{i}.txt", x_coords.detach().numpy())
+        x_1, x_2 = x_coords.view(-1, 2, self.volume).split(1, dim=1)
+
+        # Inverse projection
+        phi_out = torch.cat(
+            (
+                2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2))),
+                torch.atan2(x_2, x_1) + pi,
+            ),
+            dim=1,
+        ).view(-1, 2 * self.volume)
+
+        return phi_out
+
+    def sphere_density(self, phi_input: torch.Tensor) -> torch.Tensor:
+        zenith, azimuth = phi_input.view(-1, 2, self.volume).split(1, dim=1)
+
+        # Parameterisation
+        log_param = torch.log(torch.sin(zenith)).sum(dim=2)
+
+        # Projection
+        log_jacob_contr = (
+            torch.log(torch.sin(0.5 * zenith)) - 3 * torch.log(torch.cos(0.5 * zenith))
+        ).sum(dim=2)
+
+        x_coords = (
+            -torch.tan(0.5 * zenith)  # radial coordinate
+            * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=1)
+        ).view(-1, 2 * self.volume)
+
+        # Affine transformations
+        for layer in self.affine_layers:
+            log_jacob_contr += layer.log_det_jacobian(x_coords).view(-1, 1)
+            x_coords = layer(x_coords)
+
+        # Inverse projection
+        rad_sq = x_coords.view(-1, 2, self.volume).pow(2).sum(dim=1)
+        log_jacob_contr += (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
+            dim=1, keepdim=True
+        )
+
+        # Base distribution
+        log_simple_prob = torch.log(
+            torch.sin(2 * torch.atan(rad_sq.sqrt()))  # sin(zenith angle)
+        ).sum(dim=1, keepdim=True)
 
         return log_simple_prob + log_jacob_contr - log_param
 

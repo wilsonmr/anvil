@@ -11,6 +11,7 @@ import torch.optim as optim
 
 from math import pi
 
+
 def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.

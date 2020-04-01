@@ -9,7 +9,7 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
 
 from anvil.core import PhiFourAction, NVectorAction, TrainingOutput
-from anvil.models import RealNVP, NonCompactProjection
+from anvil.models import RealNVP, NonCompactProjection, StereographicProjection
 from anvil.geometry import Geometry2D
 
 log = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class ConfigParser(Config):
     """
 
     def produce_model(self, generator, n_affine, network_kwargs):
-        model = NonCompactProjection(
+        model = StereographicProjection(
             generator=generator, n_affine=n_affine, **network_kwargs,
         )
         return model
