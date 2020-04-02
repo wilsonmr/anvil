@@ -34,7 +34,7 @@ class NormalDist:
         self.size_out = self.lattice_volume * self.field_dimension
 
         # Pre-calculate normalisation for log density
-        self._log_normalisation = self.log_normalisation()
+        self.log_normalisation = self._log_normalisation()
 
     def __call__(self, n_sample) -> torch.Tensor:
         """Return tensor of values drawn from the standard normal distribution
@@ -44,7 +44,7 @@ class NormalDist:
         """
         return torch.randn(n_sample, self.size_out)
 
-    def log_normalisation(self) -> float:
+    def _log_normalisation(self) -> float:
         """logarithm of the normalisation for the density function."""
         return log(sqrt(pow(2 * pi, self.size_out)))
 
@@ -56,4 +56,4 @@ class NormalDist:
         field configurations (the first dimension of sample).
         """
         exponent = -torch.sum(0.5 * sample.pow(2), dim=1, keepdim=True)
-        return exponent - self._log_normalisation
+        return exponent - self.log_normalisation
