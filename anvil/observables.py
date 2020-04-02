@@ -161,14 +161,14 @@ def bootstrap_function(func, states, *args, n_boot=100):
 
 
 def two_point_function(
-    sample_training_output, training_geometry, bootstrap_n_samples=100
+    sample_training_output, training_geometry, n_boot=100
 ):
     """Bootstrap calc_two_point_function, using bootstrap_function"""
     return bootstrap_function(
         calc_two_point_function,
         sample_training_output,
         training_geometry,
-        n_boot=bootstrap_n_samples,
+        n_boot=n_boot,
     )
 
 

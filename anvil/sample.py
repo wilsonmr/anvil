@@ -55,9 +55,7 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = torch.randn(
-            (batch_size + 1, loaded_model.size_in)
-        )  # random z configurations
+        z = loaded_model.generator(batch_size + 1)
         phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
         if current_state is not None:
             phi[0] = current_state
