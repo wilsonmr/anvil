@@ -70,14 +70,12 @@ class ConfigParser(Config):
 
     def produce_generator(
         self,
-        n_batch: int,
         lattice_size: int,
         base_dist: str = "normal",
         field_dimension: int = 1,
     ):
         if base_dist == "normal":
             return NormalDist(
-                n_batch=n_batch,
                 lattice_volume=lattice_size,
                 field_dimension=field_dimension,
             )
