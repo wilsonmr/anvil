@@ -1,5 +1,5 @@
 """
-generators.py
+distributions.py
 
 Module containing classes corresponding to different base distributions.
 """
