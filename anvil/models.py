@@ -294,7 +294,7 @@ class RealNVP(nn.Module):
 
     def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
         r"""Function which maps simple distribution, z, to target distribution
-        selfz\phi.
+        \phi.
 
         Parameters
         ----------
