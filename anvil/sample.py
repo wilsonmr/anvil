@@ -71,7 +71,7 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
             "could run into nans based on minimum and maximum log of ratio of probabilities"
         )
 
-    rand_batch = uniform(size=batch_size+1)  # gen batch of random uniform numbers
+    rand_batch = uniform(size=batch_size + 1)  # gen batch of random uniform numbers
     i = 0  # phi index of current state
     for j in range(1, batch_size + 1):  # j = phi index of proposed state
         condition = min(1, exp(float(log_ratio[i] - log_ratio[j])))

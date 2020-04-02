@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class ConfigParser(Config):
-    """Extend the reportengine Config class for <project name> specific
+    """Extend the reportengine Config class for anvil-specific
     objects
     """
 
@@ -33,30 +33,22 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def parse_n_affine(self, n: int):
-        return n
+    def produce_geometry(self, lattice_length):
+        return Geometry2D(lattice_length)
 
-    def parse_epochs(self, epochs: int):
-        return epochs
+    def parse_m_sq(self, m: (float, int)):
+        return m
 
-    @element_of("cp_ids")
-    def parse_cp_id(self, cp: (int, type(None))):
-        return cp
+    def parse_lam(self, lam: (float, int)):
+        return lam
 
-    @element_of("training_outputs")
-    def parse_training_output(self, path: str):
-        return TrainingOutput(path)
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
 
-    @element_of("checkpoints")
-    def produce_checkpoint(self, cp_id=None, training_output=None):
-        if cp_id is None:
-            return None
-        if cp_id == -1:
-            return training_output.final_checkpoint()
-        if cp_id not in training_output.cp_ids:
-            raise ConfigError(f"Checkpoint {cp_id} not found in {training_output.path}")
-        # get index from training_output class
-        return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
+    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
+        return PhiFourAction(
+            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
+        )
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -69,29 +61,81 @@ class ConfigParser(Config):
         hidden_nodes = tuple(hidden_nodes)
         return dict(affine_hidden_shape=hidden_nodes)
 
+    def parse_n_affine(self, n: int):
+        return n
+
+    def parse_n_batch(self, nb: int):
+        return nb
+
     def produce_model(self, lattice_size, n_affine, network_kwargs):
         model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
         return model
 
-    def parse_optimiser_input(self, optim):
-        raise NotImplementedError
+    def parse_epochs(self, epochs: int):
+        return epochs
 
-    def parse_m_sq(self, m: (float, int)):
-        return m
+    def parse_save_interval(self, save_int: int):
+        return save_int
 
-    def parse_lam(self, lam: (float, int)):
-        return lam
+    @element_of("training_outputs")
+    def parse_training_output(self, path: str):
+        return TrainingOutput(path)
 
-    def parse_use_arxiv_version(self, do_use: bool):
-        return do_use
+    @element_of("cp_ids")
+    def parse_cp_id(self, cp: (int, type(None))):
+        return cp
 
-    def produce_geometry(self, lattice_length):
-        return Geometry2D(lattice_length)
+    @element_of("checkpoints")
+    def produce_checkpoint(self, cp_id=None, training_output=None):
+        if cp_id is None:
+            return None
+        if cp_id == -1:
+            return training_output.final_checkpoint()
+        if cp_id not in training_output.cp_ids:
+            raise ConfigError(f"Checkpoint {cp_id} not found in {training_output.path}")
+        # get index from training_output class
+        return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
 
-    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
-        return PhiFourAction(
-            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
-        )
+    def produce_training_context(self, training_output):
+        """Given a training output produce the context of that training"""
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+            _, model = self.parse_from_(None, "model", write=False)
+            _, action = self.parse_from_(None, "action", write=False)
+            _, cps = self.parse_from_(None, "checkpoints", write=False)
+
+        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
+
+    def produce_training_geometry(self, training_output):
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+        return geometry
+
+    def parse_optimizer(self, optim: str):
+        valid_optimizers = ("adam", "adadelta")
+        if optim not in valid_optimizers:
+            raise ConfigError(
+                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
+            )
+        return optim
+
+    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+        # This will only be executed if optimizer is defined in the runcard
+        if optimizer == "adam":
+            valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
+        if optimizer == "adadelta":
+            valid_kwargs = ("lr", "rho", "weight_decay", "eps")
+
+        if not all([arg in valid_kwargs for arg in kwargs]):
+            raise ConfigError(
+                f"Valid optimizer_kwargs for {optimizer} are {', '.join([arg for arg in valid_kwargs])}"
+            )
+        return kwargs
+
+    def parse_scheduler_kwargs(self, kwargs: dict):
+        if "patience" not in kwargs:
+            kwargs["patience"] = 500  # problem setting default in config parser?
+        return kwargs
 
     def parse_target_length(self, targ: int):
         return targ
@@ -126,18 +170,3 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
-
-    def produce_training_context(self, training_output):
-        """Given a training output produce the context of that training"""
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-            _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
-            _, cps = self.parse_from_(None, "checkpoints", write=False)
-
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
-
-    def produce_training_geometry(self, training_output):
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-        return geometry

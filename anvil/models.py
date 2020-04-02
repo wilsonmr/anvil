@@ -18,9 +18,6 @@ from math import sqrt, pi, log
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-ACTIVATION_FUNC = F.leaky_relu  # Globally define activation function
 
 
 class AffineLayer(nn.Module):
@@ -94,11 +91,21 @@ class AffineLayer(nn.Module):
         t_shape = [size_half, *t_hidden_shape, size_half]
 
         self.s_layers = nn.ModuleList(
-            [nn.Linear(s_in, s_out) for s_in, s_out in zip(s_shape[:-1], s_shape[1:])]
+            [
+                self._block(s_in, s_out)
+                for s_in, s_out in zip(s_shape[:-2], s_shape[1:-1])
+            ]
         )
         self.t_layers = nn.ModuleList(
-            [nn.Linear(t_in, t_out) for t_in, t_out in zip(t_shape[:-1], t_shape[1:])]
+            [
+                self._block(t_in, t_out)
+                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
+            ]
         )
+        # No ReLU on final layers: need to be able to scale data by
+        # 0 < s, not 1 < s, and enact both +/- shifts
+        self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1])]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -113,6 +120,14 @@ class AffineLayer(nn.Module):
                 (a[1], a[0]), *args, **kwargs
             )
 
+    def _block(self, f_in, f_out):
+        """Defines a single block within the neural networks.
+
+        Currently hard coded to be a dense layed followed by a leaky ReLU,
+        but could potentially specify in runcard.
+        """
+        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
+
     def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
         """Internal method which performs the forward pass of the network
         s.
@@ -123,7 +138,7 @@ class AffineLayer(nn.Module):
 
         """
         for s_layer in self.s_layers:
-            x_input = ACTIVATION_FUNC(s_layer(x_input))
+            x_input = s_layer(x_input)
         return x_input
 
     def _t_forward(self, x_input: torch.Tensor) -> torch.Tensor:
@@ -136,7 +151,7 @@ class AffineLayer(nn.Module):
 
         """
         for t_layer in self.t_layers:
-            x_input = ACTIVATION_FUNC(t_layer(x_input))
+            x_input = t_layer(x_input)
         return x_input
 
     def coupling_layer(self, phi_input) -> torch.Tensor:

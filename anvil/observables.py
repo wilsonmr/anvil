@@ -59,7 +59,6 @@ def calc_two_point_function(sample_training_output, training_geometry):
         2d tensor of size (lattice length, lattice length, *)
         containing values of green function G(x) (allowing for bootstrap
         dimension)
-
     """
     # allow for additional dimensions like bootstrap
     _, _, *extra_dims = sample_training_output.shape
