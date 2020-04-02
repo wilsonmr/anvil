@@ -18,7 +18,7 @@ from anvil.utils import SphericalUniformDist
 
 
 class ConfigParser(Config):
-    """Extend the reportengine Config class for <project name> specific
+    """Extend the reportengine Config class for anvil-specific
     objects
     """
 
@@ -35,19 +35,37 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
+    def produce_geometry(self, lattice_length):
+        return Geometry2D(lattice_length)
+
+    def parse_m_sq(self, m: (float, int)):
+        return m
+
+    def parse_lam(self, lam: (float, int)):
+        return lam
+
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
+
     def parse_n_affine(self, n: int):
         return n
+
+    def parse_n_batch(self, nb: int):
+        return nb
 
     def parse_epochs(self, epochs: int):
         return epochs
 
-    @element_of("cp_ids")
-    def parse_cp_id(self, cp: (int, type(None))):
-        return cp
+    def parse_save_interval(self, save_int: int):
+        return save_int
 
     @element_of("training_outputs")
     def parse_training_output(self, path: str):
         return TrainingOutput(path)
+
+    @element_of("cp_ids")
+    def parse_cp_id(self, cp: (int, type(None))):
+        return cp
 
     @element_of("checkpoints")
     def produce_checkpoint(self, cp_id=None, training_output=None):
@@ -82,18 +100,40 @@ class ConfigParser(Config):
             generator=generator, n_affine=n_affine, **network_kwargs,
         )
         return model
+    def produce_training_context(self, training_output):
+        """Given a training output produce the context of that training"""
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+            _, model = self.parse_from_(None, "model", write=False)
+            _, action = self.parse_from_(None, "action", write=False)
+            _, cps = self.parse_from_(None, "checkpoints", write=False)
 
-    def parse_optimiser_input(self, optim):
-        raise NotImplementedError
+        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
 
-    def parse_m_sq(self, m: (float, int)):
-        return m
+    def produce_training_geometry(self, training_output):
+        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+            _, geometry = self.parse_from_(None, "geometry", write=False)
+        return geometry
 
-    def parse_lam(self, lam: (float, int)):
-        return lam
+    def parse_optimizer(self, optim: str):
+        valid_optimizers = ("adam", "adadelta")
+        if optim not in valid_optimizers:
+            raise ConfigError(
+                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
+            )
+        return optim
 
-    def parse_use_arxiv_version(self, do_use: bool):
-        return do_use
+    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
+        # This will only be executed if optimizer is defined in the runcard
+        if optimizer == "adam":
+            valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
+        if optimizer == "adadelta":
+            valid_kwargs = ("lr", "rho", "weight_decay", "eps")
+        if not all([arg in valid_kwargs for arg in kwargs]):
+            raise ConfigError(
+                f"Valid optimizer_kwargs for {optimizer} are {', '.join([arg for arg in valid_kwargs])}"
+            )
+        return kwargs
 
     def parse_beta(self, beta):
         return beta
@@ -116,6 +156,12 @@ class ConfigParser(Config):
 
     def produce_action(self, n_coords, beta, geometry, shift_action):
         return NVectorAction(n_coords, beta, geometry, shift_action)
+        
+
+    def parse_scheduler_kwargs(self, kwargs: dict):
+        if "patience" not in kwargs:
+            kwargs["patience"] = 500  # problem setting default in config parser?
+        return kwargs
 
     def parse_target_length(self, targ: int):
         return targ
@@ -138,11 +184,11 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_bootstrap_n_samples(self, n_samples: int):
-        if n_samples < 2:
-            raise ConfigError("bootstrap_n_samples must be greater than 1")
-        log.warning(f"Using user specified bootstrap_n_samples: {n_samples}")
-        return n_samples
+    def parse_n_boot(self, n_boot: int):
+        if n_boot < 2:
+            raise ConfigError("n_boot must be greater than 1")
+        log.warning(f"Using user specified bootstrap_n_samples: {n_boot}")
+        return n_boot
 
     @element_of("windows")
     def parse_window(self, window: float):
@@ -150,18 +196,3 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
-
-    def produce_training_context(self, training_output):
-        """Given a training output produce the context of that training"""
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-            _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
-            _, cps = self.parse_from_(None, "checkpoints", write=False)
-
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
-
-    def produce_training_geometry(self, training_output):
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-        return geometry

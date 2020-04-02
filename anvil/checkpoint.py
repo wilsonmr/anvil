@@ -8,6 +8,11 @@ from copy import deepcopy
 
 import torch.optim as optim
 
+valid_optimizers = {
+    "adam": optim.Adam,
+    "adadelta": optim.Adadelta,
+}
+
 
 def loaded_checkpoint(checkpoint):
     if checkpoint is None:
@@ -32,9 +37,12 @@ def loaded_model(loaded_checkpoint, model):
     return new_model
 
 
-def loaded_optimizer(loaded_model, loaded_checkpoint):
-    # TODO: implement optimizer input
-    new_optimizer = optim.Adadelta(loaded_model.parameters())
+def loaded_optimizer(
+    loaded_model, loaded_checkpoint, optimizer="adam", optimizer_kwargs={}
+):
+    new_optimizer = valid_optimizers[optimizer](
+        loaded_model.parameters(), **optimizer_kwargs
+    )
     if loaded_checkpoint is not None:
         new_optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
     return new_optimizer
