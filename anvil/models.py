@@ -258,11 +258,12 @@ class RealNVP(nn.Module):
 
     Parameters
     ----------
+    generator:
+        Distribution object from distributions.py. Generates input data,
+        contains attributes related to its dimensions, and contains methods
+        regarding the probability distribution.
     n_affine: int
         number of affine layers, it is recommended to choose an even number
-    size_in: int
-        number of nodes in the input/output vectors, data is expected to be
-        given with shape (N_states, `size_in`)
     affine_hidden_shape: tuple
         tuple defining the number of nodes in the hidden layers of s and t.
 
@@ -274,15 +275,15 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, n_affine: int = 2, size_in: int, affine_hidden_shape: tuple = (16,)
+        self, *, generator, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
     ):
         super(RealNVP, self).__init__()
-        self.size_in = size_in
-        # log(Normalization) for `size_in` gaussian units prob distribution func
-        self._log_gauss_norm = log(sqrt(pow(2 * pi, size_in)))
+        self.generator = generator
+        self.size_in = self.generator.size_out
+        
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
                 for i in range(n_affine)
             ]
         )
@@ -293,7 +294,7 @@ class RealNVP(nn.Module):
 
     def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
         r"""Function which maps simple distribution, z, to target distribution
-        \phi.
+        selfz\phi.
 
         Parameters
         ----------
@@ -312,26 +313,6 @@ class RealNVP(nn.Module):
             phi_out = layer.inverse_coupling_layer(phi_out)
             # TODO: make this yield, then make a yield from wrapper?
         return phi_out
-
-    def log_probability_normal(self, x_tensor):
-        """Caculate the log probability of states, if each node was drawn from
-        a normal distribution with mean 0, variance 1
-
-        Parameters
-        ----------
-        x_tensor: torch.Tensor
-            A 2-D tensor. Each row of x_tensor represents a state and each column
-            represents a lattice site
-
-        Returns
-        -------
-        out: torch.Tensor
-            A 2-D tensor with a single column. Each entry is the log
-            probability of the corresponding state of the input `x_tensor`
-
-        """
-        exponent = -torch.sum(pow(x_tensor, 2) / 2, dim=-1, keepdim=True)
-        return exponent - self._log_gauss_norm
 
     def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
         r"""Returns the log of the exact probability (of model) associated with
@@ -354,7 +335,7 @@ class RealNVP(nn.Module):
         for layer in self.affine_layers:
             log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
             z_out = layer(z_out)
-        log_simple_prob = self.log_probability_normal(z_out)
+        log_simple_prob = self.generator.log_density(z_out)
         return log_simple_prob + log_jacob_contr
 
 

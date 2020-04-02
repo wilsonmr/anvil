@@ -11,6 +11,7 @@ from reportengine.configparser import ConfigError, element_of
 from anvil.core import PhiFourAction, TrainingOutput
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
+from anvil.distributions import NormalDist
 
 log = logging.getLogger(__name__)
 
@@ -67,8 +68,24 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(n_affine=n_affine, size_in=lattice_size, **network_kwargs)
+    def produce_generator(
+        self,
+        n_batch: int,
+        lattice_size: int,
+        base_dist: str = "normal",
+        field_dimension: int = 1,
+    ):
+        if base_dist == "normal":
+            return NormalDist(
+                n_batch=n_batch,
+                lattice_volume=lattice_size,
+                field_dimension=field_dimension,
+            )
+        else:
+            raise NotImplementedError
+
+    def produce_model(self, generator, n_affine, network_kwargs):
+        model = RealNVP(generator=generator, n_affine=n_affine, **network_kwargs)
         return model
 
     def parse_epochs(self, epochs: int):
@@ -158,10 +175,10 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_bootstrap_n_samples(self, n_samples: int):
+    def parse_n_boot(self, n_boot: int):
         if n_samples < 2:
-            raise ConfigError("bootstrap_n_samples must be greater than 1")
-        log.warning(f"Using user specified bootstrap_n_samples: {n_samples}")
+            raise ConfigError("n_boot must be greater than 1")
+        log.warning(f"Using user specified n_boot: {n_samples}")
         return n_samples
 
     @element_of("windows")
