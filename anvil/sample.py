@@ -60,6 +60,7 @@ def sample_batch(
         phi, log_density = loaded_model(z)  # map using trained loaded_model to phi
         if current_state is not None:
             phi[0] = current_state
+            log_density[0] = current_log_density
 
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
@@ -80,7 +81,7 @@ def sample_batch(
         else:  # rejected
             chain_indices[j - 1] = i
 
-    return phi[chain_indices, :], log_density[chain_indices, :][-1, :], history
+    return phi[chain_indices, :], log_density[chain_indices][-1], history
 
 
 def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
