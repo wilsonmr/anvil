@@ -185,7 +185,7 @@ class AffineLayer(nn.Module):
         z_b = s_out.exp() * phi_b + t_out
         return self.join_func([phi_a, z_b], dim=1)  # put back together state
 
-    def inverse_coupling_layer(self, z_input) -> torch.Tensor:
+    def forward(self, z_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
         g_i^{-1}(z)
 
@@ -195,6 +195,12 @@ class AffineLayer(nn.Module):
         \phi_b = (z_b - t_i(z_a)) * exp(-s_i(z_a))
 
         see eq. (10) of https://arxiv.org/pdf/1904.12072.pdf
+            
+        Also computes the logarithm of the jacobian determinant for the
+        forward transformation (inverse of the above), which is equal to
+        the logarithm of 
+
+        \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
 
         Parameters
         ----------
@@ -205,46 +211,16 @@ class AffineLayer(nn.Module):
         -------
             out: torch.Tensor
                 stack of transformed vectors phi, with same shape as input
-
+            log_det_jacobian: torch.Tensor
+                logarithm of the jacobian determinant for the inverse of the
+                transformation applied here.
         """
         z_a = z_input[:, self._a_ind]
         z_b = z_input[:, self._b_ind]
         s_out = self._s_forward(z_a)
         t_out = self._t_forward(z_a)
         phi_b = (z_b - t_out) * torch.exp(-s_out)
-        return self.join_func([z_a, phi_b], dim=1)
-
-    def log_det_jacobian(self, phi_input) -> torch.Tensor:
-        r"""returns the contribution to the log determinant of the jacobian
-
-            \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
-
-        see eq. (11) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            column vector of contributions to log det jacobian (N_states, 1)
-
-        """
-        a_for_net = phi_input[:, self._a_ind]  # select phi_a
-        s_out = self._s_forward(a_for_net)
-        return s_out.sum(dim=1, keepdim=True)
-
-    def forward(self, z_input: torch.Tensor) -> tuple:
-        """Given an stack of states z_input, returns a tuple 
-        (phi_out, log_det_jacob) containing the (inversely) transformed
-        states and the log of the jacobian determinant of the forward
-        transformation.
-        """
-        phi_out = self.inverse_coupling_layer(z_input)
-        log_det_jacob = self.log_det_jacobian(phi_out)
-        return phi_out, log_det_jacob
+        return self.join_func([z_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
 
 
 class RealNVP(nn.Module):
@@ -315,7 +291,7 @@ class RealNVP(nn.Module):
         """
         log_density = torch.zeros((z_input.shape[0], 1))
         phi_out = z_input
-        
+
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
