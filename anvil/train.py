@@ -10,7 +10,9 @@ import torch
 import torch.optim as optim
 
 
-def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+def shifted_kl(
+    model_log_density: torch.Tensor, target_log_density: torch.Tensor
+) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
 
@@ -19,8 +21,10 @@ def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.T
     model_log_density: torch.Tensor
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
-    action: torch.Tensor
-        column of actions S(\phi) for set of sample states
+    target_log_density: torch.Tensor
+        column of log(p) for a sample of states, which includes the negative action
+        -S(\phi) and a possible contribution for the volume element due to a
+        non-trivial parameterisation.
 
     Returns
     -------
@@ -29,11 +33,12 @@ def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.T
         shifted K-L for set of sample states.
 
     """
-    return torch.mean(model_log_density + action, dim=0)
+    return torch.mean(model_log_density - target_log_density, dim=0)
 
 
 def train(
     loaded_model,
+    generator,
     action,
     *,
     train_range,
@@ -51,7 +56,7 @@ def train(
     )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = loaded_model.size_in
+    n_units = generator.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -64,12 +69,14 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z = loaded_model.generator(n_batch)
-        phi, model_log_density = loaded_model(z)
-        target = action(phi)
+        z, base_log_density = generator(n_batch)
+        phi, map_log_density = loaded_model(z)
+
+        model_log_density = base_log_density + map_log_density
+        target_log_density = -action(phi)  # term from parameterisatiom goes here
 
         loaded_model.zero_grad()  # get rid of stored gradients
-        current_loss = shifted_kl(model_log_density, target)
+        current_loss = shifted_kl(model_log_density, target_log_density)
         current_loss.backward()  # calc gradients
 
         loaded_optimizer.step()

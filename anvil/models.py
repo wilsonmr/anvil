@@ -185,7 +185,7 @@ class AffineLayer(nn.Module):
         z_b = s_out.exp() * phi_b + t_out
         return self.join_func([phi_a, z_b], dim=1)  # put back together state
 
-    def inverse_coupling_layer(self, z_input):
+    def inverse_coupling_layer(self, z_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
         g_i^{-1}(z)
 
@@ -214,13 +214,7 @@ class AffineLayer(nn.Module):
         phi_b = (z_b - t_out) * torch.exp(-s_out)
         return self.join_func([z_a, phi_b], dim=1)
 
-    def forward(self, phi_input):
-        """Same as `coupling_layer`, but `forward` is a special method of a
-        nn.Module which should be overridden
-        """
-        return self.coupling_layer(phi_input)
-
-    def log_det_jacobian(self, phi_input):
+    def log_det_jacobian(self, phi_input) -> torch.Tensor:
         r"""returns the contribution to the log determinant of the jacobian
 
             \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
@@ -240,7 +234,17 @@ class AffineLayer(nn.Module):
         """
         a_for_net = phi_input[:, self._a_ind]  # select phi_a
         s_out = self._s_forward(a_for_net)
-        return s_out.sum(dim=-1)
+        return s_out.sum(dim=1, keepdim=True)
+
+    def forward(self, z_input: torch.Tensor) -> tuple:
+        """Given an stack of states z_input, returns a tuple 
+        (phi_out, log_det_jacob) containing the (inversely) transformed
+        states and the log of the jacobian determinant of the forward
+        transformation.
+        """
+        phi_out = self.inverse_coupling_layer(z_input)
+        log_det_jacob = self.log_det_jacobian(phi_out)
+        return phi_out, log_det_jacob
 
 
 class RealNVP(nn.Module):
@@ -258,10 +262,9 @@ class RealNVP(nn.Module):
 
     Parameters
     ----------
-    generator:
-        Distribution object from distributions.py. Generates input data,
-        contains attributes related to its dimensions, and contains methods
-        regarding the probability distribution.
+    size_in: int
+        number of units defining a single field configuration. The size of
+        the second dimension of the input data.
     n_affine: int
         number of affine layers, it is recommended to choose an even number
     affine_hidden_shape: tuple
@@ -275,15 +278,13 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, generator, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
+        self, *, size_in, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
     ):
         super(RealNVP, self).__init__()
-        self.generator = generator
-        self.size_in = self.generator.size_out
 
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
                 for i in range(n_affine)
             ]
         )
@@ -312,13 +313,12 @@ class RealNVP(nn.Module):
             logarithm of the probability density of the output distribution,
             with shape (n_states, 1)
         """
-        # log density of base distribution
-        log_density = self.generator.log_density(z_input)
-
+        log_density = torch.zeros((z_input.shape[0], 1))
         phi_out = z_input
+        
         for layer in reversed(self.affine_layers):  # reverse layers!
-            phi_out = layer.inverse_coupling_layer(phi_out)
-            log_density += layer.log_det_jacobian(phi_out).view(-1, 1)
+            phi_out, log_det_jacob = layer(phi_out)
+            log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
 
         return phi_out, log_density
