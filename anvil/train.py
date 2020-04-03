@@ -9,6 +9,7 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
+import numpy as np
 
 def shifted_kl(
     model_log_density: torch.Tensor, target_log_density: torch.Tensor

@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ def sample_batch(
         z, base_log_density = base(batch_size + 1)
         phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
         model_log_density = base_log_density + map_log_density
-
+        
         if current_state is not None:
             phi[0] = current_state
             model_log_density[0] = current_log_density

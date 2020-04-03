@@ -181,16 +181,16 @@ class SphericalUniformDist:
         # size of output Tensor at dimension 1
         self.size_out = self.lattice_volume * self.field_dimension
 
-        if self.dimension is 1:
+        if self.field_dimension is 1:
             self.generator = self.gen_circular
-        elif self.dimension is 2:
+        elif self.field_dimension is 2:
             self.generator = self.gen_spherical
         else:
             self.generator = self.gen_hyperspherical
 
         # Powers of sin(angle) for each angle except the azimuth
         # in the probability density function
-        self.sin_pow = torch.arange(self.field_dimension - 1, 0, -1).view(1, -1, 1)
+        self._sin_pow = torch.arange(self.field_dimension - 1, 0, -1).view(1, -1, 1)
 
     def __call__(self, n_sample):
         """Return tensor of values drawn from uniform distribution
@@ -214,7 +214,7 @@ class SphericalUniformDist:
 
                         \theta = \arccos( 1 - 2 x )
         """
-        samples = torch.cat(
+        sample = torch.cat(
             (
                 torch.acos(1 - 2 * torch.rand(n_sample, 1, self.lattice_volume)),
                 torch.rand(n_sample, 1, self.lattice_volume) * 2 * pi,
@@ -224,7 +224,7 @@ class SphericalUniformDist:
         return sample.view(n_sample, 2 * self.lattice_volume)
 
     def gen_hyperspherical(self, n_sample) -> torch.Tensor:
-        """Return  distributed uniformly on the unit N-sphere.
+        """Return values distributed uniformly on the unit N-sphere.
         
         Uses Marsaglia's algorithm.
         """
@@ -234,21 +234,38 @@ class SphericalUniformDist:
         # TODO: convert to self.dimension angles. Kind of a faff and not urgent
         raise NotImplementedError
 
-    def log_density(self, sample: torch.Tensor) -> torch.Tensor:
-        """Return log probability density of a sample generated from
-        the __call__ method above.
+    def log_volume_element(self, sample: torch.Tensor) -> torch.Tensor:
+        r"""Return log of volume element for the probability measure, such that
+        total probability mass equals 1.
 
+        If the volume element is \prod_{n=1}^V \Omega_n and the density function is
+        is e^{iS(\phi)}, then the probability measure (differential probability mass)
+        
+            \prod_{n=1}^V \Omega_n e^{iS(\phi)} d^{N-1}\phi_n^i
+
+        must give 1 when integrated over the entire space of configurations.
+        This means we should take
+                
+                p(\phi) = \prod_{n=1}^V \Omega_n e^{iS(\phi)}
+
+        as defining our target probability density.
+
+        In this case, \Omega_n arises from the use of spherical polar coordinates to
+        parameterise the fields, and is equal to the surface area element for the
+        unit (N-1)-sphere expressed in these coordinates, where (N-1) is equal to
+        self.field_dimension.
+        
+        This also goes by the name of the Jacobian determinant for the change
+        of coordinates Euclidean -> spherical.
+        
         Return shape: (n_sample, 1) where n_sample is the number of
         field configurations (the first dimension of sample).
-
-        Note that this is equivalent to the surface area element for
-        the (N-1)-sphere expressed in spherical coordinates.
         """
-        surf_area_element = (
-            self.sin_pow
+        log_jacob = (
+            self._sin_pow
             * torch.log(
                 torch.sin(
-                    states.view(-1, self.field_dimension, self.lattice_volume)[
+                    sample.view(-1, self.field_dimension, self.lattice_volume)[
                         :, :-1, :
                     ]
                 )
@@ -256,4 +273,13 @@ class SphericalUniformDist:
         ).sum(
             dim=1
         )  # sum over all angles except azimuth
-        return surf_area_element.sum(dim=1, keepdim=True)  # sum over volume
+        return log_jacob.sum(dim=1, keepdim=True)  # sum over volume
+
+    def log_density(self, sample: torch.Tensor) -> torch.Tensor:
+        """Return log probability density of a sample generated from
+        the __call__ method above.
+
+        Note that this is equivalent to the surface area element for
+        the (N-1)-sphere expressed in spherical coordinates.
+        """
+        return self.volume_element(sample)

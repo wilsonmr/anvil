@@ -54,7 +54,18 @@ class ConfigParser(Config):
             f"Selected theory: {theory}, has not been implemented yet",
             theory,
             ["phi_four"],
-        )
+    
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
+
+    def parse_beta(self, beta: float):
+        return beta
+
+    def parse_field_dimension(self, dim: int):
+        return dim
+
+    def produce_action(self, field_dimension, beta, geometry):
+        return SpinHamiltonian(field_dimension, beta, geometry)
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
