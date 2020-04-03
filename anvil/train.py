@@ -65,9 +65,9 @@ def train(
             )
         # gen simple states
         z = loaded_model.generator(n_batch)
-        phi = loaded_model.inverse_map(z)
+        phi, output = loaded_model(z)
         target = action(phi)
-        output = loaded_model(phi)
+        #output = loaded_model(phi)
 
         loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(output, target)
