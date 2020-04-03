@@ -280,7 +280,7 @@ class RealNVP(nn.Module):
         super(RealNVP, self).__init__()
         self.generator = generator
         self.size_in = self.generator.size_out
-        
+
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
@@ -292,9 +292,11 @@ class RealNVP(nn.Module):
         """Function that maps field configuration to simple distribution"""
         raise NotImplementedError
 
-    def inverse_map(self, z_input: torch.Tensor) -> torch.Tensor:
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
         r"""Function which maps simple distribution, z, to target distribution
-        \phi.
+        \phi, and at the same time calculates the density of the output
+        distribution using the change of variables formula, according to 
+        eq. (8) of https://arxiv.org/pdf/1904.12072.pdf.
 
         Parameters
         ----------
@@ -303,40 +305,23 @@ class RealNVP(nn.Module):
 
         Returns
         -------
-        out: torch.Tensor
+        phi_out: torch.Tensor
             stack of transformed states, which are drawn from an approximation
             of the target distribution, same shape as input.
-
+        log_density: torch.Tensor
+            logarithm of the probability density of the output distribution,
+            with shape (n_states, 1)
         """
+        # log density of base distribution
+        log_density = self.generator.log_density(z_input)
+
         phi_out = z_input
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out = layer.inverse_coupling_layer(phi_out)
+            log_density += layer.log_det_jacobian(phi_out).view(-1, 1)
             # TODO: make this yield, then make a yield from wrapper?
-        return phi_out
 
-    def forward(self, phi_input: torch.Tensor) -> torch.Tensor:
-        r"""Returns the log of the exact probability (of model) associated with
-        each of the input states according to eq. (8) of
-        https://arxiv.org/pdf/1904.12072.pdf.
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of input states, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            column of log(\tilde p) associated with each of input states
-
-        """
-        log_jacob_contr = torch.zeros(phi_input.size()[0], 1)
-        z_out = phi_input
-        for layer in self.affine_layers:
-            log_jacob_contr += layer.log_det_jacobian(z_out).view(-1, 1)
-            z_out = layer(z_out)
-        log_simple_prob = self.generator.log_density(z_out)
-        return log_simple_prob + log_jacob_contr
+        return phi_out, log_density
 
 
 if __name__ == "__main__":

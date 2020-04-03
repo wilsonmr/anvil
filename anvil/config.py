@@ -69,15 +69,11 @@ class ConfigParser(Config):
         return nb
 
     def produce_generator(
-        self,
-        lattice_size: int,
-        base_dist: str = "normal",
-        field_dimension: int = 1,
+        self, lattice_size: int, base_dist: str = "normal", field_dimension: int = 1,
     ):
         if base_dist == "normal":
             return NormalDist(
-                lattice_volume=lattice_size,
-                field_dimension=field_dimension,
+                lattice_volume=lattice_size, field_dimension=field_dimension,
             )
         else:
             raise NotImplementedError
@@ -174,10 +170,10 @@ class ConfigParser(Config):
         return interval
 
     def parse_n_boot(self, n_boot: int):
-        if n_samples < 2:
+        if n_boot < 2:
             raise ConfigError("n_boot must be greater than 1")
-        log.warning(f"Using user specified n_boot: {n_samples}")
-        return n_samples
+        log.warning(f"Using user specified n_boot: {n_boot}")
+        return n_boot
 
     @element_of("windows")
     def parse_window(self, window: float):

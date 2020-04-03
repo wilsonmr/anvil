@@ -10,13 +10,13 @@ import torch
 import torch.optim as optim
 
 
-def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
 
     Parameters
     ----------
-    log_tilde_p: torch.Tensor
+    model_log_density: torch.Tensor
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
     action: torch.Tensor
@@ -29,7 +29,7 @@ def shifted_kl(log_tilde_p: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         shifted K-L for set of sample states.
 
     """
-    return torch.mean(log_tilde_p + action, dim=0)
+    return torch.mean(model_log_density + action, dim=0)
 
 
 def train(
@@ -65,12 +65,11 @@ def train(
             )
         # gen simple states
         z = loaded_model.generator(n_batch)
-        phi = loaded_model.inverse_map(z)
+        phi, model_log_density = loaded_model(z)
         target = action(phi)
-        output = loaded_model(phi)
 
         loaded_model.zero_grad()  # get rid of stored gradients
-        current_loss = shifted_kl(output, target)
+        current_loss = shifted_kl(model_log_density, target)
         current_loss.backward()  # calc gradients
 
         loaded_optimizer.step()
