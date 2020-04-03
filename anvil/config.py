@@ -8,10 +8,10 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
 
-from anvil.core import PhiFourAction, TrainingOutput
-from anvil.models import RealNVP
+from anvil.core import PhiFourAction, SpinHamiltonian, TrainingOutput
+from anvil.models import RealNVP, StereographicProjection
 from anvil.geometry import Geometry2D
-from anvil.distributions import NormalDist
+from anvil.distributions import NormalDist, SphericalUniformDist
 
 log = logging.getLogger(__name__)
 
@@ -46,10 +46,21 @@ class ConfigParser(Config):
     def parse_use_arxiv_version(self, do_use: bool):
         return do_use
 
+    """
     def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
         return PhiFourAction(
             m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
         )
+    """
+
+    def parse_beta(self, beta: float):
+        return beta
+
+    def parse_field_dimension(self, dim: int):
+        return dim
+
+    def produce_action(self, field_dimension, beta, geometry):
+        return SpinHamiltonian(field_dimension, beta, geometry)
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -75,11 +86,18 @@ class ConfigParser(Config):
             return NormalDist(
                 lattice_volume=lattice_size, field_dimension=field_dimension,
             )
+        elif base_dist == "spherical":
+            return SphericalUniformDist(
+                lattice_volume=lattice_size, field_dimension=field_dimension,
+            )
         else:
             raise NotImplementedError
 
     def produce_model(self, generator, n_affine, network_kwargs):
-        model = RealNVP(generator=generator, n_affine=n_affine, **network_kwargs)
+        inner = RealNVP(
+            generator=generator, n_affine=n_affine, is_inner=True, **network_kwargs
+        )
+        model = StereographicProjection(inner_flow=inner, generator=generator)
         return model
 
     def parse_epochs(self, epochs: int):

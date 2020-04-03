@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +58,9 @@ def sample_batch(
     """
     with torch.no_grad():  # don't track gradients
         z = loaded_model.generator(batch_size + 1)
+        np.savetxt("base.txt", z)
         phi, log_density = loaded_model(z)  # map using trained loaded_model to phi
+        np.savetxt("target.txt", phi)
         if current_state is not None:
             phi[0] = current_state
             log_density[0] = current_log_density

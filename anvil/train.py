@@ -9,8 +9,9 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
+import numpy as np
 
-def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+def shifted_kl(model_log_density: torch.Tensor, target_log_density: torch.Tensor) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
 
@@ -19,8 +20,10 @@ def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.T
     model_log_density: torch.Tensor
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
-    action: torch.Tensor
-        column of actions S(\phi) for set of sample states
+    target_log_density: torch.Tensor
+        column of log p for a sample of states, which includes the negative action
+        -S(\phi) and a possible contribution for the volume element due to a
+        non-trivial parameterisation.
 
     Returns
     -------
@@ -29,7 +32,7 @@ def shifted_kl(model_log_density: torch.Tensor, action: torch.Tensor) -> torch.T
         shifted K-L for set of sample states.
 
     """
-    return torch.mean(model_log_density + action, dim=0)
+    return torch.mean(model_log_density - target_log_density, dim=0)
 
 
 def train(
@@ -66,10 +69,10 @@ def train(
         # gen simple states
         z = loaded_model.generator(n_batch)
         phi, model_log_density = loaded_model(z)
-        target = action(phi)
+        target_log_density = loaded_model.generator.log_volume_element(phi) - action(phi)
 
         loaded_model.zero_grad()  # get rid of stored gradients
-        current_loss = shifted_kl(model_log_density, target)
+        current_loss = shifted_kl(model_log_density, target_log_density)
         current_loss.backward()  # calc gradients
 
         loaded_optimizer.step()
