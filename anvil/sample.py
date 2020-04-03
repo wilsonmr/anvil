@@ -21,7 +21,9 @@ class LogRatioNanError(Exception):
     pass
 
 
-def sample_batch(loaded_model, action, batch_size, current_state=None, current_log_density=None):
+def sample_batch(
+    loaded_model, action, batch_size, current_state=None, current_log_density=None
+):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -58,7 +60,7 @@ def sample_batch(loaded_model, action, batch_size, current_state=None, current_l
         phi, log_density = loaded_model(z)  # map using trained loaded_model to phi
         if current_state is not None:
             phi[0] = current_state
-    
+
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 

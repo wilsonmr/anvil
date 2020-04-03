@@ -69,15 +69,11 @@ class ConfigParser(Config):
         return nb
 
     def produce_generator(
-        self,
-        lattice_size: int,
-        base_dist: str = "normal",
-        field_dimension: int = 1,
+        self, lattice_size: int, base_dist: str = "normal", field_dimension: int = 1,
     ):
         if base_dist == "normal":
             return NormalDist(
-                lattice_volume=lattice_size,
-                field_dimension=field_dimension,
+                lattice_volume=lattice_size, field_dimension=field_dimension,
             )
         else:
             raise NotImplementedError

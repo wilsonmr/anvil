@@ -280,7 +280,7 @@ class RealNVP(nn.Module):
         super(RealNVP, self).__init__()
         self.generator = generator
         self.size_in = self.generator.size_out
-        
+
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
@@ -295,7 +295,8 @@ class RealNVP(nn.Module):
     def forward(self, z_input: torch.Tensor) -> torch.Tensor:
         r"""Function which maps simple distribution, z, to target distribution
         \phi, and at the same time calculates the density of the output
-        distribution using the change of variables formula.
+        distribution using the change of variables formula, according to 
+        eq. (8) of https://arxiv.org/pdf/1904.12072.pdf.
 
         Parameters
         ----------
