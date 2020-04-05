@@ -13,6 +13,9 @@ import numpy as np
 from scipy.signal import correlate
 import torch
 
+from tqdm import tqdm
+from time import time
+
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -25,18 +28,6 @@ def arcosh(x):
     # return c0 + c1
     # NOTE: might need stable version here
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
-
-
-def bootstrap(observable):
-    """Return the standard deviation for an observable based on a number of
-    'bootstrap' samples."""
-    obs_full = observable[0]
-    obs_bootstrap = observable[1:]
-
-    variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
-
-    return variance.sqrt()
 
 
 def calc_two_point_function(sample_training_output, training_geometry):
@@ -134,6 +125,11 @@ def bootstrap_function(func, states, *args, n_boot=100):
     of the function, with the resamples on the final dimension of the returned
     tensor
 
+    For large samples and/or large n_boot, it can be impossible to allocate
+    enough memory for a single tensor containing all bootstrap resamples.
+    Furthermore, even if memory can be allocated, it is often faster to
+    do the calculations separately on several smaller tensors.
+
     Parameters
     ----------
     func:
@@ -153,16 +149,24 @@ def bootstrap_function(func, states, *args, n_boot=100):
         dimension
 
     """
-    boot_index = torch.randint(0, states.shape[0], size=(states.shape[0], n_boot))
-    # put boot index on final dimension
-    resampled_states = states[boot_index, :].transpose(1, 2)
-    res = func(resampled_states, *args)
-    return res
+    # NOTE: Optimal seems to be around n_sample x batch_size = 10000 for
+    # calc_two_point_function on my laptop. Clearly this is not a general
+    # rule though.
+    sample_size = states.shape[0]
+    batch_size = min(n_boot, max(1, 10000 // sample_size))
+    n_batch = n_boot // batch_size
+
+    pbar = tqdm(range(n_batch), desc="bootstrap batch")
+    res = []
+    for n in pbar:
+        boot_index = torch.randint(0, sample_size, size=(sample_size, batch_size))
+        resampled_states = states[boot_index, :].transpose(1, 2)
+        res.append(func(resampled_states, *args))
+
+    return torch.cat(res, dim=-1)
 
 
-def two_point_function(
-    sample_training_output, training_geometry, n_boot=100
-):
+def two_point_function(sample_training_output, training_geometry, n_boot=100):
     """Bootstrap calc_two_point_function, using bootstrap_function"""
     return bootstrap_function(
         calc_two_point_function,
