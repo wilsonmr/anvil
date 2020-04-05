@@ -173,7 +173,7 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_n_boot(self, n_boot: int):
+    def parse_n_boot(self, n_samples: int):
         if n_samples < 2:
             raise ConfigError("n_boot must be greater than 1")
         log.warning(f"Using user specified n_boot: {n_samples}")
