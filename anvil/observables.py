@@ -14,7 +14,6 @@ from scipy.signal import correlate
 import torch
 
 from tqdm import tqdm
-from time import time
 
 
 def arcosh(x):
