@@ -23,7 +23,7 @@ def test_checkerboard():
 
 def test_splitcart():
     assert torch.allclose(
-        TESTING_GEOMETRY.splitcart, torch.tensor([[0, 2], [3, 1]], dtype=torch.int)
+        TESTING_GEOMETRY.splitcart, torch.tensor([[0, 2], [3, 1]])
     )
 
 

@@ -45,12 +45,13 @@ class Geometry2D:
         representation.
 
         """
-        splitcart = torch.zeros((self.length, self.length), dtype=torch.int)
+        splitcart = torch.zeros((self.length, self.length), dtype=torch.long)
+        n_a = self.checkerboard.sum().item()
         splitcart[self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), dtype=torch.int
+            n_a, dtype=torch.long
         )
         splitcart[~self.checkerboard] = torch.arange(
-            int(ceil(self.length ** 2 / 2)), self.length ** 2, dtype=torch.int
+            n_a, self.length ** 2, dtype=torch.long
         )
         return splitcart
 
