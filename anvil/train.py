@@ -22,9 +22,9 @@ def shifted_kl(
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
     target_log_density: torch.Tensor
-        column of log(p) for a sample of states, which includes the negative target
-        -S(\phi) and a possible contribution for the volume element due to a
-        non-trivial parameterisation.
+        column of log(p) for a sample of states, which includes the negative
+        action -S(\phi) and a possible contribution to the volume element due
+        to a non-trivial parameterisation.
 
     Returns
     -------

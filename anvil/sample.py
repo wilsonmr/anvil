@@ -232,7 +232,11 @@ def sample(
     Returns
     -------
     decorrelated_chain: torch.Tensor
+<<<<<<< HEAD
         a sample of states from loaded_model, size = (target_length, base.size_out)
+=======
+        a sample of states from loaded_model, size = (target_length, generator.size_out)
+>>>>>>> master
 
     """
 
