@@ -13,8 +13,6 @@ import numpy as np
 from scipy.signal import correlate
 import torch
 
-from tqdm import tqdm
-
 
 def arcosh(x):
     """Inverse hyperbolic cosine function for torch.Tensor arguments.
@@ -148,21 +146,15 @@ def bootstrap_function(func, states, *args, n_boot=100):
         dimension
 
     """
-    # NOTE: Optimal seems to be around n_sample x batch_size = 10000 for
-    # calc_two_point_function on my laptop. Clearly this is not a general
-    # rule though.
     sample_size = states.shape[0]
-    batch_size = min(n_boot, max(1, 10000 // sample_size))
-    n_batch = n_boot // batch_size
 
-    pbar = tqdm(range(n_batch), desc="bootstrap batch")
     res = []
-    for n in pbar:
-        boot_index = torch.randint(0, sample_size, size=(sample_size, batch_size))
-        resampled_states = states[boot_index, :].transpose(1, 2)
+    for resample in range(n_boot):
+        boot_index = torch.randint(0, sample_size, size=(sample_size,))
+        resampled_states = states[boot_index, :]
         res.append(func(resampled_states, *args))
 
-    return torch.cat(res, dim=-1)
+    return torch.stack(res, dim=-1)
 
 
 def two_point_function(sample_training_output, training_geometry, n_boot=100):
