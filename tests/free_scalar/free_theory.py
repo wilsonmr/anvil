@@ -28,15 +28,8 @@ class FreeScalarEigenmodes:
 
         \sigma^2(p) = V / \lambda(p)
 
-    This means we can sample from this probability distribution by simply
-    generating Gaussian random numbers. We can feed the inverse Fourier
-    transform of these eigenmodes into a Metropolis-Hastings implementation
-    to check that it accepts almost all of them.
-
-    More usefully, we can check that a neural network-based model is
-    producing field configurations which follow the correct distribution,
-    by comparing the variance of the fourier-transformed fields with
-    the theoretical eigenvalues.
+    This means we can sample from this probability distribution in Fourier
+    space by simply generating Gaussian random numbers.
     """
     def __init__(self, m_sq: int, lattice_length: int):
         self.m_sq = m_sq

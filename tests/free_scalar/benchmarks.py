@@ -19,7 +19,7 @@ def theory(training_context, training_geometry):
 
 
 def fourier_transform(sample_training_output, training_geometry):
-    """Takes a decorrelated samples of field configurations and performs
+    """Takes a decorrelated sample of field configurations and performs
     a Fourier transform.
     """
     L = training_geometry.length
