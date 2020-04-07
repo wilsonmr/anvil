@@ -3,8 +3,6 @@ training_output: train
 cp_id: -1
 target_length: 10000
 
-m_sq: 4
-
 thermalisation: 1000
 sample_interval: null
 

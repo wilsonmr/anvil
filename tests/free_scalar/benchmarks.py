@@ -10,10 +10,11 @@ from reportengine.table import table
 from free_theory import FreeScalarEigenmodes
 
 
-def theory(m_sq, training_geometry):
+def theory(training_context, training_geometry):
     """Returns instance of FreeScalarEigenmodes class with specific
     mass and lattice size.
     """
+    m_sq = training_context["action"].m_sq
     return FreeScalarEigenmodes(m_sq=m_sq, lattice_length=training_geometry.length)
 
 
