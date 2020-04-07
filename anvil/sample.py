@@ -46,8 +46,8 @@ def sample_batch(
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
     target: Module
-        the target upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
     batch_size: int
         the number of states to generate from the loaded_model
     current_state: torch.Tensor or None
@@ -100,8 +100,8 @@ def thermalised_state(loaded_model, base, target, thermalisation) -> torch.Tenso
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
     target: Module
-        the target upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
 
     Returns
     -------
@@ -149,8 +149,8 @@ def chain_autocorrelation(
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
     target: Module
-        the target upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
     initial_state:
         the current state of the Markov chain, after thermalisation
 
@@ -232,12 +232,7 @@ def sample(
     Returns
     -------
     decorrelated_chain: torch.Tensor
-<<<<<<< HEAD
         a sample of states from loaded_model, size = (target_length, base.size_out)
-=======
-        a sample of states from loaded_model, size = (target_length, generator.size_out)
->>>>>>> master
-
     """
 
     # Thermalise
