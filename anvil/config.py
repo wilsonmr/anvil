@@ -8,13 +8,12 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of
 
-from anvil.core import PhiFourAction, TrainingOutput
+from anvil.core import Target, TrainingOutput
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
 from anvil.distributions import NormalDist
 
 log = logging.getLogger(__name__)
-
 
 class ConfigParser(Config):
     """Extend the reportengine Config class for anvil-specific
@@ -37,18 +36,15 @@ class ConfigParser(Config):
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def parse_m_sq(self, m: (float, int)):
-        return m
+    def parse_theory(self, theo: str):
+        return theo
 
-    def parse_lam(self, lam: (float, int)):
-        return lam
+    def parse_theory_parameters(self, params: dict):
+        return params
 
-    def parse_use_arxiv_version(self, do_use: bool):
-        return do_use
-
-    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
-        return PhiFourAction(
-            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
+    def produce_target(self, theory, theory_parameters, geometry):
+        return Target(
+            theory=theory, theory_parameters=theory_parameters, geometry=geometry
         )
 
     def parse_hidden_nodes(self, hid_spec):
@@ -68,7 +64,7 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_generator(
+    def produce_base(
         self, lattice_size: int, base_dist: str = "normal", field_dimension: int = 1,
     ):
         if base_dist == "normal":
@@ -112,11 +108,17 @@ class ConfigParser(Config):
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
             _, geometry = self.parse_from_(None, "geometry", write=False)
             _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
+            _, target = self.parse_from_(None, "target", write=False)
             _, cps = self.parse_from_(None, "checkpoints", write=False)
-            _, generator = self.parse_from_(None, "generator", write=False)
+            _, base = self.parse_from_(None, "base", write=False)
 
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps, generator=generator)
+        return dict(
+            geometry=geometry,
+            model=model,
+            target=target,
+            checkpoints=cps,
+            base=base,
+        )
 
     def produce_training_geometry(self, training_output):
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):

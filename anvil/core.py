@@ -24,6 +24,30 @@ class TrainingRuncardNotFound(InvalidTrainingOutputError):
     pass
 
 
+class Target:
+    """Defines the target distribution by the logarithm of it's probability
+    density function.
+
+    The general form of the target probability density should a product over
+    all lattice sites of 
+
+                    | \det J(\phi) | exp( -S(\phi) )
+                    
+    where S(\phi) is the lattice action for the theory, and J(\phi) is a
+    Jacobian matrix which may arise if the parameterisation of the fields
+    in terms of \phi is non-trivial.
+    """
+
+    def __init__(self, theory, theory_parameters, geometry):
+        if theory == "phi_four":
+            self.action = PhiFourAction(geometry, **theory_parameters)
+
+        # define contribution to log density from parameterisation here
+
+    def log_density(self, sample: torch.Tensor) -> torch.Tensor:
+        return -self.action(sample)
+
+
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given either
     a single state size (1, length * length) or a stack of N states
@@ -66,7 +90,7 @@ class PhiFourAction(nn.Module):
 
     """
 
-    def __init__(self, m_sq, lam, geometry, use_arxiv_version=False):
+    def __init__(self, geometry, *, m_sq, lam, use_arxiv_version=False):
         super(PhiFourAction, self).__init__()
         self.geometry = geometry
         self.shift = self.geometry.get_shift()

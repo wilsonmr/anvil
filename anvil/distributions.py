@@ -44,7 +44,7 @@ class NormalDist:
         """
         sample = self.generator(n_sample)
         log_density = self.log_density(sample)
-        return (sample, log_density)
+        return sample, log_density
 
     def generator(self, n_sample):
         """Return tensor of values drawn from the standard normal distribution
