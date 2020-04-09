@@ -93,11 +93,11 @@ class ConfigParser(Config):
         else:
             raise NotImplementedError
 
-    def produce_model(self, generator, n_affine, network_kwargs):
+    def produce_model(self, lattice_size, field_dimension, n_affine, network_kwargs):
         inner = RealNVP(
-            generator=generator, n_affine=n_affine, is_inner=True, **network_kwargs
+            size_in=lattice_size*field_dimension, n_affine=n_affine, **network_kwargs
         )
-        model = StereographicProjection(inner_flow=inner, generator=generator)
+        model = StereographicProjection(inner_flow=inner, size_in=size_in, field_dimension=field_dimension)
         return model
 
     def parse_epochs(self, epochs: int):
@@ -132,8 +132,9 @@ class ConfigParser(Config):
             _, model = self.parse_from_(None, "model", write=False)
             _, action = self.parse_from_(None, "action", write=False)
             _, cps = self.parse_from_(None, "checkpoints", write=False)
+            _, generator = self.parse_from_(None, "generator", write=False)
 
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
+        return dict(geometry=geometry, model=model, action=action, checkpoints=cps, generator=generator)
 
     def produce_training_geometry(self, training_output):
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):

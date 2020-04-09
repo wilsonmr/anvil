@@ -11,7 +11,9 @@ import torch.optim as optim
 
 import numpy as np
 
-def shifted_kl(model_log_density: torch.Tensor, target_log_density: torch.Tensor) -> torch.Tensor:
+def shifted_kl(
+    model_log_density: torch.Tensor, target_log_density: torch.Tensor
+) -> torch.Tensor:
     r"""Sample mean of the shifted Kullbach-Leibler divergence between target
     and model distribution.
 
@@ -21,7 +23,7 @@ def shifted_kl(model_log_density: torch.Tensor, target_log_density: torch.Tensor
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
     target_log_density: torch.Tensor
-        column of log p for a sample of states, which includes the negative action
+        column of log(p) for a sample of states, which includes the negative action
         -S(\phi) and a possible contribution for the volume element due to a
         non-trivial parameterisation.
 
@@ -37,6 +39,7 @@ def shifted_kl(model_log_density: torch.Tensor, target_log_density: torch.Tensor
 
 def train(
     loaded_model,
+    generator,
     action,
     *,
     train_range,
@@ -54,7 +57,7 @@ def train(
     )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = loaded_model.size_in
+    n_units = generator.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -67,9 +70,11 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z = loaded_model.generator(n_batch)
-        phi, model_log_density = loaded_model(z)
-        target_log_density = loaded_model.generator.log_volume_element(phi) - action(phi)
+        z, base_log_density = generator(n_batch)
+        phi, map_log_density = loaded_model(z)
+
+        model_log_density = base_log_density + map_log_density
+        target_log_density = generator.log_volume_element(phi) - action(phi)  # term from parameterisatiom goes here
 
         loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(model_log_density, target_log_density)

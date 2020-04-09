@@ -107,7 +107,7 @@ class AffineLayer(nn.Module):
         # No ReLU on final layers: need to be able to scale data by
         # 0 < s, not 1 < s, and enact both +/- shifts
         self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1]), nn.Tanh()]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1]), nn.Tanh()]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -156,38 +156,7 @@ class AffineLayer(nn.Module):
             x_input = t_layer(x_input)
         return x_input
 
-    def coupling_layer(self, phi_input) -> torch.Tensor:
-        r"""performs the transformation of a single coupling layer, denoted
-        g_i(\phi).
-
-        Affine transformation, z = g_i(\phi), defined as:
-
-        z_a = \phi_a
-        z_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
-
-        see eq. (9) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            stack of transformed vectors z, with same shape as input
-
-        """
-        # since inputs are like (N_states, D) we need to index correct halves
-        # of if input states
-        phi_a = phi_input[:, self._a_ind]
-        phi_b = phi_input[:, self._b_ind]
-        s_out = self._s_forward(phi_a)
-        t_out = self._t_forward(phi_a)
-        z_b = s_out.exp() * phi_b + t_out
-        return self.join_func([phi_a, z_b], dim=1)  # put back together state
-
-    def inverse_coupling_layer(self, z_input):
+    def forward(self, z_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
         g_i^{-1}(z)
 
@@ -197,6 +166,12 @@ class AffineLayer(nn.Module):
         \phi_b = (z_b - t_i(z_a)) * exp(-s_i(z_a))
 
         see eq. (10) of https://arxiv.org/pdf/1904.12072.pdf
+            
+        Also computes the logarithm of the jacobian determinant for the
+        forward transformation (inverse of the above), which is equal to
+        the logarithm of 
+
+        \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
 
         Parameters
         ----------
@@ -207,42 +182,16 @@ class AffineLayer(nn.Module):
         -------
             out: torch.Tensor
                 stack of transformed vectors phi, with same shape as input
-
+            log_det_jacobian: torch.Tensor
+                logarithm of the jacobian determinant for the inverse of the
+                transformation applied here.
         """
         z_a = z_input[:, self._a_ind]
         z_b = z_input[:, self._b_ind]
         s_out = self._s_forward(z_a)
         t_out = self._t_forward(z_a)
         phi_b = (z_b - t_out) * torch.exp(-s_out)
-        return self.join_func([z_a, phi_b], dim=1)
-
-    def forward(self, phi_input):
-        """Same as `coupling_layer`, but `forward` is a special method of a
-        nn.Module which should be overridden
-        """
-        return self.coupling_layer(phi_input)
-
-    def log_det_jacobian(self, phi_input):
-        r"""returns the contribution to the log determinant of the jacobian
-
-            \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
-
-        see eq. (11) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            column vector of contributions to log det jacobian (N_states, 1)
-
-        """
-        a_for_net = phi_input[:, self._a_ind]  # select phi_a
-        s_out = self._s_forward(a_for_net)
-        return s_out.sum(dim=-1)
+        return self.join_func([z_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
 
 
 class RealNVP(nn.Module):
@@ -260,10 +209,9 @@ class RealNVP(nn.Module):
 
     Parameters
     ----------
-    generator:
-        Distribution object from distributions.py. Generates input data,
-        contains attributes related to its dimensions, and contains methods
-        regarding the probability distribution.
+    size_in: int
+        number of units defining a single field configuration. The size of
+        the second dimension of the input data.
     n_affine: int
         number of affine layers, it is recommended to choose an even number
     affine_hidden_shape: tuple
@@ -277,18 +225,13 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-            self, *, generator, n_affine: int = 2, is_inner = False, affine_hidden_shape: tuple = (16,)):
+        self, *, size_in, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
+    ):
         super(RealNVP, self).__init__()
-        if is_inner:
-            self.log_density_init = lambda input_tensor: torch.zeros((input_tensor.shape[0], 1))
-        else:
-            self.generator = generator
-            self.log_density_init = self.generator.log_density
-        
-        self.size_in = generator.size_out
+
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(self.size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
                 for i in range(n_affine)
             ]
         )
@@ -317,31 +260,27 @@ class RealNVP(nn.Module):
             logarithm of the probability density of the output distribution,
             with shape (n_states, 1)
         """
-        # log density of base distribution
-        log_density = self.log_density_init(z_input)
-
+        log_density = torch.zeros((z_input.shape[0], 1))
         phi_out = z_input
+
         for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
-            phi_out = layer.inverse_coupling_layer(phi_out)
+            phi_out, log_det_jacob = layer(phi_out)
             np.savetxt(f"layer_{i}.txt", phi_out.detach().numpy())
-            log_density += layer.log_det_jacobian(phi_out).view(-1, 1)
+            log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
 
         return phi_out, log_density
 
 
 class StereographicProjection(nn.Module):
-    def __init__(self, *, inner_flow, generator):
+    def __init__(self, *, inner_flow, size_in, field_dimension):
         super().__init__()
         self.inner_flow = inner_flow
-        self.generator = generator
-
-        self.volume = self.generator.lattice_volume
-        self.size_in = self.generator.size_out
-
-        if self.generator.field_dimension == 1:
+        self.size_in = size_in
+        
+        if field_dimension == 1:
             self.forward = self.circle_flow
-        elif self.generator.field_dimension == 2:
+        elif field_dimension == 2:
             self.forward = self.sphere_flow
         else:
             raise NotImplementedError
@@ -367,10 +306,6 @@ class StereographicProjection(nn.Module):
     def sphere_flow(self, z_input: torch.Tensor) -> torch.Tensor:
         polar, azimuth = z_input.view(-1, 2, self.volume).split(1, dim=1)
 
-        # Base distribution
-        # In this case, this is faster than using generator.log_density
-        log_density = torch.log(torch.sin(polar)).sum(dim=2)
-
         # Projection
         # -1 factor because polar coordinate = azimuth - pi (*-1 is faster than shift)
         x_coords = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
@@ -380,11 +315,11 @@ class StereographicProjection(nn.Module):
         log_density += (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
             dim=1, keepdim=True
         )
-        np.savetxt(f"projected.txt", x_coords.view(-1, 2 * self.volume).detach().numpy())
+        np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
 
         # Inner flow on real plane e.g. RealNVP
-        x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, 2 * self.volume))
-        x_1, x_2 = x_coords.view(-1, 2, self.volume).split(1, dim=1)
+        x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
+        x_1, x_2 = x_coords.view(-1, 2, self.size_in//2).split(1, dim=1)
 
         # Inverse projection
         polar = (2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2))))
@@ -393,7 +328,7 @@ class StereographicProjection(nn.Module):
             torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
         ).sum(dim=2)
 
-        return phi_out.view(-1, 2 * self.volume), log_density + log_density_inner
+        return phi_out.view(-1, self.size_in), log_density + log_density_inner
 
 
 
@@ -430,6 +365,17 @@ class StereographicProjection(nn.Module):
         ).sum(dim=1, keepdim=True)
 
         return log_simple_prob + log_jacob_contr - log_param
+=======
+        log_density = torch.zeros((z_input.shape[0], 1))
+        phi_out = z_input
+
+        for layer in reversed(self.affine_layers):  # reverse layers!
+            phi_out, log_det_jacob = layer(phi_out)
+            log_density += log_det_jacob
+            # TODO: make this yield, then make a yield from wrapper?
+
+        return phi_out, log_density
+>>>>>>> master
 
 
 if __name__ == "__main__":

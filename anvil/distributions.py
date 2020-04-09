@@ -36,7 +36,17 @@ class NormalDist:
         # Pre-calculate normalisation for log density
         self.log_normalisation = self._log_normalisation()
 
-    def __call__(self, n_sample) -> torch.Tensor:
+    def __call__(self, n_sample) -> tuple:
+        """Return a tuple (sample, log_density) for a sample of n_sample states
+        drawn from the standard uniform distribution.
+        
+        See docstrings for instance methods generator, log_density for more details.
+        """
+        sample = self.generator(n_sample)
+        log_density = self.log_density(sample)
+        return (sample, log_density)
+
+    def generator(self, n_sample):
         """Return tensor of values drawn from the standard normal distribution
         with mean 0, variance 1.
         
