@@ -267,10 +267,9 @@ class RealNVP(nn.Module):
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
-            
-            if not phi_out.requires_grad:
-                np.savetxt(f"layer_{i}.txt", phi_out)
 
+            np.savetxt(f"layer_{i}.txt", phi_out)
+            
         return phi_out, log_density
 
 
@@ -293,8 +292,6 @@ class StereographicProjection(nn.Module):
         phi_out = torch.tan(0.5 * (z_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
         
-        #np.savetxt("projected.txt", phi_out.detach().numpy())
-
         # Inner flow on real line e.g. RealNVP
         phi_out, log_density_inner = self.inner_flow(phi_out)
 
@@ -319,8 +316,6 @@ class StereographicProjection(nn.Module):
             dim=1, keepdim=True
         )
         
-        #np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
-
         # Inner flow on real plane e.g. RealNVP
         x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
         x_1, x_2 = x_coords.view(-1, self.size_in // 2, 2).split(1, dim=2)

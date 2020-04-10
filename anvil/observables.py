@@ -26,150 +26,14 @@ def arcosh(x):
     # NOTE: might need stable version here
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
+def field_ensemble(sample_training_output, training_geometry, FieldClass, field_dimension):
+    return FieldClass(training_output=sample_training_output, geometry=training_geometry, field_dimension=field_dimension)
 
-def bootstrap(observable):
-    """Return the standard deviation for an observable based on a number of
-    'bootstrap' samples."""
-    obs_full = observable[0]
-    obs_bootstrap = observable[1:]
+def volume_avg_two_point_function(field_ensemble):
+    return field_ensemble.volume_avg_two_point_function()
 
-    variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
-
-    return variance.sqrt()
-
-
-def calc_two_point_function(sample_training_output, training_geometry):
-    r"""Calculates the two point connected green function, G(x), given a set of
-    states where x = (x_0, x_1) refers to a shift applied to the fields \phi
-
-    Parameters
-    ----------
-    sample_training_output: torch.Tensor
-        a stack of phi states sampled from the model. First dimension is the
-        `batch dimension` and is length sample_size. Second dimension is the
-        `lattice dimension` which is of length lattice_size.
-    training_geometry:
-        a geometry class as defined in geometry.py, used primarily for the
-        nearest neighbour shift.
-
-    Returns
-    -------
-    g_func: torch.Tensor
-        2d tensor of size (lattice length, lattice length, *)
-        containing values of green function G(x) (allowing for bootstrap
-        dimension)
-    """
-    # allow for additional dimensions like bootstrap
-    _, _, *extra_dims = sample_training_output.shape
-
-    g_func = torch.empty(
-        (training_geometry.length, training_geometry.length, *extra_dims)
-    )
-    for i in range(training_geometry.length):
-        for j in range(training_geometry.length):
-            shift = training_geometry.get_shift(shifts=((i, j),), dims=((0, 1),)).view(
-                -1
-            )  # make 1d
-
-            # Sample of size (target_length, sample_size)
-            phi = sample_training_output
-            phi_shift = phi[:, shift]
-
-            #  Average over stack of states
-            phi_mean = phi.mean(dim=0)
-            phi_shift_mean = phi_shift.mean(dim=0)
-            phi_shift_phi_mean = (phi_shift * phi).mean(dim=0)
-
-            # Average over coordinates
-            g_func[i, j] = torch.mean(
-                phi_shift_phi_mean - phi_shift_mean * phi_mean, dim=0
-            )
-    return g_func
-
-
-def volume_avg_two_point_function(sample_training_output, training_geometry):
-    """
-    Return torch Tensor of volume-averaged two point functions, defined like
-    in calc_two_point_function except the mean is just taken over lattice sites
-    for each shift, no mean is taken across batch dimension
-
-    Parameters
-    ----------
-    sample_training_output: torch.Tensor
-        a stack of phi states sampled from the model. First dimension is the
-        `batch dimension` and is length sample_size. Second dimension is the
-        `lattice dimension` which is of length lattice_size.
-    training_geometry:
-        a geometry class as defined in geometry.py, used primarily for the
-        nearest neighbour shift.
-
-    Returns
-    -------
-    va_2pf: torch.Tensor
-        A 3 dimensional Tensor containing the volume-averaged two point function
-        for each state in the sample, for each set of shifts shape
-        (sample_size, lattice length, lattice length)
-
-    """
-
-    va_2pf = torch.empty_like(sample_training_output).view(
-        -1, training_geometry.length, training_geometry.length
-    )
-    for i in range(training_geometry.length):
-        for j in range(training_geometry.length):
-            shift = training_geometry.get_shift(shifts=((i, j),), dims=((0, 1),)).view(
-                -1
-            )
-
-            va_2pf[:, i, j] = (
-                sample_training_output[:, shift] * sample_training_output
-            ).mean(dim=1) - sample_training_output.mean(dim=1).pow(2)
-    return va_2pf
-
-
-def bootstrap_function(func, states, *args, n_boot=100):
-    """Take a func which expects N_batch on the first dimension and can handle
-    an extra bootstrap dimension on final dimension and return n_boot resamples
-    of the function, with the resamples on the final dimension of the returned
-    tensor
-
-    Parameters
-    ----------
-    func:
-        function which is to be resampled, should be able to take tensor of shape
-        (sample_size, lattice_size, N_boot)
-    states: torch.Tensor
-        states of shape (sample_size, lattice_size)
-    *args:
-        other positional arguments of the `func`
-    n_boot: int, default 100
-        number of resamples, by default set to 100
-
-    Returns
-    -------
-    resampled_func: torch.Tensor
-        with shape (*func(states, *args).shape, n_boot), resamples are on final
-        dimension
-
-    """
-    boot_index = torch.randint(0, states.shape[0], size=(states.shape[0], n_boot))
-    # put boot index on final dimension
-    resampled_states = states[boot_index, :].transpose(1, 2)
-    res = func(resampled_states, *args)
-    return res
-
-
-def two_point_function(
-    sample_training_output, training_geometry, n_boot=100
-):
-    """Bootstrap calc_two_point_function, using bootstrap_function"""
-    return bootstrap_function(
-        calc_two_point_function,
-        sample_training_output,
-        training_geometry,
-        n_boot=n_boot,
-    )
+def two_point_function(field_ensemble, n_boot=100):
+    return field_ensemble.two_point_function(n_boot=n_boot)
 
 
 def zero_momentum_two_point(two_point_function):
@@ -310,8 +174,7 @@ def autocorr_two_point(volume_avg_two_point_function, window=2.0):
     All numpy arrays are truncated at a point 4*W_opt for the sake of plotting.
     """
     # TODO: look at more than one seperation
-    x = t = 0
-    va_2pf = volume_avg_two_point_function[:, x, t]
+    va_2pf = volume_avg_two_point_function[0, 1, :]
     va_2pf -= va_2pf.mean()
     # converts to numpy array
     autocorrelation = correlate(va_2pf, va_2pf, mode="same")
@@ -365,7 +228,7 @@ def automatic_windowing_function(
         g(W) = exp( -W / \tau_{exp}(W) ) - \tau_{exp}(W) / \sqrt(W*N)
 
     """
-    sample_size = volume_avg_two_point_function.shape[0]
+    sample_size = volume_avg_two_point_function.shape[-1]
     tau_int = integrated_autocorr_two_point
     tau_exp = exp_autocorr_two_point
     windows = np.arange(1, tau_int.size + 1)

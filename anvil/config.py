@@ -12,6 +12,7 @@ from anvil.core import PhiFourAction, SpinHamiltonian, TrainingOutput
 from anvil.models import RealNVP, StereographicProjection
 from anvil.geometry import Geometry2D
 from anvil.distributions import NormalDist, SphericalUniformDist
+from anvil.fields import ScalarField, ClassicalSpinField
 
 log = logging.getLogger(__name__)
 
@@ -49,12 +50,18 @@ class ConfigParser(Config):
     def parse_beta(self, beta: float):
         return beta
 
-    def parse_field_dimension(self, dim: int):
+    def parse_field_dimension(self, dim):
         return dim
+
+    def produce_FieldClass(self):
+        return ClassicalSpinField
 
     def produce_action(self, field_dimension, beta, geometry):
         return SpinHamiltonian(field_dimension, beta, geometry)
-
+    """
+    def produce_action(self, m_sq, lam, geometry):
+        return PhiFourAction(m_sq, lam, geometry)
+    """
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
 

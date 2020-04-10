@@ -74,6 +74,7 @@ def train(
         phi, map_log_density = loaded_model(z)
 
         model_log_density = base_log_density + map_log_density
+        #target_log_density = - action(phi)
         target_log_density = generator.log_volume_element(phi) - action(phi)  # term from parameterisatiom goes here
 
         loaded_model.zero_grad()  # get rid of stored gradients
