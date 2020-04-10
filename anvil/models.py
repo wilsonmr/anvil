@@ -265,9 +265,10 @@ class RealNVP(nn.Module):
 
         for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
-            np.savetxt(f"layer_{i}.txt", phi_out.detach().numpy())
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
+            
+            #np.savetxt(f"layer_{i}.txt", phi_out.detach().numpy())
 
         return phi_out, log_density
 
@@ -277,7 +278,7 @@ class StereographicProjection(nn.Module):
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
-        
+
         if field_dimension == 1:
             self.forward = self.circle_flow
         elif field_dimension == 2:
@@ -290,7 +291,8 @@ class StereographicProjection(nn.Module):
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
-        np.savetxt("projected.txt", phi_out.detach().numpy())
+        
+        #np.savetxt("projected.txt", phi_out.detach().numpy())
 
         # Inner flow on real line e.g. RealNVP
         phi_out, log_density_inner = self.inner_flow(phi_out)
@@ -304,78 +306,32 @@ class StereographicProjection(nn.Module):
         return phi_out, log_density_proj + log_density_inner
 
     def sphere_flow(self, z_input: torch.Tensor) -> torch.Tensor:
-        polar, azimuth = z_input.view(-1, 2, self.volume).split(1, dim=1)
+        polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Projection
         # -1 factor because polar coordinate = azimuth - pi (*-1 is faster than shift)
         x_coords = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
-            (torch.cos(azimuth), torch.sin(azimuth)), dim=1
+            (torch.cos(azimuth), torch.sin(azimuth)), dim=2
         )
-        rad_sq = x_coords.pow(2).sum(dim=1)
-        log_density += (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
+        rad_sq = x_coords.pow(2).sum(dim=2)
+        log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
             dim=1, keepdim=True
         )
-        np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
+        
+        #np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
 
         # Inner flow on real plane e.g. RealNVP
         x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
-        x_1, x_2 = x_coords.view(-1, 2, self.size_in//2).split(1, dim=1)
+        x_1, x_2 = x_coords.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Inverse projection
-        polar = (2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2))))
-        phi_out = torch.cat((polar, torch.atan2(x_2, x_1) + pi,), dim=1)  # azimuth
-        log_density += (
+        polar = 2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2)))
+        phi_out = torch.cat((polar, torch.atan2(x_2, x_1) + pi,), dim=2)  # azimuth
+        log_density_proj += (
             torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
-        ).sum(dim=2)
+        ).sum(dim=1)
 
-        return phi_out.view(-1, self.size_in), log_density + log_density_inner
-
-
-
-    def sphere_log_density(self, phi_input: torch.Tensor) -> torch.Tensor:
-        zenith, azimuth = phi_input.view(-1, 2, self.volume).split(1, dim=1)
-
-        # Parameterisation
-        log_param = torch.log(torch.sin(zenith)).sum(dim=2)
-
-        # Projection
-        log_jacob_contr = (
-            torch.log(torch.sin(0.5 * zenith)) - 3 * torch.log(torch.cos(0.5 * zenith))
-        ).sum(dim=2)
-
-        x_coords = (
-            -torch.tan(0.5 * zenith)  # radial coordinate
-            * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=1)
-        ).view(-1, 2 * self.volume)
-
-        # Affine transformations
-        for layer in self.affine_layers:
-            log_jacob_contr += layer.log_det_jacobian(x_coords).view(-1, 1)
-            x_coords = layer(x_coords)
-
-        # Inverse projection
-        rad_sq = x_coords.view(-1, 2, self.volume).pow(2).sum(dim=1)
-        log_jacob_contr += (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
-            dim=1, keepdim=True
-        )
-
-        # Base distribution
-        log_simple_prob = torch.log(
-            torch.sin(2 * torch.atan(rad_sq.sqrt()))  # sin(zenith angle)
-        ).sum(dim=1, keepdim=True)
-
-        return log_simple_prob + log_jacob_contr - log_param
-=======
-        log_density = torch.zeros((z_input.shape[0], 1))
-        phi_out = z_input
-
-        for layer in reversed(self.affine_layers):  # reverse layers!
-            phi_out, log_det_jacob = layer(phi_out)
-            log_density += log_det_jacob
-            # TODO: make this yield, then make a yield from wrapper?
-
-        return phi_out, log_density
->>>>>>> master
+        return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
 
 if __name__ == "__main__":
