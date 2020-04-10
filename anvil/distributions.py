@@ -96,6 +96,8 @@ class SphericalUniformDist:
 
         if self.field_dimension is 1:
             self.generator = self.gen_circular
+            # Overrides the existing method to save time
+            self.log_volume_element = lambda sample: torch.zeros((sample.shape[0], 1))
         elif self.field_dimension is 2:
             self.generator = self.gen_spherical
         else:
