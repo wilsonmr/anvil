@@ -113,7 +113,7 @@ class SpinHamiltonian(nn.Module):
         """
         Take a stack of angles with shape (n_sample, (N-1) * lattice_volume), where the N-1
         angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
-        to a stack of euclidean field vectors with shape (n_sample, N, lattice_volume).
+        to a stack of euclidean field vectors with shape (n_sample, lattice_volume, N).
         """
         coords = state.view(-1, self.volume, self.field_dimension)
 
