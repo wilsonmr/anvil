@@ -190,7 +190,7 @@ class SphericalUniformDist:
 
         # Powers of sin(angle) for each angle except the azimuth
         # in the probability density function
-        self._sin_pow = torch.arange(self.field_dimension - 1, 0, -1).view(1, -1, 1)
+        self._sin_pow = torch.arange(self.field_dimension - 1, 0, -1).view(1, 1, -1)
 
     def __call__(self, n_sample):
         """Return tensor of values drawn from uniform distribution
@@ -198,7 +198,9 @@ class SphericalUniformDist:
         
         Return shape: (n_sample, field_dimension * lattice_volume).
         """
-        return self.generator(n_sample)
+        sample = self.generator(n_sample)
+        log_density = self.log_density(sample)
+        return sample, log_density
 
     def gen_circular(self, n_sample) -> torch.Tensor:
         """Return tensor of values distributed uniformly on the unit 1-sphere.
@@ -214,12 +216,12 @@ class SphericalUniformDist:
 
                         \theta = \arccos( 1 - 2 x )
         """
-        sample = torch.cat(
+        sample = torch.stack(
             (
-                torch.acos(1 - 2 * torch.rand(n_sample, 1, self.lattice_volume)),
-                torch.rand(n_sample, 1, self.lattice_volume) * 2 * pi,
+                torch.acos(1 - 2 * torch.rand(n_sample, self.lattice_volume)),
+                torch.rand(n_sample, self.lattice_volume) * 2 * pi,
             ),
-            dim=1,
+            dim=-1,
         )
         return sample.view(n_sample, 2 * self.lattice_volume)
 
@@ -228,7 +230,7 @@ class SphericalUniformDist:
         
         Uses Marsaglia's algorithm.
         """
-        rand_normal = torch.randn(n_samples, self.dimension + 1, self.lattice_volume)
+        rand_normal = torch.randn(n_samples, self.lattice_volume, self.dimension + 1)
         points = rand_normal / rand_normal.norm(dim=1, keepdim=True)
 
         # TODO: convert to self.dimension angles. Kind of a faff and not urgent
@@ -257,21 +259,32 @@ class SphericalUniformDist:
         
         This also goes by the name of the Jacobian determinant for the change
         of coordinates Euclidean -> spherical.
-        
-        Return shape: (n_sample, 1) where n_sample is the number of
-        field configurations (the first dimension of sample).
+
+        Inputs
+        ------
+        sample: torch.Tensor
+            A tensor of shape (n_sample, lattice_volume * field_dimension).
+            When reshaped into (n_sample, lattice_volume, field_dimension),
+            the final dimension should contain field_dimension angles from the
+            same lattice site, with the largest index corresponding to the
+            azimuthal angle.
+
+        Returns
+        -------
+        torch.Tensor which is the logarithm of the Jacobian determinant for
+        the entire lattice, with shape (n_sample, 1).
         """
         log_jacob = (
             self._sin_pow
             * torch.log(
                 torch.sin(
-                    sample.view(-1, self.field_dimension, self.lattice_volume)[
-                        :, :-1, :
+                    sample.view(-1, self.lattice_volume, self.field_dimension)[
+                        :, :, :-1
                     ]
                 )
             )
         ).sum(
-            dim=1
+            dim=2
         )  # sum over all angles except azimuth
         return log_jacob.sum(dim=1, keepdim=True)  # sum over volume
 
@@ -282,4 +295,4 @@ class SphericalUniformDist:
         Note that this is equivalent to the surface area element for
         the (N-1)-sphere expressed in spherical coordinates.
         """
-        return self.volume_element(sample)
+        return self.log_volume_element(sample)

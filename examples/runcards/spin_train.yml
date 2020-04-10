@@ -1,0 +1,30 @@
+# Lattice
+lattice_length: 4
+lattice_dimension: 2
+
+# Action
+field_dimension: 2
+beta: 0.5
+
+# Base distrbution
+base_dist: "spherical"
+
+# Networks
+hidden_nodes: [24]
+n_affine: 6
+n_batch: 3000
+
+# Training length
+epochs: 3000
+save_interval: 1000
+
+# Optimizer ('adam', 'adadelta')
+optimizer: 'adam'
+optimizer_kwargs:
+    lr: 0.01
+
+# Scheduler
+scheduler_kwargs:
+    verbose: true
+    factor: 0.5
+    patience: 500

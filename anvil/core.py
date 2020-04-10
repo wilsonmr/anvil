@@ -76,39 +76,37 @@ class SpinHamiltonian(nn.Module):
         Compute XY Hamiltonian from a stack of angles (not Euclidean field components)
         with shape (n_sample, lattice_volume).
         """
-        hamiltonian = (
-            -1
-            * self.beta
-            * torch.cos(state[:, self.shift] - state.view(-1, 1, self.volume))
-            .sum(dim=1,)  # sum over two shift directions (+ve nearest neighbours)
-            .sum(dim=1, keepdim=True)  # sum over lattice sites
-        )
+        hamiltonian = -self.beta * torch.cos(
+            state[:, self.shift] - state.view(-1, 1, self.volume)
+        ).sum(
+            dim=1,
+        ).sum(  # sum over two shift directions (+ve nearest neighbours)
+            dim=1, keepdim=True
+        )  # sum over lattice sites
         return hamiltonian
 
     def heisenberg_hamiltonian(self, state: torch.Tensor) -> torch.Tensor:
         """
         Compute classical Heisenberg Hamiltonian from a stack of angles with shape (n_sample, 2 * volume).
 
-        Reshapes state into shape (n_sample, 2, lattice_volume), so must make sure to keep this
+        Reshapes state into shape (n_sample, lattice_volume, 2), so must make sure to keep this
         consistent with observables.
         """
-        state = state.view(-1, 2, self.volume)  # (n_sample, angles, volume)
-        cos_polar = torch.cos(state[:, 0, :])
-        sin_polar = torch.sin(state[:, 0, :])
-        azimuth = state[:, 1, :]
+        polar = state[:, ::2]
+        azimuth = state[:, 1::2]
+        cos_polar = torch.cos(polar)
+        sin_polar = torch.sin(polar)
 
-        hamiltonian = (
-            -1
-            * self.beta
-            * (
-                cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.volume)
-                + sin_polar[:, self.shift]
-                * sin_polar.view(-1, 1, self.volume)
-                * torch.cos(azimuth[:, self.shift] - azimuth.view(-1, 1, self.volume))
-            )
-            .sum(dim=1,)  # sum over two shift directions (+ve nearest neighbours)
-            .sum(dim=1, keepdim=True)  # sum over lattice sites
-        )
+        hamiltonian = -self.beta * (
+            cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.volume)
+            + sin_polar[:, self.shift]
+            * sin_polar.view(-1, 1, self.volume)
+            * torch.cos(azimuth[:, self.shift] - azimuth.view(-1, 1, self.volume))
+        ).sum(
+            dim=1,
+        ).sum(  # sum over two shift directions (+ve nearest neighbours)
+            dim=1, keepdim=True
+        )  # sum over lattice sites
         return hamiltonian
 
     def _spher_to_eucl(self, state):
@@ -117,13 +115,11 @@ class SpinHamiltonian(nn.Module):
         angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
         to a stack of euclidean field vectors with shape (n_sample, N, lattice_volume).
         """
-        coords = state.view(
-            -1, self.field_dimension, self.volume,  # (n_samples, N-1, volume)
-        )
+        coords = state.view(-1, self.volume, self.field_dimension)
 
-        vector = torch.empty(coords.shape[0], self.field_dimension + 1, self.volume)
-        vector[:, :-1, :] = torch.cos(coords)
-        vector[:, 1:, :] *= torch.cumprod(torch.sin(coords), dim=1)
+        vector = torch.empty(coords.shape[0], self.volume, self.field_dimension + 1)
+        vector[:, :, :-1] = torch.cos(coords)
+        vector[:, :, 1:] *= torch.cumprod(torch.sin(coords), dim=2)
 
         return vector
 
@@ -134,17 +130,15 @@ class SpinHamiltonian(nn.Module):
         """
         field_vector = self._spher_to_eucl(state)
 
-        hamiltonian = (
-            -1
-            * self.beta
-            * torch.sum(
-                field_vector[:, :, self.shift]
-                * field_vector.view(-1, self.field_dimension + 1, 1, self.volume),
-                dim=1,  # sum over vector components
-            )
-            .sum(dim=1,)  # sum over shift directions
-            .sum(dim=1, keepdim=True)  # sum over lattice sites
-        )
+        hamiltonian = -self.beta * torch.sum(
+            field_vector[:, self.shift, :]
+            * field_vector.view(-1, 1, self.volume, self.field_dimension + 1),
+            dim=-1,  # sum over vector components
+        ).sum(
+            dim=1,
+        ).sum(  # sum over shift directions
+            dim=1, keepdim=True
+        )  # sum over lattice sites
         return hamiltonian
 
 
