@@ -77,11 +77,11 @@ class ConfigParser(Config):
     ):
         if base_dist == "normal":
             return NormalDist(
-                lattice_volume=lattice_size, field_dimension=field_dimension,
+                lattice_size=lattice_size, field_dimension=field_dimension,
             )
         elif base_dist == "spherical":
             return SphericalUniformDist(
-                lattice_volume=lattice_size, field_dimension=field_dimension,
+                lattice_size=lattice_size, field_dimension=field_dimension,
             )
         else:
             raise NotImplementedError

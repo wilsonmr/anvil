@@ -101,8 +101,8 @@ class SpinHamiltonian(nn.Module):
     """
     Extend the nn.Module class to return the Hamiltonian for the classical
     N-spin model (also known as the N-vector model), given either
-    a single state size (1, (N-1) * lattice_volume) or a stack of shape
-    (n_sample, (N-1) * lattice_volume).
+    a single state size (1, (N-1) * lattice_size) or a stack of shape
+    (sample_size, (N-1) * lattice_size).
 
     The spins are defined as having modulus 1, such that they take values
     on the (N-1)-sphere, and can be parameterised by N-1 angles using
@@ -148,7 +148,7 @@ class SpinHamiltonian(nn.Module):
     def xy_hamiltonian(self, state: torch.Tensor) -> torch.Tensor:
         """
         Compute XY Hamiltonian from a stack of angles (not Euclidean field components)
-        with shape (n_sample, lattice_volume).
+        with shape (sample_size, lattice_size).
         """
         hamiltonian = -self.beta * torch.cos(
             state[:, self.shift] - state.view(-1, 1, self.volume)
@@ -161,9 +161,9 @@ class SpinHamiltonian(nn.Module):
 
     def heisenberg_hamiltonian(self, state: torch.Tensor) -> torch.Tensor:
         """
-        Compute classical Heisenberg Hamiltonian from a stack of angles with shape (n_sample, 2 * volume).
+        Compute classical Heisenberg Hamiltonian from a stack of angles with shape (sample_size, 2 * volume).
 
-        Reshapes state into shape (n_sample, lattice_volume, 2), so must make sure to keep this
+        Reshapes state into shape (sample_size, lattice_size, 2), so must make sure to keep this
         consistent with observables.
         """
         polar = state[:, ::2]
@@ -185,9 +185,9 @@ class SpinHamiltonian(nn.Module):
 
     def _spher_to_eucl(self, state):
         """
-        Take a stack of angles with shape (n_sample, (N-1) * lattice_volume), where the N-1
+        Take a stack of angles with shape (sample_size, (N-1) * lattice_size), where the N-1
         angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
-        to a stack of euclidean field vectors with shape (n_sample, lattice_volume, N).
+        to a stack of euclidean field vectors with shape (sample_size, lattice_size, N).
         """
         coords = state.view(-1, self.volume, self.field_dimension)
 
@@ -199,7 +199,7 @@ class SpinHamiltonian(nn.Module):
 
     def n_spin_hamiltonian(self, state):
         """
-        Compute the N-spin Hamiltonian from a stack of angles with shape (n_sample, field_dimension * volume).
+        Compute the N-spin Hamiltonian from a stack of angles with shape (sample_size, field_dimension * volume).
 
         """
         field_vector = self._spher_to_eucl(state)

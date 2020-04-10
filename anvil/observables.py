@@ -47,8 +47,8 @@ def calc_two_point_function(sample_training_output, training_geometry):
     ----------
     sample_training_output: torch.Tensor
         a stack of phi states sampled from the model. First dimension is the
-        `batch dimension` and is length N_states. Second dimension is the
-        `lattice dimension` which is of length N_lattice.
+        `batch dimension` and is length sample_size. Second dimension is the
+        `lattice dimension` which is of length lattice_size.
     training_geometry:
         a geometry class as defined in geometry.py, used primarily for the
         nearest neighbour shift.
@@ -72,7 +72,7 @@ def calc_two_point_function(sample_training_output, training_geometry):
                 -1
             )  # make 1d
 
-            # Sample of size (target_length, n_states)
+            # Sample of size (target_length, sample_size)
             phi = sample_training_output
             phi_shift = phi[:, shift]
 
@@ -98,8 +98,8 @@ def volume_avg_two_point_function(sample_training_output, training_geometry):
     ----------
     sample_training_output: torch.Tensor
         a stack of phi states sampled from the model. First dimension is the
-        `batch dimension` and is length N_states. Second dimension is the
-        `lattice dimension` which is of length N_lattice.
+        `batch dimension` and is length sample_size. Second dimension is the
+        `lattice dimension` which is of length lattice_size.
     training_geometry:
         a geometry class as defined in geometry.py, used primarily for the
         nearest neighbour shift.
@@ -109,7 +109,7 @@ def volume_avg_two_point_function(sample_training_output, training_geometry):
     va_2pf: torch.Tensor
         A 3 dimensional Tensor containing the volume-averaged two point function
         for each state in the sample, for each set of shifts shape
-        (N_states, lattice length, lattice length)
+        (sample_size, lattice length, lattice length)
 
     """
 
@@ -138,9 +138,9 @@ def bootstrap_function(func, states, *args, n_boot=100):
     ----------
     func:
         function which is to be resampled, should be able to take tensor of shape
-        (N_states, N_lattice, N_boot)
+        (sample_size, lattice_size, N_boot)
     states: torch.Tensor
-        states of shape (N_states, N_lattice)
+        states of shape (sample_size, lattice_size)
     *args:
         other positional arguments of the `func`
     n_boot: int, default 100
@@ -365,11 +365,11 @@ def automatic_windowing_function(
         g(W) = exp( -W / \tau_{exp}(W) ) - \tau_{exp}(W) / \sqrt(W*N)
 
     """
-    n_states = volume_avg_two_point_function.shape[0]
+    sample_size = volume_avg_two_point_function.shape[0]
     tau_int = integrated_autocorr_two_point
     tau_exp = exp_autocorr_two_point
     windows = np.arange(1, tau_int.size + 1)
-    return np.exp(-windows / tau_exp) - tau_exp / np.sqrt(windows * n_states)
+    return np.exp(-windows / tau_exp) - tau_exp / np.sqrt(windows * sample_size)
 
 
 def optimal_window(automatic_windowing_function):

@@ -48,7 +48,7 @@ class AffineLayer(nn.Module):
     ----------
     size_in: int
         number of dimensions, D, of input/output data. Data should be fed to
-        network in shape (N_states, size_in).
+        network in shape (sample_size, size_in).
     s_hidden_shape: tuple
         tuple which gives the number of nodes in the hidden layers of neural
         network s_i, can be a single layer network with 16 nodes e.g (16,)
@@ -176,7 +176,7 @@ class AffineLayer(nn.Module):
         Parameters
         ----------
         z_input: torch.Tensor
-            stack of vectors z, shape (N_states, D)
+            stack of vectors z, shape (sample_size, D)
 
         Returns
         -------
@@ -249,7 +249,7 @@ class RealNVP(nn.Module):
         Parameters
         ----------
         z_input: torch.Tensor
-            stack of simple distribution state vectors, shape (N_states, D)
+            stack of simple distribution state vectors, shape (sample_size, D)
 
         Returns
         -------
@@ -258,7 +258,7 @@ class RealNVP(nn.Module):
             of the target distribution, same shape as input.
         log_density: torch.Tensor
             logarithm of the probability density of the output distribution,
-            with shape (n_states, 1)
+            with shape (sample_size, 1)
         """
         log_density = torch.zeros((z_input.shape[0], 1))
         phi_out = z_input

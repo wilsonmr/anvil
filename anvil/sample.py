@@ -177,9 +177,9 @@ def chain_autocorrelation(
     )
 
     accepted = float(torch.sum(history))
-    n_states = len(history)
+    sample_size = len(history)
     autocorrelations = torch.zeros(
-        n_states + 1, dtype=torch.float
+        sample_size + 1, dtype=torch.float
     )  # +1 in case 100% rejected
     consecutive_rejections = 0
 
@@ -199,7 +199,7 @@ def chain_autocorrelation(
 
     # Compute integrated autocorrelation
     integrated_autocorrelation = 0.5 + torch.sum(
-        autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
+        autocorrelations / torch.arange(sample_size + 1, 0, -1, dtype=torch.float)
     )
     sample_interval = ceil(2 * integrated_autocorrelation)
     log.info(

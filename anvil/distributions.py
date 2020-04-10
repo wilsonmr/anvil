@@ -18,41 +18,41 @@ class NormalDist:
 
     Inputs:
     -------
-    lattice_volume: int
+    lattice_size: int
         Number of lattice sites.
     field_dimension: int
         Number of independent field components at each lattice site.
         Default = 1, i.e. a scalar field.
     """
 
-    def __init__(self, lattice_volume, field_dimension=1):
-        self.lattice_volume = lattice_volume
+    def __init__(self, lattice_size, field_dimension=1):
+        self.lattice_size = lattice_size
         self.field_dimension = field_dimension
 
         # Number of components per field configuration =
         # size of output Tensor at dimension 1
-        self.size_out = self.lattice_volume * self.field_dimension
+        self.size_out = self.lattice_size * self.field_dimension
 
         # Pre-calculate normalisation for log density
         self.log_normalisation = self._log_normalisation()
 
-    def __call__(self, n_sample) -> tuple:
-        """Return a tuple (sample, log_density) for a sample of n_sample states
+    def __call__(self, sample_size) -> tuple:
+        """Return a tuple (sample, log_density) for a sample of sample_size states
         drawn from the standard uniform distribution.
         
         See docstrings for instance methods generator, log_density for more details.
         """
-        sample = self.generator(n_sample)
+        sample = self.generator(sample_size)
         log_density = self.log_density(sample)
         return (sample, log_density)
 
-    def generator(self, n_sample):
+    def generator(self, sample_size):
         """Return tensor of values drawn from the standard normal distribution
         with mean 0, variance 1.
         
-        Return shape: (n_sample, field_dimension * lattice_volume).
+        Return shape: (sample_size, field_dimension * lattice_size).
         """
-        return torch.randn(n_sample, self.size_out)
+        return torch.randn(sample_size, self.size_out)
 
     def _log_normalisation(self) -> float:
         """logarithm of the normalisation for the density function."""
@@ -62,7 +62,7 @@ class NormalDist:
         """Return log probability density of a sample generated from
         the __call__ method above.
 
-        Return shape: (n_sample, 1) where n_sample is the number of
+        Return shape: (sample_size, 1) where sample_size is the number of
         field configurations (the first dimension of sample).
         """
         exponent = -torch.sum(0.5 * sample.pow(2), dim=1, keepdim=True)
@@ -76,7 +76,7 @@ class SphericalUniformDist:
 
     Inputs:
     -------
-    lattice_volume: int
+    lattice_size: int
         Number of lattice sites.
     field_dimension: int
         Number of angles parameterising points on the unit sphere at each
@@ -86,13 +86,13 @@ class SphericalUniformDist:
         unit circle.
     """
 
-    def __init__(self, lattice_volume, field_dimension=1):
-        self.lattice_volume = lattice_volume
+    def __init__(self, lattice_size, field_dimension=1):
+        self.lattice_size = lattice_size
         self.field_dimension = field_dimension
 
         # Number of components per field configuration =
         # size of output Tensor at dimension 1
-        self.size_out = self.lattice_volume * self.field_dimension
+        self.size_out = self.lattice_size * self.field_dimension
 
         if self.field_dimension is 1:
             self.generator = self.gen_circular
@@ -107,22 +107,22 @@ class SphericalUniformDist:
         # in the probability density function
         self._sin_pow = torch.arange(self.field_dimension - 1, 0, -1).view(1, 1, -1)
 
-    def __call__(self, n_sample):
+    def __call__(self, sample_size):
         """Return tensor of values drawn from uniform distribution
         on a unit sphere of dimension field_dimension.
         
-        Return shape: (n_sample, field_dimension * lattice_volume).
+        Return shape: (sample_size, field_dimension * lattice_size).
         """
-        sample = self.generator(n_sample)
+        sample = self.generator(sample_size)
         log_density = self.log_density(sample)
         return sample, log_density
 
-    def gen_circular(self, n_sample) -> torch.Tensor:
+    def gen_circular(self, sample_size) -> torch.Tensor:
         """Return tensor of values distributed uniformly on the unit 1-sphere.
         """
-        return torch.rand(n_sample, self.lattice_volume) * 2 * pi
+        return torch.rand(sample_size, self.lattice_size) * 2 * pi
 
-    def gen_spherical(self, n_sample) -> torch.Tensor:
+    def gen_spherical(self, sample_size) -> torch.Tensor:
         r"""Return tensor of values distributed uniformly on the unit 2-sphere.
         
         Uses inversion sampling to map random variables x ~ [0, 1] to the 
@@ -133,19 +133,19 @@ class SphericalUniformDist:
         """
         sample = torch.stack(
             (
-                torch.acos(1 - 2 * torch.rand(n_sample, self.lattice_volume)),
-                torch.rand(n_sample, self.lattice_volume) * 2 * pi,
+                torch.acos(1 - 2 * torch.rand(sample_size, self.lattice_size)),
+                torch.rand(sample_size, self.lattice_size) * 2 * pi,
             ),
             dim=-1,
         )
-        return sample.view(n_sample, 2 * self.lattice_volume)
+        return sample.view(sample_size, 2 * self.lattice_size)
 
-    def gen_hyperspherical(self, n_sample) -> torch.Tensor:
+    def gen_hyperspherical(self, sample_size) -> torch.Tensor:
         """Return values distributed uniformly on the unit N-sphere.
         
         Uses Marsaglia's algorithm.
         """
-        rand_normal = torch.randn(n_samples, self.lattice_volume, self.dimension + 1)
+        rand_normal = torch.randn(sample_size, self.lattice_size, self.dimension + 1)
         points = rand_normal / rand_normal.norm(dim=1, keepdim=True)
 
         # TODO: convert to self.dimension angles. Kind of a faff and not urgent
@@ -178,8 +178,8 @@ class SphericalUniformDist:
         Inputs
         ------
         sample: torch.Tensor
-            A tensor of shape (n_sample, lattice_volume * field_dimension).
-            When reshaped into (n_sample, lattice_volume, field_dimension),
+            A tensor of shape (sample_size, lattice_size * field_dimension).
+            When reshaped into (sample_size, lattice_size, field_dimension),
             the final dimension should contain field_dimension angles from the
             same lattice site, with the largest index corresponding to the
             azimuthal angle.
@@ -187,13 +187,13 @@ class SphericalUniformDist:
         Returns
         -------
         torch.Tensor which is the logarithm of the Jacobian determinant for
-        the entire lattice, with shape (n_sample, 1).
+        the entire lattice, with shape (sample_size, 1).
         """
         log_jacob = (
             self._sin_pow
             * torch.log(
                 torch.sin(
-                    sample.view(-1, self.lattice_volume, self.field_dimension)[
+                    sample.view(-1, self.lattice_size, self.field_dimension)[
                         :, :, :-1
                     ]
                 )
