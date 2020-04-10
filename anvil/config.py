@@ -11,7 +11,8 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 from anvil.core import TrainingOutput
 from anvil.geometry import Geometry2D
 from anvil.models import real_nvp, stereographic_projection
-from anvil.distributions import normal_distribution, spherical_distribution, phi_four_action, spin_hamiltonian
+from anvil.theories import phi_four_action, spin_hamiltonian
+from anvil.distributions import normal_distribution, spherical_distribution
 
 log = logging.getLogger(__name__)
 
