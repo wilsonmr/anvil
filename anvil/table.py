@@ -11,19 +11,20 @@ from reportengine.table import table
 
 
 @table
-def ising_observables_table(ising_energy, susceptibility):
+def ising_observables_table(energy_density, susceptibility, heat_capacity):
     """Table of the ising observables, with mean and standard deviation taken
     across boostrap samples
     """
     # annoying that tensors have to be cast to float
     res = [
-        [float(ising_energy.mean()), float(ising_energy.std())],
+        [float(energy_density.mean()), float(energy_density.std())],
         [float(susceptibility.mean()), float(susceptibility.std())],
+        [float(heat_capacity.mean()), float(heat_capacity.std())],
     ]
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
-        index=["Ising energy", "susceptibility"],
+        index=["Ising energy", "susceptibility", "heat capacity"],
     )
     return df
 

@@ -26,11 +26,20 @@ def arcosh(x):
     # NOTE: might need stable version here
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
-def field_ensemble(sample_training_output, training_geometry, FieldClass, field_dimension):
-    return FieldClass(training_output=sample_training_output, geometry=training_geometry, field_dimension=field_dimension)
+
+def field_ensemble(
+    sample_training_output, training_geometry, FieldClass, field_dimension
+):
+    return FieldClass(
+        training_output=sample_training_output,
+        geometry=training_geometry,
+        field_dimension=field_dimension,
+    )
+
 
 def volume_avg_two_point_function(field_ensemble):
     return field_ensemble.volume_avg_two_point_function()
+
 
 def two_point_function(field_ensemble, n_boot=100):
     return field_ensemble.two_point_function(n_boot=n_boot)
@@ -92,6 +101,31 @@ def effective_pole_mass(zero_momentum_two_point):
     return res
 
 
+def energy_density(two_point_function):
+    r"""Energy density defined as
+
+        E = 1/d sum_{\mu} G(\mu)
+
+    where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
+    in 2D
+
+    For classical spin models, this is 1/d times the expectation value of the
+    Hamiltonian density for pure nearest-neighbour interactions and no external
+    field.
+
+    Returns
+    -------
+    E: torch.Tensor
+        value for the energy density Tensor of size n_boot
+
+    Notes
+    -----
+    as defined in eq. (26) of https://arxiv.org/pdf/1904.12072.pdf
+
+    """
+    return (two_point_function[1, 0] + two_point_function[0, 1]) / 2
+
+
 def susceptibility(two_point_function):
     r"""Calculate the susceptibility, which is the sum of two point connected
     green functions over all seperations
@@ -111,67 +145,45 @@ def susceptibility(two_point_function):
     return two_point_function.sum(dim=(0, 1))
 
 
-def ising_energy(two_point_function):
-    r"""Ising energy defined as
+def heat_capacity(volume_avg_two_point_function, energy_density):
+    r"""Calculates the specific heat capacity, defined as the second
+    central moment of the Hamiltonian density.
 
-        E = 1/d sum_{\mu} G(\mu)
-
-    where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
-    in 2D
-
-    Returns
-    -------
-    E: torch.Tensor
-        value for the Ising energy Tensor of size n_boot
-
-    Notes
-    -----
-    as defined in eq. (26) of https://arxiv.org/pdf/1904.12072.pdf
+    Conventions used:
+        - First term is scaled by 1/d^2 in keeping with energy density
+        - Result is scaled by a factor of 1 / (V \beta^2) compared to
+            usual convention for spin models with inverse temperature
+            \beta
 
     """
-    return (two_point_function[1, 0] + two_point_function[0, 1]) / 2
+    # TODO: this may not be a sensible convention.
+    heat_cap = 0.25 * (
+        volume_avg_two_point_function[1, 0, :] + volume_avg_two_point_function[0, 1, :]
+    ).pow(2).mean() - energy_density.pow(2)
+    return heat_cap
 
 
 def autocorr_two_point(volume_avg_two_point_function, window=2.0):
-    r"""Computes the autocorrelation of the volume-averaged two point function,
-    the integrated autocorrelation time, and two other functions related to the
-    computation of an optimal window size for the integrated autocorrelation.
+    r"""Computes the autocorrelation function of the volume-averaged
+    two point function for each field configuration in the sample.
+    
+    The sample of field configurations results from sampling a Markov chain.
+    Thus, residual autocorrelations will remain, unless the sampling interval
+    is sufficiently large. Hence, we should treat the sample as a series.
 
-    Autocorrelation is defined by
+    The autocorrelation of a quantity G is an ensemble average of G at
+    a reference point 'k' and a second point 'k+t':
+        
+        \Gamma(k, t; G) = <G(k)G(k+t)> - <G(k)><G(k+t)>
 
-        \Gamma(t) = <G(k)G(k+t)> - <G(k)><G(k+t)>
+    However, if we make the assumption that the sample has been taken from a
+    Markov chain which has reached a stationary state (i.e. it has thermalised),
+    then we can replace the ensemble averages with averages over the sample.
 
-    where G(k) is the volume-averaged two point function at Monte Carlo timestep 'k',
-    and <> represents an average over all timesteps.
+    The autocorrelation function for a sample of size N is then
 
-    -----
-
-    Integrated autocorrelation is defined, for some window size 'W' by
-
-        \tau_{int}(W) = 0.5 + sum_t^W \Gamma(t)
-
-    Exponential autocorrelation is estimated, up to a factor of S as
-
-        S / \tau_{exp}(W) = log( (2\tau_int(W) + 1) / (2\tau_int(W) - 1) )
-
-    The "g" function has a minimum at 'W_opt' where the sum of the statistical
-    error and the systematic error due to truncation, in \tau_{int}, has a minimum.
-
-        g(W) = exp( -W / \tau_{exp}(W) ) - \tau_{exp}(W) / \sqrt(W*N)
-
-    The automatic windowing procedure and definitions of \tau_{exp}(W) and g(W)
-    are found in section 3.3 of Ulli Wolff: Monte Carlo errors with less errors -
-    https://arxiv.org/pdf/hep-lat/0306017.pdf
-
-    Returns
-    -------
-    autocorrelation:    numpy.array
-    tau_int_W:          numpy.array
-    tau_exp_W:          numpy.array
-    g_W:                numpy.array
-    W_opt:              int         - minimum of g_W
-
-    All numpy arrays are truncated at a point 4*W_opt for the sake of plotting.
+        \Gamma(t; G) = (N-t)^{-1} \sum_{k=1}^{N-t} G(k) G(k+t)
+                       - N^{-2} ( \sum_{k=1}^N G(k) )^2
     """
     # TODO: look at more than one seperation
     va_2pf = volume_avg_two_point_function[0, 1, :]
@@ -189,13 +201,12 @@ def integrated_autocorr_two_point(autocorr_two_point):
     Integrated autocorrelation is defined, for some window size 'W' by
 
         \tau_{int}(W) = 0.5 + sum_t^W \Gamma(t)
-
     """
     return 0.5 + np.cumsum(autocorr_two_point[1:])
 
 
 def exp_autocorr_two_point(integrated_autocorr_two_point, window=2.0):
-    """Calculate the exponential autocorrelation of the two point function.
+    r"""Calculate the exponential autocorrelation of the two point function.
 
     Exponential autocorrelation is estimated, up to a factor of S as
 

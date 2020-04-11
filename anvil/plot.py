@@ -214,9 +214,9 @@ def plot_bootstrap_susceptibility(susceptibility):
 
 
 @figure
-def plot_bootstrap_ising_energy(ising_energy):
-    """plot a bootstrap distribution of the ising_energy"""
-    return plot_bootstrap_single_number(ising_energy, r"Ising $E$")
+def plot_bootstrap_energy_density(energy_density):
+    """plot a bootstrap distribution of the energy density"""
+    return plot_bootstrap_single_number(energy_density, r"Ising $E$")
 
 
 @figuregen
