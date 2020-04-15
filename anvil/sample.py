@@ -65,8 +65,8 @@ def sample_batch(
         z, base_log_density = generator(batch_size + 1)
         phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
 
-        np.savetxt("base.txt", z)
-        np.savetxt("target.txt", phi)
+        #np.savetxt("base.txt", z)
+        #np.savetxt("target.txt", phi)
 
         model_log_density = base_log_density + map_log_density
 
@@ -290,7 +290,7 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 

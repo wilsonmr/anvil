@@ -268,7 +268,7 @@ class RealNVP(nn.Module):
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
 
-            np.savetxt(f"layer_{i}.txt", phi_out)
+            #np.savetxt(f"layer_{i}.txt", phi_out)
             
         return phi_out, log_density
 

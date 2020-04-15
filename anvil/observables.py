@@ -69,6 +69,90 @@ def zero_momentum_two_point(two_point_function):
     return g_tilde_t
 
 
+def ising_energy(two_point_function):
+    r"""Ising energy density defined as
+
+        E = sum_{\mu} G(\mu)
+
+    where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
+    in 2D
+
+    The choice of name derives from the classical spin models, for which the RHS
+    of the equation above is equal to the expectation value of the Hamiltonian
+    density for pure nearest-neighbour interactions and no external field.
+
+    Returns
+    -------
+    E: torch.Tensor
+        value for the energy density Tensor of size n_boot
+
+    Notes
+    -----
+    In eq. (26) of https://arxiv.org/pdf/1904.12072.pdf this is defined with
+    an additional factor of 1/d where d is the lattice dimension.
+
+    """
+    return two_point_function[1, 0] + two_point_function[0, 1]
+
+
+def susceptibility(two_point_function):
+    r"""Calculate the sum of two point connected correlation functions over
+    all seperations.
+
+        \chi = sum_x G(x)
+
+    For classical spin models, this is equal to the magnetic susceptibility.
+
+    Returns
+    -------
+    chi: torch.Tensor
+        value for the susceptibility Tensor of size n_boot
+
+    Notes
+    -----
+    as defined in eq. (25) of https://arxiv.org/pdf/1904.12072.pdf
+
+    """
+    return two_point_function.sum(dim=(0, 1))
+
+
+def heat_capacity(volume_avg_two_point_function, ising_energy, training_geometry):
+    r"""Calculates the second central moment of the action, which is proportional
+    to the heat capacity for thermodynamic systems.
+
+        C ~ < S^2 > - < S >^2
+
+    where the "action" is (-1 times) whatever is exponentiated in the functional
+    integral defining the theory, and < > denotes an expectation value taken over
+    an ensemble of configurations.
+
+    The first term is
+
+        < S^2 > ~ < \sum_\mu G_V(\mu) >
+
+    where G_V is the volume-averaged two point function. The second term is
+
+        < S >^2 ~ E^2
+
+    For classical thermodynamic models with inverse temperature \beta = T^{-1}
+    and Hamiltonian defined as \beta H = S, the constant of proportionality
+    for both terms is V^2 * \beta^2.
+
+    The convention used here is to take the specific heat capacity 'c', which
+    means the factor of V^2 becomes just V, but to ignore the factor of \beta^2
+    since not all of the actions used have a single parameter representing
+    nearest-neighbour coupling.
+
+    Thus, the function returns T^2 c.
+    """
+    # TODO: this may not be a sensible convention.
+    heat_cap = training_geometry.length ** 2 * (
+        volume_avg_two_point_function[1, 0, :] + volume_avg_two_point_function[0, 1, :]
+    ).pow(2).mean() - ising_energy.pow(2)
+    return heat_cap
+
+
+
 def effective_pole_mass(zero_momentum_two_point):
     r"""Calculate the effective pole mass m^eff(t) defined as
 
@@ -101,66 +185,8 @@ def effective_pole_mass(zero_momentum_two_point):
     return res
 
 
-def energy_density(two_point_function):
-    r"""Energy density defined as
-
-        E = 1/d sum_{\mu} G(\mu)
-
-    where \mu is the possible unit shifts for each dimension: (1, 0) and (0, 1)
-    in 2D
-
-    For classical spin models, this is 1/d times the expectation value of the
-    Hamiltonian density for pure nearest-neighbour interactions and no external
-    field.
-
-    Returns
-    -------
-    E: torch.Tensor
-        value for the energy density Tensor of size n_boot
-
-    Notes
-    -----
-    as defined in eq. (26) of https://arxiv.org/pdf/1904.12072.pdf
-
-    """
-    return (two_point_function[1, 0] + two_point_function[0, 1]) / 2
 
 
-def susceptibility(two_point_function):
-    r"""Calculate the susceptibility, which is the sum of two point connected
-    green functions over all seperations
-
-        \chi = sum_x G(x)
-
-    Returns
-    -------
-    chi: torch.Tensor
-        value for the susceptibility Tensor of size n_boot
-
-    Notes
-    -----
-    as defined in eq. (25) of https://arxiv.org/pdf/1904.12072.pdf
-
-    """
-    return two_point_function.sum(dim=(0, 1))
-
-
-def heat_capacity(volume_avg_two_point_function, energy_density):
-    r"""Calculates the specific heat capacity, defined as the second
-    central moment of the Hamiltonian density.
-
-    Conventions used:
-        - First term is scaled by 1/d^2 in keeping with energy density
-        - Result is scaled by a factor of 1 / (V \beta^2) compared to
-            usual convention for spin models with inverse temperature
-            \beta
-
-    """
-    # TODO: this may not be a sensible convention.
-    heat_cap = 0.25 * (
-        volume_avg_two_point_function[1, 0, :] + volume_avg_two_point_function[0, 1, :]
-    ).pow(2).mean() - energy_density.pow(2)
-    return heat_cap
 
 
 def autocorr_two_point(volume_avg_two_point_function, window=2.0):

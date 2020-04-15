@@ -5,7 +5,7 @@ class ScalarField:
     def __init__(self, training_output, geometry):
         self.geometry = geometry
 
-        self.lattice_volume = self.geometry.length ** 2
+        self.lattice_size = self.geometry.length ** 2
 
         self.sample = training_output
         self.sample_size = self.sample.shape[0]
@@ -64,7 +64,7 @@ class ClassicalSpinField:
         self.geometry = geometry
         self.field_dimension = field_dimension
 
-        self.lattice_volume = (
+        self.lattice_size = (
             self.geometry.length ** 2
         )  # need to do this in a dim indep way
 
@@ -81,11 +81,11 @@ class ClassicalSpinField:
         to a stack of euclidean field vectors with shape (lattice_size, N, sample_size).
         """
         angles = training_output.view(
-            self.sample_size, self.lattice_volume, self.field_dimension
+            self.sample_size, self.lattice_size, self.field_dimension
         )
 
         vectors = torch.ones(
-            self.sample_size, self.lattice_volume, self.field_dimension + 1
+            self.sample_size, self.lattice_size, self.field_dimension + 1
         )
         vectors[:, :, :-1] = torch.cos(angles)
         vectors[:, :, 1:] *= torch.cumprod(torch.sin(angles), dim=-1)
