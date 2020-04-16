@@ -24,7 +24,24 @@ def ising_observables_table(ising_energy, susceptibility, heat_capacity):
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
-        index=["Ising energy", "susceptibility", "heat capacity"],
+        index=["Ising energy", "Susceptibility", "Heat capacity"],
+    )
+    return df
+
+
+@table
+def topological_observables_table(topological_charge, topological_susceptibility):
+    res = [
+        [float(topological_charge.mean()), float(topological_charge.std())],
+        [
+            float(topological_susceptibility.mean()),
+            float(topological_susceptibility.std()),
+        ],
+    ]
+    df = pd.DataFrame(
+        res,
+        columns=["Mean", "Standard deviation"],
+        index=["Topological charge", "Topological susceptibility"],
     )
     return df
 

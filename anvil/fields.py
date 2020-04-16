@@ -1,4 +1,5 @@
 import torch
+from math import pi
 
 
 class ScalarField:
@@ -67,18 +68,21 @@ class ClassicalSpinField:
         self.lattice_size = (
             self.geometry.length ** 2
         )  # need to do this in a dim indep way
+        self.shift = self.geometry.get_shift()
 
         self.sample_size = training_output.shape[0]  # not great - needed in next line
         self.sample = self._spher_to_eucl(training_output)
         self._modulus_check()
         self._volume_avg_two_point_function = self._calc_volume_avg_two_point_function()
-        return
+
+        # Topological charge density formula valid for O(3) only
+        if field_dimension == 2:
+            self._topological_charge = self._calc_topological_charge()
 
     def _spher_to_eucl(self, training_output):
-        """
-        Take a stack of angles with shape ((N-1) * lattice_size, sample_size), where the N-1
+        """Take a stack of angles with shape (sample_size, (N-1) * lattice_size), where the N-1
         angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
-        to a stack of euclidean field vectors with shape (lattice_size, N, sample_size).
+        to a stack of euclidean field vectors with shape (sample_size, lattice_size, N).
         """
         angles = training_output.view(
             self.sample_size, self.lattice_size, self.field_dimension
@@ -116,6 +120,33 @@ class ClassicalSpinField:
 
         return va_2pf
 
+    def _tan_half_spher_triangle(self, ilat, axis):
+        x0 = ilat
+        x1 = self.shift[axis, x0]
+        x2 = self.shift[(axis + 1) % 2, x1]
+
+        numerator = torch.sum(
+            self.sample[:, x0, :]
+            * torch.cross(self.sample[:, x1, :], self.sample[:, x2, :]),
+            dim=1,
+        )
+        denominator = (
+            1
+            + torch.sum(self.sample[:, x0, :] * self.sample[:, x1, :], dim=1)
+            + torch.sum(self.sample[:, x1, :] * self.sample[:, x2, :], dim=1)
+            + torch.sum(self.sample[:, x2, :] * self.sample[:, x0, :], dim=1)
+        )
+        return numerator / denominator
+
+    def _calc_topological_charge(self):
+        charge = torch.zeros(self.sample_size)
+
+        for ilat in range(self.lattice_size):
+            charge += torch.atan(self._tan_half_spher_triangle(ilat, 0)) + torch.atan(
+                self._tan_half_spher_triangle(ilat, 1)
+            )
+        return charge / (2 * pi)
+
     # Accessed by reportengine actions
     def volume_avg_two_point_function(self):
         return self._volume_avg_two_point_function
@@ -128,4 +159,12 @@ class ClassicalSpinField:
             result.append(
                 self._volume_avg_two_point_function[:, :, boot_index].mean(dim=2)
             )
+        return torch.stack(result, dim=-1)
+
+    def topological_charge(self, n_boot=100):
+
+        result = []
+        for n in range(n_boot):
+            boot_index = torch.randint(0, self.sample_size, size=(self.sample_size,))
+            result.append(self._topological_charge[boot_index])
         return torch.stack(result, dim=-1)

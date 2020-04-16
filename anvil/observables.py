@@ -45,6 +45,10 @@ def two_point_function(field_ensemble, n_boot=100):
     return field_ensemble.two_point_function(n_boot=n_boot)
 
 
+def topological_charge_ens(field_ensemble, n_boot=100):
+    return field_ensemble.topological_charge(n_boot=n_boot)
+
+
 def zero_momentum_two_point(two_point_function):
     r"""Calculate the zero momentum green function as a function of t
     \tilde{G}(t, 0) which is assumed to be in the first dimension defined as
@@ -141,16 +145,16 @@ def heat_capacity(volume_avg_two_point_function, ising_energy, training_geometry
     The convention used here is to take the specific heat capacity 'c', which
     means the factor of V^2 becomes just V, but to ignore the factor of \beta^2
     since not all of the actions used have a single parameter representing
-    nearest-neighbour coupling.
+    nearest-neighbour coupling strength.
 
     Thus, the function returns T^2 c.
     """
     # TODO: this may not be a sensible convention.
+    # TODO: the bootstrapping for this function is wrong - no boot dimension on va_2pf
     heat_cap = training_geometry.length ** 2 * (
         volume_avg_two_point_function[1, 0, :] + volume_avg_two_point_function[0, 1, :]
     ).pow(2).mean() - ising_energy.pow(2)
     return heat_cap
-
 
 
 def effective_pole_mass(zero_momentum_two_point):
@@ -185,8 +189,12 @@ def effective_pole_mass(zero_momentum_two_point):
     return res
 
 
+def topological_charge(topological_charge_ens):
+    return topological_charge_ens.mean(dim=0)
 
 
+def topological_susceptibility(topological_charge_ens, training_geometry):
+    return topological_charge_ens.pow(2).mean(dim=0) / training_geometry.length ** 2
 
 
 def autocorr_two_point(volume_avg_two_point_function, window=2.0):
