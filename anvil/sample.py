@@ -72,7 +72,7 @@ def sample_batch(
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 
-    log_ratio = model_log_density - target.log_density(phi)
+    log_ratio = model_log_density - target(phi)
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
             "could run into nans based on minimum and maximum log of ratio of probabilities"

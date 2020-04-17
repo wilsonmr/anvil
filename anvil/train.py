@@ -73,7 +73,7 @@ def train(
         phi, map_log_density = loaded_model(z)
 
         model_log_density = base_log_density + map_log_density
-        target_log_density = target.log_density(phi)  # term from parameterisatiom goes here
+        target_log_density = target(phi)  # term from parameterisatiom goes here
 
         loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(model_log_density, target_log_density)
