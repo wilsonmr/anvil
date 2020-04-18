@@ -107,7 +107,7 @@ class AffineLayer(nn.Module):
         # No ReLU on final layers: need to be able to scale data by
         # 0 < s, not 1 < s, and enact both +/- shifts
         self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1]), nn.Tanh()]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1]), nn.Tanh()]
+        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1]), ]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -155,37 +155,6 @@ class AffineLayer(nn.Module):
         for t_layer in self.t_layers:
             x_input = t_layer(x_input)
         return x_input
-
-    def coupling_layer(self, phi_input) -> torch.Tensor:
-        r"""performs the transformation of a single coupling layer, denoted
-        g_i(\phi).
-
-        Affine transformation, z = g_i(\phi), defined as:
-
-        z_a = \phi_a
-        z_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
-
-        see eq. (9) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            stack of transformed vectors z, with same shape as input
-
-        """
-        # since inputs are like (N_states, D) we need to index correct halves
-        # of if input states
-        phi_a = phi_input[:, self._a_ind]
-        phi_b = phi_input[:, self._b_ind]
-        s_out = self._s_forward(phi_a)
-        t_out = self._t_forward(phi_a)
-        z_b = s_out.exp() * phi_b + t_out
-        return self.join_func([phi_a, z_b], dim=1)  # put back together state
 
     def forward(self, z_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
@@ -298,12 +267,18 @@ class RealNVP(nn.Module):
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
+<<<<<<< HEAD
             if phi_out.requires_grad is False:
+=======
+            
+            if not phi_out.requires_grad:
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
                 np.savetxt(f"layer_{i}.txt", phi_out)
 
         return phi_out, log_density
 
 
+<<<<<<< HEAD
 def real_nvp(lattice_size, field_dimension, n_affine, network_kwargs):
     return RealNVP(
         size_in=lattice_size * field_dimension, n_affine=n_affine, **network_kwargs
@@ -312,6 +287,10 @@ def real_nvp(lattice_size, field_dimension, n_affine, network_kwargs):
 
 class StereographicProjection(nn.Module):
     def __init__(self, *, inner_flow, size_in, field_dimension: int = 1):
+=======
+class StereographicProjection(nn.Module):
+    def __init__(self, *, inner_flow, size_in, field_dimension):
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
@@ -328,6 +307,11 @@ class StereographicProjection(nn.Module):
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
+<<<<<<< HEAD
+=======
+        
+        #np.savetxt("projected.txt", phi_out.detach().numpy())
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
 
         # Inner flow on real line e.g. RealNVP
         phi_out, log_density_inner = self.inner_flow(phi_out)
@@ -343,10 +327,13 @@ class StereographicProjection(nn.Module):
     def sphere_flow(self, z_input: torch.Tensor) -> torch.Tensor:
         polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
+<<<<<<< HEAD
         # Base distribution
         # In this case, this is faster than using generator.log_density
         log_density = torch.log(torch.sin(polar)).sum(dim=2)
 
+=======
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
         # Projection
         # -1 factor because polar coordinate = azimuth - pi (*-1 is faster than shift)
         x_coords = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
@@ -356,6 +343,11 @@ class StereographicProjection(nn.Module):
         log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
             dim=1, keepdim=True
         )
+<<<<<<< HEAD
+=======
+        
+        #np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
 
         # Inner flow on real plane e.g. RealNVP
         x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
@@ -371,6 +363,7 @@ class StereographicProjection(nn.Module):
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
 
+<<<<<<< HEAD
 def stereographic_projection(real_nvp, lattice_size, field_dimension):
     return StereographicProjection(
         inner_flow=real_nvp,
@@ -379,5 +372,7 @@ def stereographic_projection(real_nvp, lattice_size, field_dimension):
     )
 
 
+=======
+>>>>>>> 2c4b7ff651d5a3ada4bf8397cf4c084289c0325a
 if __name__ == "__main__":
     pass

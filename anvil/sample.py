@@ -64,6 +64,9 @@ def sample_batch(
     with torch.no_grad():  # don't track gradients
         z, base_log_density = base(batch_size + 1)
         phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
+        np.savetxt("base.txt", z)
+        np.savetxt("target.txt", phi)
+        
         model_log_density = base_log_density + map_log_density
 
         np.savetxt("base.txt", z)
