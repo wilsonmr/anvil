@@ -142,7 +142,7 @@ class ClassicalSpinField:
         charge = torch.zeros(self.sample_size)
 
         for ilat in range(self.lattice_size):
-            charge += torch.atan(self._tan_half_spher_triangle(ilat, 0)) + torch.atan(
+            charge += torch.atan(self._tan_half_spher_triangle(ilat, 0)) - torch.atan(
                 self._tan_half_spher_triangle(ilat, 1)
             )
         return charge / (2 * pi)
