@@ -9,9 +9,9 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
-from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
-from anvil.distributions import normal_distribution, phi_four_action
+from anvil.models import real_nvp, stereographic_projection
+from anvil.distributions import normal_distribution, spherical_distribution, phi_four_action, spin_hamiltonian
 
 log = logging.getLogger(__name__)
 
@@ -50,10 +50,13 @@ class ConfigParser(Config):
         """Return the function which initialises the correct action"""
         if theory == "phi_four":
             return phi_four_action
+        elif theory == "spin":
+            return spin_hamiltonian
         raise ConfigError(
             f"Selected theory: {theory}, has not been implemented yet",
             theory,
-            ["phi_four"],
+            ["phi_four", "spin"],
+            )
     
     def parse_use_arxiv_version(self, do_use: bool):
         return do_use
@@ -63,9 +66,6 @@ class ConfigParser(Config):
 
     def parse_field_dimension(self, dim: int):
         return dim
-
-    def produce_action(self, field_dimension, beta, geometry):
-        return SpinHamiltonian(field_dimension, beta, geometry)
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -89,15 +89,25 @@ class ConfigParser(Config):
         """Return the action which loads appropriate base distribution"""
         if base_dist == "normal":
             return normal_distribution
+        elif base_dist == "spherical":
+            return spherical_distribution
         raise ConfigError(
             f"Base distribution: {base_dist}, has not been implemented yet",
             base_dist,
-            ["normal"],
+            ["normal", "spherical"],
         )
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(size_in=lattice_size, n_affine=n_affine, **network_kwargs)
-        return model
+    @explicit_node
+    def produce_model(self, flow_model: str = "real_nvp"):
+        if flow_model == "real_nvp":
+            return real_nvp
+        elif flow_model == "stereographic_projection":
+            return stereographic_projection
+        raise ConfigError(
+            f"Model: {flow_model}, has not been implemented yet",
+            flow_model,
+            ["real_nvp", "stereographic_projection"],
+        )
 
     def parse_epochs(self, epochs: int):
         return epochs

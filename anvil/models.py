@@ -48,7 +48,7 @@ class AffineLayer(nn.Module):
     ----------
     size_in: int
         number of dimensions, D, of input/output data. Data should be fed to
-        network in shape (N_states, size_in).
+        network in shape (sample_size, size_in).
     s_hidden_shape: tuple
         tuple which gives the number of nodes in the hidden layers of neural
         network s_i, can be a single layer network with 16 nodes e.g (16,)
@@ -207,7 +207,7 @@ class AffineLayer(nn.Module):
         Parameters
         ----------
         z_input: torch.Tensor
-            stack of vectors z, shape (N_states, D)
+            stack of vectors z, shape (sample_size, D)
 
         Returns
         -------
@@ -280,7 +280,7 @@ class RealNVP(nn.Module):
         Parameters
         ----------
         z_input: torch.Tensor
-            stack of simple distribution state vectors, shape (N_states, D)
+            stack of simple distribution state vectors, shape (sample_size, D)
 
         Returns
         -------
@@ -289,31 +289,36 @@ class RealNVP(nn.Module):
             of the target distribution, same shape as input.
         log_density: torch.Tensor
             logarithm of the probability density of the output distribution,
-            with shape (n_states, 1)
+            with shape (sample_size, 1)
         """
         log_density = torch.zeros((z_input.shape[0], 1))
         phi_out = z_input
 
-        for layer in reversed(self.affine_layers):  # reverse layers!
+        for i, layer in enumerate(reversed(self.affine_layers)):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
-            
-            if not phi_out.requires_grad:
+            if phi_out.requires_grad is False:
                 np.savetxt(f"layer_{i}.txt", phi_out)
 
         return phi_out, log_density
 
 
+def real_nvp(lattice_size, field_dimension, n_affine, network_kwargs):
+    return RealNVP(
+        size_in=lattice_size * field_dimension, n_affine=n_affine, **network_kwargs
+    )
+
+
 class StereographicProjection(nn.Module):
-    def __init__(self, *, inner_flow, generator):
+    def __init__(self, *, inner_flow, size_in, field_dimension: int = 1):
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
 
         if field_dimension == 1:
             self.forward = self.circle_flow
-        elif self.generator.field_dimension == 2:
+        elif field_dimension == 2:
             self.forward = self.sphere_flow
         else:
             raise NotImplementedError
@@ -323,8 +328,6 @@ class StereographicProjection(nn.Module):
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
-        
-        #np.savetxt("projected.txt", phi_out.detach().numpy())
 
         # Inner flow on real line e.g. RealNVP
         phi_out, log_density_inner = self.inner_flow(phi_out)
@@ -353,7 +356,6 @@ class StereographicProjection(nn.Module):
         log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
             dim=1, keepdim=True
         )
-        #np.savetxt(f"projected.txt", x_coords.view(-1, self.size_in).detach().numpy())
 
         # Inner flow on real plane e.g. RealNVP
         x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
@@ -367,6 +369,14 @@ class StereographicProjection(nn.Module):
         ).sum(dim=1)
 
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
+
+
+def stereographic_projection(real_nvp, lattice_size, field_dimension):
+    return StereographicProjection(
+        inner_flow=real_nvp,
+        size_in=lattice_size * field_dimension,
+        field_dimension=field_dimension,
+    )
 
 
 if __name__ == "__main__":
