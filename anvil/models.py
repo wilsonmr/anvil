@@ -107,7 +107,9 @@ class AffineLayer(nn.Module):
         # No ReLU on final layers: need to be able to scale data by
         # 0 < s, not 1 < s, and enact both +/- shifts
         self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1]), nn.Tanh()]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1]), ]
+        self.t_layers += [
+            nn.Linear(t_shape[-2], t_shape[-1]),
+        ]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -273,26 +275,13 @@ class RealNVP(nn.Module):
         return phi_out, log_density
 
 
-def real_nvp(lattice_size, field_dimension, n_affine, network_kwargs):
-    return RealNVP(
-        size_in=lattice_size * field_dimension, n_affine=n_affine, **network_kwargs
-    )
-
-
-class StereographicProjection(nn.Module):
-    def __init__(self, *, inner_flow, size_in, field_dimension: int = 1):
+class ProjectCircle(nn.Module):
+    def __init__(self, *, inner_flow, size_in):
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
 
-        if field_dimension == 1:
-            self.forward = self.circle_flow
-        elif field_dimension == 2:
-            self.forward = self.sphere_flow
-        else:
-            raise NotImplementedError
-
-    def circle_flow(self, z_input: torch.Tensor) -> torch.Tensor:
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
 
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
@@ -309,7 +298,14 @@ class StereographicProjection(nn.Module):
 
         return phi_out, log_density_proj + log_density_inner
 
-    def sphere_flow(self, z_input: torch.Tensor) -> torch.Tensor:
+
+class ProjectSphere(nn.Module):
+    def __init__(self, *, inner_flow, size_in):
+        super().__init__()
+        self.inner_flow = inner_flow
+        self.size_in = size_in
+
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
         polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Projection
@@ -336,12 +332,16 @@ class StereographicProjection(nn.Module):
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
 
-def stereographic_projection(real_nvp, lattice_size, field_dimension):
-    return StereographicProjection(
-        inner_flow=real_nvp,
-        size_in=lattice_size * field_dimension,
-        field_dimension=field_dimension,
-    )
+def real_nvp(config_size, n_affine, network_kwargs):
+    return RealNVP(size_in=config_size, n_affine=n_affine, **network_kwargs)
+
+
+def project_circle(real_nvp, config_size):
+    return ProjectCircle(inner_flow=real_nvp, size_in=config_size)
+
+
+def project_sphere(real_nvp, config_size):
+    return ProjectSphere(inner_flow=real_nvp, size_in=config_size)
 
 
 if __name__ == "__main__":

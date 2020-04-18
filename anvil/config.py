@@ -10,11 +10,17 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.geometry import Geometry2D
-from anvil.models import real_nvp, stereographic_projection
-from anvil.theories import phi_four_action, spin_hamiltonian
-from anvil.distributions import normal_distribution, spherical_distribution
+from anvil.models import real_nvp, project_circle, project_sphere
+from anvil.theories import phi_four_action, xy_hamiltonian, heisenberg_hamiltonian
+from anvil.distributions import (
+    normal_distribution,
+    uniform_distribution,
+    circular_uniform_distribution,
+    spherical_uniform_distribution,
+)
 
 log = logging.getLogger(__name__)
+
 
 class ConfigParser(Config):
     """Extend the reportengine Config class for anvil-specific
@@ -34,11 +40,27 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_geometry(self, lattice_length):
-        return Geometry2D(lattice_length)
-
     def parse_theory(self, theory: str):
         return theory
+
+    def parse_theory_N(self, N: int = 1):
+        """N for O(N) and CP^{N-1} models"""
+        return N
+
+    def produce_field_dimension(self, theory, theory_N=1):
+        if theory == "heisenberg":
+            return 2
+        elif theory == "on":  # not yet implemented
+            return theory_N - 1
+        elif theory == "cpn":  # not yet implemented
+            return 2 * theory_N - 2
+        return 1
+
+    def produce_config_size(self, lattice_size, field_dimension):
+        return lattice_size * field_dimension
+
+    def produce_geometry(self, lattice_length):
+        return Geometry2D(lattice_length)
 
     def parse_m_sq(self, m: (float, int)):
         return m
@@ -46,27 +68,11 @@ class ConfigParser(Config):
     def parse_lam(self, lam: (float, int)):
         return lam
 
-    @explicit_node
-    def produce_target(self, theory):
-        """Return the function which initialises the correct action"""
-        if theory == "phi_four":
-            return phi_four_action
-        elif theory == "spin":
-            return spin_hamiltonian
-        raise ConfigError(
-            f"Selected theory: {theory}, has not been implemented yet",
-            theory,
-            ["phi_four", "spin"],
-            )
-    
     def parse_use_arxiv_version(self, do_use: bool):
         return do_use
 
     def parse_beta(self, beta: float):
         return beta
-
-    def parse_field_dimension(self, dim: int):
-        return dim
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -86,28 +92,49 @@ class ConfigParser(Config):
         return nb
 
     @explicit_node
-    def produce_base(self, base_dist: str = "normal",):
+    def produce_target(self, theory):
+        """Return the function which initialises the correct action"""
+        if theory == "phi_four":
+            return phi_four_action
+        elif theory == "xy":
+            return xy_hamiltonian
+        elif theory == "heisenberg":
+            return heisenberg_hamiltonian
+        raise ConfigError(
+            f"Selected theory: {theory}, has not been implemented yet",
+            theory,
+            ["phi_four", "xy", "heisenberg"],
+        )
+
+    @explicit_node
+    def produce_base(
+        self, base_dist: str = "normal",
+    ):
         """Return the action which loads appropriate base distribution"""
         if base_dist == "normal":
             return normal_distribution
-        elif base_dist == "spherical":
-            return spherical_distribution
+        elif base_dist == "uniform_circle":
+            return circular_uniform_distribution
+        elif base_dist == "uniform_sphere":
+            return spherical_uniform_distribution
         raise ConfigError(
             f"Base distribution: {base_dist}, has not been implemented yet",
             base_dist,
-            ["normal", "spherical"],
+            ["normal", "uniform_circle", "uniform_sphere"],
         )
 
     @explicit_node
     def produce_model(self, flow_model: str = "real_nvp"):
         if flow_model == "real_nvp":
             return real_nvp
-        elif flow_model == "stereographic_projection":
-            return stereographic_projection
+        elif flow_model == "project_circle":
+            return project_circle
+        elif flow_model == "project_sphere":
+            return project_sphere
         raise ConfigError(
             f"Model: {flow_model}, has not been implemented yet",
             flow_model,
-            ["real_nvp", "stereographic_projection"],
+            ["real_nvp", "project_circle", "project_sphere"],
         )
 
     def parse_epochs(self, epochs: int):

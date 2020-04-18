@@ -68,9 +68,6 @@ def sample_batch(
         np.savetxt("target.txt", phi)
         
         model_log_density = base_log_density + map_log_density
-
-        np.savetxt("base.txt", z)
-        np.savetxt("target.txt", phi)
         
         if current_state is not None:
             phi[0] = current_state

@@ -3,7 +3,6 @@ distributions.py
 
 Module containing classes corresponding to different base distributions.
 """
-from math import pi, log, sqrt
 import torch
 import torch.nn as nn
 
@@ -53,11 +52,10 @@ class PhiFourAction(nn.Module):
 
     def __init__(self, m_sq, lam, geometry, use_arxiv_version=False):
         super(PhiFourAction, self).__init__()
-        self.geometry = geometry
-        self.shift = self.geometry.get_shift()
+        self.shift = geometry.get_shift()
         self.lam = lam
         self.m_sq = m_sq
-        self.length = self.geometry.length
+        self.lattice_size = geometry.length ** 2
         if use_arxiv_version:
             self.version_factor = 2
         else:
@@ -75,13 +73,118 @@ class PhiFourAction(nn.Module):
             + self.lam * phi_state ** 4  # phi^4 term
             - self.version_factor
             * torch.sum(
-                phi_state[:, self.shift] * phi_state.view(-1, 1, self.length ** 2),
+                phi_state[:, self.shift] * phi_state.view(-1, 1, self.lattice_size),
                 dim=1,
             )  # derivative
         ).sum(
             dim=1, keepdim=True  # sum across sites
         )
         return -action
+
+
+class XYHamiltonian(nn.Module):
+    """
+    Extend the nn.Module class to return the Hamiltonian for the classical
+    XY spin model (also known as the O(2) model), given a stack of polar
+    angles with shape (sample_size, lattice_size).
+
+    The spins are defined as having modulus 1, such that they take values
+    on the unit circle.
+
+    Parameters
+    ----------
+    geometry:
+        define the geometry of the lattice, including dimension, size and
+        how the state is split into two parts
+    beta: float
+        the inverse temperature (coupling strength).
+    """
+
+    def __init__(self, beta, geometry):
+        super().__init__()
+        self.beta = beta
+        self.lattice_size = geometry.length ** 2
+        self.shift = geometry.get_shift()
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Compute XY Hamiltonian from a stack of angles (not Euclidean field components)
+        with shape (sample_size, lattice_size).
+        """
+        hamiltonian = -self.beta * torch.cos(
+            state[:, self.shift] - state.view(-1, 1, self.lattice_size)
+        ).sum(
+            dim=1,
+        ).sum(  # sum over two shift directions (+ve nearest neighbours)
+            dim=1, keepdim=True
+        )  # sum over lattice sites
+        return -hamiltonian
+
+
+class HeisenbergHamiltonian(nn.Module):
+    """
+    Extend the nn.Module class to return the Hamiltonian for the classical
+    Heisenberg model (also known as the O(3) model), given a stack of polar
+    angles with shape (sample_size, 2 * lattice_size).
+
+    The spins are defined as having modulus 1, such that they take values
+    on the unit 2-sphere, and can be parameterised by two angles using
+    spherical polar coordinates (with the radial coordinate equal to one).
+
+    Parameters
+    ----------
+    geometry:
+        define the geometry of the lattice, including dimension, size and
+        how the state is split into two parts
+    beta: float
+        the inverse temperature (coupling strength).
+    """
+
+    def __init__(self, beta, geometry):
+        super().__init__()
+        self.beta = beta
+        self.lattice_size = geometry.length ** 2
+        self.shift = geometry.get_shift()
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        r"""
+        Compute classical Heisenberg Hamiltonian from a stack of angles with shape
+        (sample_size, 2 * volume).
+
+        Also computes the logarithm of the 'volume element' for the probability
+        distribution due to parameterisating the spin vectors using polar coordinates.
+        
+        The volume element for a configuration is a product over all lattice sites
+        
+            \prod_{n=1}^V sin(\theta_n)
+
+        where \theta_n is the polar angle for the spin at site n.
+        
+        Notes
+        -----
+        Assumes that state.view(-1, lattice_size, 2) yields a tensor for which the
+        two elements in the final dimension represent, respectively, the polar and
+        azimuthal angles for the same lattice site.
+        """
+        polar = state[:, ::2]
+        azimuth = state[:, 1::2]
+        cos_polar = torch.cos(polar)
+        sin_polar = torch.sin(polar)
+
+        hamiltonian = -self.beta * (
+            cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.lattice_size)
+            + sin_polar[:, self.shift]
+            * sin_polar.view(-1, 1, self.lattice_size)
+            * torch.cos(azimuth[:, self.shift] - azimuth.view(-1, 1, self.lattice_size))
+        ).sum(
+            dim=1,
+        ).sum(  # sum over two shift directions (+ve nearest neighbours)
+            dim=1, keepdim=True
+        )  # sum over lattice sites
+
+        log_volume_element = torch.log(sin_polar).sum(dim=1, keepdim=True)
+        
+        return log_volume_element - hamiltonian
 
 
 def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
@@ -91,124 +194,10 @@ def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
     )
 
 
-class SpinHamiltonian(nn.Module):
-    """
-    Extend the nn.Module class to return the Hamiltonian for the classical
-    N-spin model (also known as the N-vector model), given either
-    a single state size (1, (N-1) * lattice_size) or a stack of shape
-    (sample_size, (N-1) * lattice_size).
-
-    The spins are defined as having modulus 1, such that they take values
-    on the (N-1)-sphere, and can be parameterised by N-1 angles using
-    spherical polar coordinates (with the radial coordinate equal to one).
-
-    Parameters
-    ----------
-    geometry:
-        define the geometry of the lattice, including dimension, size and
-        how the state is split into two parts
-    field_dimension: int
-        number of polar coordinates (angles) parameterising each spin vector
-        on the unit sphere. Note that this is equal to N-1 where N is the
-        number of Euclidean spin components!
-    beta: float
-        the inverse temperature (coupling strength).
-
-    Notes
-    -----
-    There are separate methods for the N = 2 (XY) and N = 3 (Heisenberg)
-    models, since the Hamiltonians can be written directly in terms of the
-    polar coordinates in a simple form.
-
-    For higher dimensional spin models, the spin vector components are first
-    computed from the polar coordinates.
-    """
-
-    def __init__(self, field_dimension, beta, geometry):
-        super().__init__()
-        self.field_dimension = field_dimension  # N-1
-        self.beta = beta
-        self.geometry = geometry
-        self.volume = self.geometry.length ** 2
-        self.shift = self.geometry.get_shift()
-
-        if self.field_dimension == 1:
-            self.forward = self.xy_hamiltonian
-        elif self.field_dimension == 2:
-            self.forward = self.heisenberg_hamiltonian
-        else:
-            self.forward = self.n_spin_hamiltonian
-
-    def xy_hamiltonian(self, state: torch.Tensor) -> torch.Tensor:
-        """
-        Compute XY Hamiltonian from a stack of angles (not Euclidean field components)
-        with shape (sample_size, lattice_size).
-        """
-        hamiltonian = -self.beta * torch.cos(
-            state[:, self.shift] - state.view(-1, 1, self.volume)
-        ).sum(
-            dim=1,
-        ).sum(  # sum over two shift directions (+ve nearest neighbours)
-            dim=1, keepdim=True
-        )  # sum over lattice sites
-        return hamiltonian
-
-    def heisenberg_hamiltonian(self, state: torch.Tensor) -> torch.Tensor:
-        """
-        Compute classical Heisenberg Hamiltonian from a stack of angles with shape (sample_size, 2 * volume).
-
-        Reshapes state into shape (sample_size, lattice_size, 2), so must make sure to keep this
-        consistent with observables.
-        """
-        polar = state[:, ::2]
-        azimuth = state[:, 1::2]
-        cos_polar = torch.cos(polar)
-        sin_polar = torch.sin(polar)
-
-        hamiltonian = -self.beta * (
-            cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.volume)
-            + sin_polar[:, self.shift]
-            * sin_polar.view(-1, 1, self.volume)
-            * torch.cos(azimuth[:, self.shift] - azimuth.view(-1, 1, self.volume))
-        ).sum(
-            dim=1,
-        ).sum(  # sum over two shift directions (+ve nearest neighbours)
-            dim=1, keepdim=True
-        )  # sum over lattice sites
-        return hamiltonian
-
-    def _spher_to_eucl(self, state):
-        """
-        Take a stack of angles with shape (sample_size, (N-1) * lattice_size), where the N-1
-        angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
-        to a stack of euclidean field vectors with shape (sample_size, lattice_size, N).
-        """
-        coords = state.view(-1, self.volume, self.field_dimension)
-
-        vector = torch.empty(coords.shape[0], self.volume, self.field_dimension + 1)
-        vector[:, :, :-1] = torch.cos(coords)
-        vector[:, :, 1:] *= torch.cumprod(torch.sin(coords), dim=2)
-
-        return vector
-
-    def n_spin_hamiltonian(self, state):
-        """
-        Compute the N-spin Hamiltonian from a stack of angles with shape (sample_size, field_dimension * volume).
-
-        """
-        field_vector = self._spher_to_eucl(state)
-
-        hamiltonian = -self.beta * torch.sum(
-            field_vector[:, self.shift, :]
-            * field_vector.view(-1, 1, self.volume, self.field_dimension + 1),
-            dim=-1,  # sum over vector components
-        ).sum(
-            dim=1,
-        ).sum(  # sum over shift directions
-            dim=1, keepdim=True
-        )  # sum over lattice sites
-        return hamiltonian
+def xy_hamiltonian(beta, geometry):
+    return XYHamiltonian(beta, geometry)
 
 
-def spin_hamiltonian(field_dimension, beta, geometry):
-    return SpinHamiltonian(field_dimension, beta, geometry)
+def heisenberg_hamiltonian(beta, geometry):
+    return HeisenbergHamiltonian(beta, geometry)
+
