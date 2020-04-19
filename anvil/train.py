@@ -23,9 +23,9 @@ def shifted_kl(
         column of log (\tilde p) for a sample of states, which is returned by
         forward pass of `RealNVP` model
     target_log_density: torch.Tensor
-        column of log(p) for a sample of states, which includes the negative action
-        -S(\phi) and a possible contribution for the volume element due to a
-        non-trivial parameterisation.
+        column of log(p) for a sample of states, which includes the negative
+        action -S(\phi) and a possible contribution to the volume element due
+        to a non-trivial parameterisation.
 
     Returns
     -------
@@ -39,8 +39,8 @@ def shifted_kl(
 
 def train(
     loaded_model,
-    generator,
-    action,
+    base,
+    target,
     *,
     train_range,
     save_interval,
@@ -57,7 +57,7 @@ def train(
     )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = generator.size_out
+    n_units = base.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -70,12 +70,11 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z, base_log_density = generator(n_batch)
+        z, base_log_density = base(n_batch)
         phi, map_log_density = loaded_model(z)
 
         model_log_density = base_log_density + map_log_density
-        #target_log_density = - action(phi)
-        target_log_density = generator.log_volume_element(phi) - action(phi)  # term from parameterisatiom goes here
+        target_log_density = target(phi)  # term from parameterisatiom goes here
 
         loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(model_log_density, target_log_density)

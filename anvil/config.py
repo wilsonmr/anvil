@@ -6,13 +6,19 @@ Module to parse runcards
 import logging
 
 from reportengine.report import Config
-from reportengine.configparser import ConfigError, element_of
+from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import PhiFourAction, SpinHamiltonian, TrainingOutput
-from anvil.models import RealNVP, StereographicProjection
+from anvil.core import TrainingOutput
 from anvil.geometry import Geometry2D
-from anvil.distributions import NormalDist, SphericalUniformDist
-from anvil.fields import ScalarField, ClassicalSpinField
+from anvil.models import real_nvp, project_circle, project_sphere
+from anvil.theories import phi_four_action, xy_hamiltonian, heisenberg_hamiltonian
+from anvil.distributions import (
+    normal_distribution,
+    uniform_distribution,
+    circular_uniform_distribution,
+    spherical_uniform_distribution,
+)
+from anvil.fields import scalar_field, xy_field, heisenberg_field
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +41,25 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
+    def parse_theory(self, theory: str):
+        return theory
+
+    def parse_theory_N(self, N: int = 1):
+        """N for O(N) and CP^{N-1} models"""
+        return N
+
+    def produce_field_dimension(self, theory, theory_N=1):
+        if theory == "heisenberg":
+            return 2
+        elif theory == "on":  # not yet implemented
+            return theory_N - 1
+        elif theory == "cpn":  # not yet implemented
+            return 2 * theory_N - 2
+        return 1
+
+    def produce_config_size(self, lattice_size, field_dimension):
+        return lattice_size * field_dimension
+
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
@@ -50,18 +75,6 @@ class ConfigParser(Config):
     def parse_beta(self, beta: float):
         return beta
 
-    def parse_field_dimension(self, dim):
-        return dim
-
-    def produce_FieldClass(self):
-        return ClassicalSpinField
-
-    def produce_action(self, field_dimension, beta, geometry):
-        return SpinHamiltonian(field_dimension, beta, geometry)
-    """
-    def produce_action(self, m_sq, lam, geometry):
-        return PhiFourAction(m_sq, lam, geometry)
-    """
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
 
@@ -79,30 +92,65 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_generator(
-        self, lattice_size: int, base_dist: str = "normal", field_dimension: int = 1,
-    ):
-        if base_dist == "normal":
-            return NormalDist(
-                lattice_size=lattice_size, field_dimension=field_dimension,
-            )
-        elif base_dist == "spherical":
-            return SphericalUniformDist(
-                lattice_size=lattice_size, field_dimension=field_dimension,
-            )
-        else:
-            raise NotImplementedError
+    @explicit_node
+    def produce_target(self, theory):
+        """Return the function which initialises the correct action"""
+        if theory == "phi_four":
+            return phi_four_action
+        elif theory == "xy":
+            return xy_hamiltonian
+        elif theory == "heisenberg":
+            return heisenberg_hamiltonian
+        raise ConfigError(
+            f"Selected theory: {theory}, has not been implemented yet",
+            theory,
+            ["phi_four", "xy", "heisenberg"],
+        )
 
-    def produce_model(self, lattice_size, field_dimension, n_affine, network_kwargs):
-        inner = RealNVP(
-            size_in=lattice_size * field_dimension, n_affine=n_affine, **network_kwargs
+    @explicit_node
+    def produce_base(
+        self, base_dist: str = "normal",
+    ):
+        """Return the action which loads appropriate base distribution"""
+        if base_dist == "normal":
+            return normal_distribution
+        elif base_dist == "uniform_circle":
+            return circular_uniform_distribution
+        elif base_dist == "uniform_sphere":
+            return spherical_uniform_distribution
+        raise ConfigError(
+            f"Base distribution: {base_dist}, has not been implemented yet",
+            base_dist,
+            ["normal", "uniform_circle", "uniform_sphere"],
         )
-        model = StereographicProjection(
-            inner_flow=inner,
-            size_in=lattice_size * field_dimension,
-            field_dimension=field_dimension,
+
+    @explicit_node
+    def produce_model(self, flow_model: str = "real_nvp"):
+        if flow_model == "real_nvp":
+            return real_nvp
+        elif flow_model == "project_circle":
+            return project_circle
+        elif flow_model == "project_sphere":
+            return project_sphere
+        raise ConfigError(
+            f"Model: {flow_model}, has not been implemented yet",
+            flow_model,
+            ["real_nvp", "project_circle", "project_sphere"],
         )
-        return model
+
+    @explicit_node
+    def produce_field_ensemble(self, theory):
+        if theory == "phi_four":
+            return scalar_field
+        elif theory == "xy":
+            return xy_field
+        elif theory == "heisenberg":
+            return heisenberg_field
+        raise ConfigError(
+            f"Selected theory: {theory}, has not been implemented yet",
+            theory,
+            ["phi_four", "xy", "heisenberg"],
+        )
 
     def parse_epochs(self, epochs: int):
         return epochs
@@ -131,20 +179,9 @@ class ConfigParser(Config):
 
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-            _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
-            _, cps = self.parse_from_(None, "checkpoints", write=False)
-            _, generator = self.parse_from_(None, "generator", write=False)
-
-        return dict(
-            geometry=geometry,
-            model=model,
-            action=action,
-            checkpoints=cps,
-            generator=generator,
-        )
+        # NOTE: This seems a bit hacky, exposing the entire training configuration
+        # file - hopefully doesn't cause any issues..
+        return training_output.as_input()
 
     def produce_training_geometry(self, training_output):
         with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
@@ -155,7 +192,7 @@ class ConfigParser(Config):
         valid_optimizers = ("adam", "adadelta")
         if optim not in valid_optimizers:
             raise ConfigError(
-                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
+                f"Invalid optimizer choice: {optim}", optim, valid_optimizers
             )
         return optim
 

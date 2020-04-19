@@ -27,16 +27,6 @@ def arcosh(x):
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
 
-def field_ensemble(
-    sample_training_output, training_geometry, FieldClass, field_dimension
-):
-    return FieldClass(
-        training_output=sample_training_output,
-        geometry=training_geometry,
-        field_dimension=field_dimension,
-    )
-
-
 def volume_avg_two_point_function(field_ensemble):
     return field_ensemble.volume_avg_two_point_function()
 

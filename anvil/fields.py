@@ -61,45 +61,30 @@ class ScalarField:
 
 
 class ClassicalSpinField:
-    def __init__(self, training_output, geometry, field_dimension):
+    def __init__(self, training_output, geometry):
         self.geometry = geometry
-        self.field_dimension = field_dimension
 
-        self.lattice_size = (
-            self.geometry.length ** 2
-        )  # need to do this in a dim indep way
-        self.shift = self.geometry.get_shift()
+        self.lattice_size = self.geometry.length ** 2
+        (
+            self.sample_size,
+            self.config_size,
+        ) = training_output.shape  # not great - needed in next line
+        self.spin_dimension = self.config_size // self.lattice_size + 1
 
-        self.sample_size = training_output.shape[0]  # not great - needed in next line
-        self.sample = self._spher_to_eucl(training_output)
-        self._modulus_check()
-        self._volume_avg_two_point_function = self._calc_volume_avg_two_point_function()
-
-        # Topological charge density formula valid for O(3) only
-        if field_dimension == 2:
-            self._topological_charge = self._calc_topological_charge()
+        self.spins = self._spher_to_eucl(training_output)
 
     def _spher_to_eucl(self, training_output):
         """Take a stack of angles with shape (sample_size, (N-1) * lattice_size), where the N-1
         angles parameterise an N-spin vector on the unit (N-1)-sphere, and convert this
         to a stack of euclidean field vectors with shape (sample_size, lattice_size, N).
         """
-        angles = training_output.view(
-            self.sample_size, self.lattice_size, self.field_dimension
-        )
+        angles = training_output.view(self.sample_size, self.lattice_size, -1)
 
-        vectors = torch.ones(
-            self.sample_size, self.lattice_size, self.field_dimension + 1
-        )
-        vectors[:, :, :-1] = torch.cos(angles)
-        vectors[:, :, 1:] *= torch.cumprod(torch.sin(angles), dim=-1)
+        spins = torch.ones(self.sample_size, self.lattice_size, self.spin_dimension)
+        spins[:, :, :-1] = torch.cos(angles)
+        spins[:, :, 1:] *= torch.cumprod(torch.sin(angles), dim=-1)
 
-        return vectors
-
-    def _modulus_check(self):
-        modulus = torch.sum(self.sample ** 2, dim=-1)
-        if torch.any(torch.abs(modulus - 1) > 0.01):
-            print("smeg")  # TODO
+        return spins
 
     def _calc_volume_avg_two_point_function(self):
         va_2pf = torch.empty(
@@ -112,7 +97,7 @@ class ClassicalSpinField:
                     -1
                 )
                 va_2pf[i, j, :] = torch.sum(
-                    self.sample[:, shift, :] * self.sample,
+                    self.spins[:, shift, :] * self.spins,
                     dim=2,  # sum over vector components
                 ).mean(
                     dim=1
@@ -120,21 +105,46 @@ class ClassicalSpinField:
 
         return va_2pf
 
+    # Accessed by reportengine actions
+    def volume_avg_two_point_function(self):
+        if not hasattr(self, "_volume_avg_two_point_function"):
+            self._volume_avg_two_point_function = (
+                self._calc_volume_avg_two_point_function()
+            )
+        return self._volume_avg_two_point_function
+
+    def two_point_function(self, n_boot=100):
+        result = []
+        for n in range(n_boot):
+            boot_index = torch.randint(0, self.sample_size, size=(self.sample_size,))
+            result.append(
+                self.volume_avg_two_point_function()[:, :, boot_index].mean(dim=2)
+            )
+        return torch.stack(result, dim=-1)
+
+
+class HeisenbergField(ClassicalSpinField):
+    def __init__(self, training_output, geometry):
+        super().__init__(training_output, geometry)
+        self.shift = self.geometry.get_shift()
+
+        self._topological_charge = self._calc_topological_charge()
+
     def _tan_half_spher_triangle(self, ilat, axis):
         x0 = ilat
         x1 = self.shift[axis, x0]
         x2 = self.shift[(axis + 1) % 2, x1]
 
         numerator = torch.sum(
-            self.sample[:, x0, :]
-            * torch.cross(self.sample[:, x1, :], self.sample[:, x2, :]),
+            self.spins[:, x0, :]
+            * torch.cross(self.spins[:, x1, :], self.spins[:, x2, :]),
             dim=1,
         )
         denominator = (
             1
-            + torch.sum(self.sample[:, x0, :] * self.sample[:, x1, :], dim=1)
-            + torch.sum(self.sample[:, x1, :] * self.sample[:, x2, :], dim=1)
-            + torch.sum(self.sample[:, x2, :] * self.sample[:, x0, :], dim=1)
+            + torch.sum(self.spins[:, x0, :] * self.spins[:, x1, :], dim=1)
+            + torch.sum(self.spins[:, x1, :] * self.spins[:, x2, :], dim=1)
+            + torch.sum(self.spins[:, x2, :] * self.spins[:, x0, :], dim=1)
         )
         return numerator / denominator
 
@@ -147,20 +157,6 @@ class ClassicalSpinField:
             )
         return charge / (2 * pi)
 
-    # Accessed by reportengine actions
-    def volume_avg_two_point_function(self):
-        return self._volume_avg_two_point_function
-
-    def two_point_function(self, n_boot=100):
-
-        result = []
-        for n in range(n_boot):
-            boot_index = torch.randint(0, self.sample_size, size=(self.sample_size,))
-            result.append(
-                self._volume_avg_two_point_function[:, :, boot_index].mean(dim=2)
-            )
-        return torch.stack(result, dim=-1)
-
     def topological_charge(self, n_boot=100):
 
         result = []
@@ -168,3 +164,15 @@ class ClassicalSpinField:
             boot_index = torch.randint(0, self.sample_size, size=(self.sample_size,))
             result.append(self._topological_charge[boot_index])
         return torch.stack(result, dim=-1)
+
+
+def scalar_field(sample_training_output, training_geometry):
+    return ScalarField(sample_training_output, training_geometry)
+
+
+def xy_field(sample_training_output, training_geometry):
+    return ClassicalSpinField(sample_training_output, training_geometry)
+
+
+def heisenberg_field(sample_training_output, training_geometry):
+    return HeisenbergField(sample_training_output, training_geometry)

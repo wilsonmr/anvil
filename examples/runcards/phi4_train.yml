@@ -2,10 +2,11 @@
 lattice_length: 6
 lattice_dimension: 2
 
-# Action
+theory: "phi_four"
+
 m_sq: 4
 lam: 0
-use_arxiv_version: True
+use_arxiv_version: False
 
 # Networks
 hidden_nodes: [24]
@@ -13,7 +14,7 @@ n_affine: 2
 n_batch: 2000
 
 # Training length
-epochs: 1000
+epochs: 5000
 save_interval: 1000
 
 # Optimizer ('adam', 'adadelta')

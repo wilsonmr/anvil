@@ -107,7 +107,9 @@ class AffineLayer(nn.Module):
         # No ReLU on final layers: need to be able to scale data by
         # 0 < s, not 1 < s, and enact both +/- shifts
         self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1]), nn.Tanh()]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
+        self.t_layers += [
+            nn.Linear(t_shape[-2], t_shape[-1]),
+        ]
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -267,31 +269,24 @@ class RealNVP(nn.Module):
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
             # TODO: make this yield, then make a yield from wrapper?
+            #if not phi_out.requires_grad:
+            #    np.savetxt(f"layer_{i}.txt", phi_out)
 
-            #np.savetxt(f"layer_{i}.txt", phi_out)
-            
         return phi_out, log_density
 
 
-class StereographicProjection(nn.Module):
-    def __init__(self, *, inner_flow, size_in, field_dimension):
+class ProjectCircle(nn.Module):
+    def __init__(self, *, inner_flow, size_in):
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
 
-        if field_dimension == 1:
-            self.forward = self.circle_flow
-        elif field_dimension == 2:
-            self.forward = self.sphere_flow
-        else:
-            raise NotImplementedError
-
-    def circle_flow(self, z_input: torch.Tensor) -> torch.Tensor:
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
 
         # Projection
         phi_out = torch.tan(0.5 * (z_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
-        
+
         # Inner flow on real line e.g. RealNVP
         phi_out, log_density_inner = self.inner_flow(phi_out)
 
@@ -303,7 +298,14 @@ class StereographicProjection(nn.Module):
 
         return phi_out, log_density_proj + log_density_inner
 
-    def sphere_flow(self, z_input: torch.Tensor) -> torch.Tensor:
+
+class ProjectSphere(nn.Module):
+    def __init__(self, *, inner_flow, size_in):
+        super().__init__()
+        self.inner_flow = inner_flow
+        self.size_in = size_in
+
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
         polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Projection
@@ -315,7 +317,7 @@ class StereographicProjection(nn.Module):
         log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
             dim=1, keepdim=True
         )
-        
+
         # Inner flow on real plane e.g. RealNVP
         x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
         x_1, x_2 = x_coords.view(-1, self.size_in // 2, 2).split(1, dim=2)
@@ -328,6 +330,18 @@ class StereographicProjection(nn.Module):
         ).sum(dim=1)
 
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
+
+
+def real_nvp(config_size, n_affine, network_kwargs):
+    return RealNVP(size_in=config_size, n_affine=n_affine, **network_kwargs)
+
+
+def project_circle(real_nvp, config_size):
+    return ProjectCircle(inner_flow=real_nvp, size_in=config_size)
+
+
+def project_sphere(real_nvp, config_size):
+    return ProjectSphere(inner_flow=real_nvp, size_in=config_size)
 
 
 if __name__ == "__main__":
