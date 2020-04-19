@@ -26,7 +26,6 @@ def arcosh(x):
     # NOTE: might need stable version here
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
-
 def volume_avg_two_point_function(field_ensemble):
     return field_ensemble.volume_avg_two_point_function()
 

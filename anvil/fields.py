@@ -1,6 +1,8 @@
 import torch
 from math import pi
 
+from reportengine import collect
+
 
 class ScalarField:
     def __init__(self, training_output, geometry):
@@ -176,3 +178,10 @@ def xy_field(sample_training_output, training_geometry):
 
 def heisenberg_field(sample_training_output, training_geometry):
     return HeisenbergField(sample_training_output, training_geometry)
+
+
+_field_ensemble = collect("field_ensemble_action", ("training_context",))
+
+
+def field_ensemble(_field_ensemble):
+    return _field_ensemble[0]

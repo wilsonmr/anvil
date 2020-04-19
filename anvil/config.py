@@ -177,17 +177,20 @@ class ConfigParser(Config):
         )
 
     @explicit_node
-    def produce_field_ensemble(self, theory):
+    def produce_field_ensemble_action(self, theory, target_dimension):
+        """Returns action which will take the training output and return an instance
+        of a 'field ensemble' class, used for calculation of observables."""
         if theory == "phi_four":
             return scalar_field
-        elif theory == "xy":
-            return xy_field
-        elif theory == "heisenberg":
-            return heisenberg_field
+        elif theory == "spin":
+            if target_dimension == 1:
+                return xy_field
+            elif target_dimension == 2:
+                return heisenberg_field
         raise ConfigError(
-            f"Selected theory: {theory}, has not been implemented yet",
+            f"Field ensemble for theory: {theory}, and target dimension {target_dimension} has not been implemented yet",
             theory,
-            ["phi_four", "xy", "heisenberg"],
+            ["phi_four", "spin"],
         )
 
     def parse_epochs(self, epochs: int):
