@@ -1,4 +1,4 @@
-training_output: phi4_train
+training_output: spin_train
 
 cp_id: -1
 target_length: 10000
@@ -12,7 +12,7 @@ meta:
   title: Phi Four training
   keywords: [example]
 
-template: report.md
+template: topology_report.md
 
 actions_:
   - report(main=True)

@@ -1,6 +1,7 @@
 lattice_length: 2
 lattice_dimension: 2
 
+theory: "phi_four"
 m_sq: 1
 lam: 1
 use_arxiv_version: False

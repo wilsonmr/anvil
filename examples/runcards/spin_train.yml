@@ -1,17 +1,19 @@
 # Lattice
-lattice_length: 4
+lattice_length: 6
 lattice_dimension: 2
 
 # Action
-field_dimension: 2
-beta: 0.5
+theory: "spin"
+theory_N: 3
+beta: 0.05
 
 # Base distrbution
-base_dist: "spherical"
+base_dist: "uniform"
 
 # Networks
-hidden_nodes: [24]
-n_affine: 6
+flow_model: "real_nvp"
+hidden_nodes: [36]
+n_affine: 4
 n_batch: 3000
 
 # Training length
