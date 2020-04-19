@@ -1,15 +1,14 @@
 import torch
-import matplotlib.pyplot as plt
 from math import pi, sqrt
 from itertools import product
 from random import randint
 
 from anvil.geometry import Geometry2D
-from anvil.fields import ClassicalSpinField
+from anvil.fields import HeisenbergField
 
 L = 4  # must be 4 or greater
-geom = Geometry2D(L)
-splitcart = geom._splitcart()
+TESTING_GEOMETRY = Geometry2D(L)
+SPLITCART = TESTING_GEOMETRY._splitcart()
 
 
 def add_minimal_hedgehog(state, loc: tuple, positive: bool = True):
@@ -81,13 +80,13 @@ def cart_to_split(state):
     """
     state_split = torch.empty((L ** 2, 2))
     for i, j in product(range(L), range(L)):
-        state_split[splitcart[i, j], :] = state[i, j, :]
+        state_split[SPLITCART[i, j], :] = state[i, j, :]
     return state_split
 
 
 def test_uncharged():
     state = torch.rand((1, 2 * L ** 2))
-    field = ClassicalSpinField(state, geom, 2)
+    field = HeisenbergField(state, TESTING_GEOMETRY)
     assert abs(float(field._topological_charge)) < 1e-7
 
 
@@ -99,7 +98,7 @@ def test_minimal_hedgehog_pos():
 
     state_split = cart_to_split(state).view(1, -1)
 
-    field = ClassicalSpinField(state_split, geom, 2)
+    field = HeisenbergField(state_split, TESTING_GEOMETRY)
     assert abs(float(field._topological_charge) - 1) < 1e-7
 
 
@@ -111,5 +110,5 @@ def test_minimal_hedgehog_neg():
 
     state_split = cart_to_split(state).view(1, -1)
 
-    field = ClassicalSpinField(state_split, geom, 2)
+    field = HeisenbergField(state_split, TESTING_GEOMETRY)
     assert abs(float(field._topological_charge) + 1) < 1e-7
