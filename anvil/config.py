@@ -41,23 +41,43 @@ class ConfigParser(Config):
         return pow(lattice_length, lattice_dimension)
 
     def parse_theory(self, theory: str):
+        valid = ("phi_four", "spin")
+        if theory not in valid:
+            raise ConfigError(
+                f"Selected theory: {theory}, has not been implemented yet",
+                theory,
+                valid,
+            )
         return theory
 
-    def parse_theory_N(self, N: int = 1):
+    def parse_theory_N(self, N: int):
         """N for O(N) and CP^{N-1} models"""
         return N
 
-    def produce_field_dimension(self, theory, theory_N=1):
-        if theory == "heisenberg":
-            return 2
-        elif theory == "on":  # not yet implemented
+    def produce_target_dimension(self, theory, theory_N = 2):  # requires default N
+        """Dimension of the target manifold for the theory.
+        This allows for more generality in produce functions than
+        if we were to use theory-specific parameters such as
+        'theory_N', for example.
+        """
+        if theory == "phi_four":
+            return 1
+        elif theory == "spin":
             return theory_N - 1
-        elif theory == "cpn":  # not yet implemented
-            return 2 * theory_N - 2
-        return 1
+        elif theory == "cpn":
+            return 2 * theory_N - 2  # not yet implemented
 
-    def produce_config_size(self, lattice_size, field_dimension):
-        return lattice_size * field_dimension
+
+    def produce_target_manifold(self, theory):
+        """Return a string specifying the class of manifolds (of arbitrary
+        dimensionality) to the target manifold for the theory belongs."""
+        if theory == "phi_four":
+            return "R"
+        elif theory in ("spin", "cpn"):
+            return "S"
+
+    def produce_config_size(self, lattice_size, target_dimension):
+        return target_dimension * lattice_size
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
@@ -73,6 +93,24 @@ class ConfigParser(Config):
 
     def parse_beta(self, beta: float):
         return beta
+
+    def parse_flow_model(self, mod: str):
+        valid = ("real_nvp",)
+        if mod not in valid:
+            raise ConfigError(
+                f"Selected flow model: {mod}, has not been implemented yet", mod, valid,
+            )
+        return mod
+
+    def parse_base_dist(self, dist):
+        valid = ("normal", "uniform")
+        if dist not in valid:
+            raise ConfigError(
+                f"Selected base distribution: {dist}, has not been implemented yet",
+                dist,
+                valid,
+            )
+        return dist
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -92,49 +130,49 @@ class ConfigParser(Config):
         return nb
 
     @explicit_node
-    def produce_target(self, theory):
+    def produce_target(self, theory, target_dimension):
         """Return the function which initialises the correct action"""
         if theory == "phi_four":
             return phi_four_action
-        elif theory == "xy":
-            return xy_hamiltonian
-        elif theory == "heisenberg":
-            return heisenberg_hamiltonian
+        elif theory == "spin":
+            if target_dimension == 1:
+                return xy_hamiltonian
+            elif target_dimension == 2:
+                return heisenberg_hamiltonian
         raise ConfigError(
-            f"Selected theory: {theory}, has not been implemented yet",
-            theory,
-            ["phi_four", "xy", "heisenberg"],
+            f"Target distribution for theory: {theory}, has not been implemented yet for target dimeinsion {target_dimension}",
         )
 
     @explicit_node
-    def produce_base(
-        self, base_dist: str = "normal",
-    ):
+    def produce_base(self, target_manifold, target_dimension, base_dist="normal"):
         """Return the action which loads appropriate base distribution"""
-        if base_dist == "normal":
-            return normal_distribution
-        elif base_dist == "uniform_circle":
-            return circular_uniform_distribution
-        elif base_dist == "uniform_sphere":
-            return spherical_uniform_distribution
+        if target_manifold == "R":
+            if base_dist == "normal":
+                return normal_distribution
+            elif base_dist == "uniform":
+                return uniform_distribution
+        elif target_manifold == "S":
+            if base_dist == "uniform":
+                if target_dimension == 1:
+                    return circular_uniform_distribution
+                if target_dimension == 2:
+                    return spherical_uniform_distribution
         raise ConfigError(
-            f"Base distribution: {base_dist}, has not been implemented yet",
-            base_dist,
-            ["normal", "uniform_circle", "uniform_sphere"],
+            f"Base distribution: {base_dist}, has not been implemented yet for target manifold {target_manifold}{target_dimension}",
         )
 
     @explicit_node
-    def produce_model(self, flow_model: str = "real_nvp"):
+    def produce_model(self, target_manifold, target_dimension, flow_model="real_nvp"):
         if flow_model == "real_nvp":
-            return real_nvp
-        elif flow_model == "project_circle":
-            return project_circle
-        elif flow_model == "project_sphere":
-            return project_sphere
+            if target_manifold == "R":
+                return real_nvp
+            elif target_manifold == "S":
+                if target_dimension == 1:
+                    return project_circle
+                elif target_dimension == 2:
+                    return project_sphere
         raise ConfigError(
-            f"Model: {flow_model}, has not been implemented yet",
-            flow_model,
-            ["real_nvp", "project_circle", "project_sphere"],
+            f"Flow model: {flow_model}, has not been implemented yet for target manifold {target_manifold}{target_dimension}",
         )
 
     def parse_epochs(self, epochs: int):
