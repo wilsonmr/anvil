@@ -45,6 +45,9 @@ class ConfigParser(Config):
     def parse_lam(self, lam: (float, int)):
         return lam
 
+    def parse_use_arxiv_version(self, do_use: bool):
+        return do_use
+
     @explicit_node
     def produce_target(self, theory):
         """Return the function which initialises the correct action"""
