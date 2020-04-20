@@ -27,18 +27,6 @@ def arcosh(x):
     return torch.log(x + torch.sqrt(pow(x, 2) - 1))
 
 
-def bootstrap(observable):
-    """Return the standard deviation for an observable based on a number of
-    'bootstrap' samples."""
-    obs_full = observable[0]
-    obs_bootstrap = observable[1:]
-
-    variance = torch.mean((obs_bootstrap - obs_full) ** 2, axis=0)
-    # bias = torch.mean(obs_bootstrap) - obs_full  # not sure whether to use this
-
-    return variance.sqrt()
-
-
 def calc_two_point_function(sample_training_output, training_geometry):
     r"""Calculates the two point connected green function, G(x), given a set of
     states where x = (x_0, x_1) refers to a shift applied to the fields \phi
@@ -134,6 +122,11 @@ def bootstrap_function(func, states, *args, n_boot=100):
     of the function, with the resamples on the final dimension of the returned
     tensor
 
+    For large samples and/or large n_boot, it can be impossible to allocate
+    enough memory for a single tensor containing all bootstrap resamples.
+    Furthermore, even if memory can be allocated, it is often faster to
+    do the calculations separately on several smaller tensors.
+
     Parameters
     ----------
     func:
@@ -153,16 +146,18 @@ def bootstrap_function(func, states, *args, n_boot=100):
         dimension
 
     """
-    boot_index = torch.randint(0, states.shape[0], size=(states.shape[0], n_boot))
-    # put boot index on final dimension
-    resampled_states = states[boot_index, :].transpose(1, 2)
-    res = func(resampled_states, *args)
-    return res
+    sample_size = states.shape[0]
+
+    res = []
+    for resample in range(n_boot):
+        boot_index = torch.randint(0, sample_size, size=(sample_size,))
+        resampled_states = states[boot_index, :]
+        res.append(func(resampled_states, *args))
+
+    return torch.stack(res, dim=-1)
 
 
-def two_point_function(
-    sample_training_output, training_geometry, n_boot=100
-):
+def two_point_function(sample_training_output, training_geometry, n_boot=100):
     """Bootstrap calc_two_point_function, using bootstrap_function"""
     return bootstrap_function(
         calc_two_point_function,
