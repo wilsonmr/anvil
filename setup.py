@@ -15,8 +15,10 @@ setup(
         "console_scripts": [
             "anvil-train = anvil.scripts.anvil_train:main",
             "anvil-sample = anvil.scripts.anvil_sample:main",
+            "anvil-benchmark = anvil.scripts.anvil_benchmark:main",
         ]
     },
     packages=find_packages(),
+    package_data= {'': ['*.yml']},
     zip_safe=False,
 )

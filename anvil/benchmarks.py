@@ -17,7 +17,7 @@ from reportengine import collect
 from reportengine.figure import figure
 from reportengine.table import table
 
-from free_theory import FreeScalarEigenmodes
+from anvil.free_theory import FreeScalarEigenmodes
 from anvil.checks import check_trained_with_free_theory
 
 

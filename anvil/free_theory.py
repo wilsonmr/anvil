@@ -1,5 +1,13 @@
-import numpy as np
+"""
+free_theory.py
+
+module containing the FreeScalarEigenmodes class used to compare with model
+trained to free scalar theory
+
+"""
+
 from math import pi
+import numpy as np
 
 
 class FreeScalarEigenmodes:
