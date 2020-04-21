@@ -16,7 +16,7 @@ PROVIDERS = ["anvil.sample", "anvil.observables", "anvil.plot", "anvil.table", "
 class SampleApp(App):
     config_class = ConfigParser
 
-    def __init__(self, name="validphys", *, providers):
+    def __init__(self, name="anvil-sample", *, providers):
         super().__init__(name, providers)
 
 

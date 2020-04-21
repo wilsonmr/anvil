@@ -1,16 +1,17 @@
 import numpy as np
 from math import pi
 
+
 class FreeScalarEigenmodes:
     r"""
     The action for the theory of a free scalar on a lattice is
-    
+
         S(\phi) = \frac{1}{2} \sum_x \sum_y \phi(x) K(x, y) \phi(y)
-    
+
     The eigenmodes of the matrix
 
         K(x, y) = \box(x, y) + m^2 \delta(x - y)
-    
+
     (which is referred to here as the kinetic operator) are the momentum
     states \tilde\phi(p), and the associated eigenvalues in two dimensions
     are
@@ -18,9 +19,9 @@ class FreeScalarEigenmodes:
         \lambda(p) = m^2 + 4 \sin^2(p1 / 2) + 4 \sin^2(p2 / 2)
 
     where (p1, p2) are the two components of p.
-    
+
     It can be shown that the action can be written in Fourier space as
-        
+
         S(\tilde\phi) = \frac{1}{2V} \lambda(p) |\tilde\phi(p)|^2
 
     and hence the partition function is a product of Gaussian distributions
@@ -31,6 +32,7 @@ class FreeScalarEigenmodes:
     This means we can sample from this probability distribution in Fourier
     space by simply generating Gaussian random numbers.
     """
+
     def __init__(self, m_sq: int, lattice_length: int):
         self.m_sq = m_sq
         self.lattice_length = lattice_length
@@ -59,7 +61,7 @@ class FreeScalarEigenmodes:
             (0, p_max)
             (p_max, 0)
             (p_max, p_max)
-        
+
         where p_max = 2 \pi / L * L / 2 = \pi is the Nyquist frequency for the
         one-dimensional lattice with unit lattice spacing and length L.
         """
@@ -89,7 +91,7 @@ class FreeScalarEigenmodes:
         First, the variance of the modulus of the eigenmodes is calculated
         by identifying them with the inverse of the eigenvalues of the kinetic
         operator.
-        
+
         Because the real-space fields are real, we have a constraint on the
         eigenmodes:
 
@@ -98,7 +100,7 @@ class FreeScalarEigenmodes:
         This means that we can write the partition function as a product,
         over positive momenta only, of one-dimensional Gaussian distributions
         for a(p) and b(p), the real and imaginary parts of \tilde\phi(p).
-        
+
         For the purely real eigenmodes, the variance of a(p) is equal to the
         variance of |\tilde\phi(p)|. However, for the complex eigenmodes the
         variance of a(p) and b(p) is half of the variance of |\tilde\phi(p)|.
@@ -144,7 +146,7 @@ class FreeScalarEigenmodes:
         The real and imaginary components of the eigenmodes are drawn from
         Gaussian distributions with variances given by the eigenvalues of the
         kinetic operator - see _variance() method above.
-        
+
         Inputs:
         -------
         n_sample: int
@@ -209,10 +211,9 @@ class FreeScalarEigenmodes:
 
         # Numpy fft requires input in form
         # [f_0, f_1, ..., f_{n-1}, f_n, f_{-n+1}, ..., f_{-1}]
-        eigenmodes = np.roll(eigenmodes, (-self.ip0, -self.ip0), (-2,-1))
+        eigenmodes = np.roll(eigenmodes, (-self.ip0, -self.ip0), (-2, -1))
 
         fields = np.fft.ifft2(eigenmodes)
-        #TODO add a check that fields are indeed real
+        # TODO add a check that fields are indeed real
 
         return fields.real
-
