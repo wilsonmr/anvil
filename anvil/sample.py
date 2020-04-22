@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from reportengine import collect
 
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -23,8 +24,8 @@ class LogRatioNanError(Exception):
 
 def sample_batch(
     loaded_model,
-    base,
-    target,
+    base_dist,
+    target_dist,
     batch_size,
     current_state=None,
     current_log_density=None,
@@ -61,8 +62,12 @@ def sample_batch(
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z, base_log_density = base(batch_size + 1)
+        z, base_log_density = base_dist(batch_size + 1)
         phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
+        if not phi.requires_grad:
+            np.savetxt("base.txt", z)
+            np.savetxt("target.txt", phi)
+
         model_log_density = base_log_density + map_log_density
 
         if current_state is not None:
@@ -72,7 +77,7 @@ def sample_batch(
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 
-    log_ratio = model_log_density - target(phi)
+    log_ratio = model_log_density - target_dist.log_density(phi)
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
             "could run into nans based on minimum and maximum log of ratio of probabilities"

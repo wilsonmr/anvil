@@ -38,8 +38,8 @@ def shifted_kl(
 
 def train(
     loaded_model,
-    base,
-    target,
+    base_dist,
+    target_dist,
     *,
     train_range,
     save_interval,
@@ -47,16 +47,12 @@ def train(
     outpath,
     current_loss,
     loaded_optimizer,
-    scheduler_kwargs={"patience": 500},
+    scheduler,
 ):
     """training loop of model"""
-    # create your optimizer and a scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        loaded_optimizer, **scheduler_kwargs
-    )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = base.size_out
+    n_units = base_dist.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -69,11 +65,11 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states
-        z, base_log_density = base(n_batch)
+        z, base_log_density = base_dist(n_batch)
         phi, map_log_density = loaded_model(z)
 
         model_log_density = base_log_density + map_log_density
-        target_log_density = target(phi)  # term from parameterisatiom goes here
+        target_log_density = target_dist.log_density(phi)
 
         loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(model_log_density, target_log_density)
@@ -92,4 +88,85 @@ def train(
             "loss": current_loss,
         },
         f"{outpath}/checkpoint_{train_range[-1]}.pt",
+    )
+
+
+def adam(
+    loaded_model,
+    loaded_checkpoint,
+    lr=0.001,
+    betas=(0.9, 0.999),
+    eps=1e-08,
+    weight_decay=0,
+    amsgrad=False,
+):
+    optimizer = optim.Adam(
+        loaded_model.parameters(),
+        lr=lr,
+        betas=betas,
+        eps=eps,
+        weight_decay=weight_decay,
+        amsgrad=amsgrad,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def adadelta(
+    loaded_model, loaded_checkpoint, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0
+):
+    optimizer = optim.Adadelta(
+        loaded_model.parameters(), lr=lr, rho=rho, eps=eps, weight_decay=weight_decay
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def stochastic_gradient_descent(
+    loaded_model,
+    loaded_checkpoint,
+    lr,
+    momentum=0,
+    dampening=0,
+    weight_decay=0,
+    nesterov=False,
+):
+    optimizer = optim.SGD(
+        loaded_model.parameters(),
+        lr=lr,
+        momentum=momentum,
+        dampening=dampening,
+        weight_decay=weight_decay,
+        nesterov=nesterov,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def reduce_lr_on_plateau(
+    loaded_optimizer,
+    mode="min",
+    factor=0.1,
+    patience=500,
+    verbose=True,
+    threshold=0.0001,
+    threshold_mode="rel",
+    cooldown=0,
+    min_lr=0,
+    eps=1e-08,
+):
+    return optim.lr_scheduler.ReduceLROnPlateau(
+        loaded_optimizer,
+        mode=mode,
+        factor=factor,
+        patience=patience,
+        verbose=verbose,
+        threshold=threshold,
+        threshold_mode=threshold_mode,
+        cooldown=cooldown,
+        min_lr=min_lr,
+        eps=eps,
     )

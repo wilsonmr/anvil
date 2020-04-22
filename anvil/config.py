@@ -9,11 +9,28 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
+from anvil.train import adam, adadelta, stochastic_gradient_descent, reduce_lr_on_plateau
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
-from anvil.distributions import normal_distribution, phi_four_action
+from anvil.distributions import *
 
 log = logging.getLogger(__name__)
+
+BASE_OPTIONS = {
+    "standard_normal": standard_normal_distribution,
+    "normal": normal_distribution,
+    "uniform": uniform_distribution,
+    "circular_uniform": circular_uniform_distribution,
+    "spherical_uniform": spherical_uniform_distribution,
+}
+TARGET_OPTIONS = dict({"phi_four": phi_four_action,}, **BASE_OPTIONS)
+
+OPTIMIZER_OPTIONS = {
+    "adam": adam,
+    "adadelta": adadelta,
+    "sgd": stochastic_gradient_descent,
+}
+
 
 class ConfigParser(Config):
     """Extend the reportengine Config class for anvil-specific
@@ -33,11 +50,17 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
+    def produce_config_size(self, lattice_size, target_dimension=1):
+        return target_dimension * lattice_size
+
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def parse_theory(self, theory: str):
-        return theory
+    def parse_target(self, target: str):
+        return target
+
+    def parse_base(self, base: str):
+        return base
 
     def parse_m_sq(self, m: (float, int)):
         return m
@@ -49,15 +72,26 @@ class ConfigParser(Config):
         return do_use
 
     @explicit_node
-    def produce_target(self, theory):
+    def produce_target_dist(self, target):
         """Return the function which initialises the correct action"""
-        if theory == "phi_four":
-            return phi_four_action
-        raise ConfigError(
-            f"Selected theory: {theory}, has not been implemented yet",
-            theory,
-            ["phi_four"],
-        )
+        try:
+            return TARGET_OPTIONS[target]
+        except KeyError:
+            raise ConfigError(
+                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
+            )
+
+    @explicit_node
+    def produce_base_dist(
+        self, base,
+    ):
+        """Return the action which loads appropriate base distribution"""
+        try:
+            return BASE_OPTIONS[base]
+        except KeyError:
+            raise ConfigError(
+                f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
+            )
 
     def parse_hidden_nodes(self, hid_spec):
         return hid_spec
@@ -75,17 +109,6 @@ class ConfigParser(Config):
 
     def parse_n_batch(self, nb: int):
         return nb
-
-    @explicit_node
-    def produce_base(self, base_dist: str = "normal",):
-        """Return the action which loads appropriate base distribution"""
-        if base_dist == "normal":
-            return normal_distribution
-        raise ConfigError(
-            f"Base distribution: {base_dist}, has not been implemented yet",
-            base_dist,
-            ["normal"],
-        )
 
     def produce_model(self, lattice_size, n_affine, network_kwargs):
         model = RealNVP(size_in=lattice_size, n_affine=n_affine, **network_kwargs)
@@ -127,26 +150,18 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    def parse_optimizer(self, optim: str):
-        valid_optimizers = ("adam", "adadelta")
-        if optim not in valid_optimizers:
+    @explicit_node
+    def produce_loaded_optimizer(self, optimizer):
+        try:
+            return OPTIMIZER_OPTIONS[optimizer]
+        except KeyError:
             raise ConfigError(
-                f"Invalid optimizer choice: {optim}", optim, valid_optimizers
+                f"Invalid optimizer {optimizer}", optimizer, OPTIMIZER_OPTIONS.keys()
             )
-        return optim
 
-    def parse_optimizer_kwargs(self, kwargs: dict, optimizer):
-        # This will only be executed if optimizer is defined in the runcard
-        if optimizer == "adam":
-            valid_kwargs = ("lr", "lr_decay", "weight_decay", "eps")
-        if optimizer == "adadelta":
-            valid_kwargs = ("lr", "rho", "weight_decay", "eps")
-
-        if not all([arg in valid_kwargs for arg in kwargs]):
-            raise ConfigError(
-                f"Valid optimizer_kwargs for {optimizer} are {', '.join([arg for arg in valid_kwargs])}"
-            )
-        return kwargs
+    @explicit_node
+    def produce_scheduler(self):
+        return reduce_lr_on_plateau
 
     def parse_scheduler_kwargs(self, kwargs: dict):
         if "patience" not in kwargs:
