@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 class BenchmarkTrainConfig(anvil_train.TrainConfig):
     """Update class for benchmarking"""
+
     @classmethod
     def from_yaml(cls, o, *args, **kwargs):
         if kwargs["environment"].output_path.is_dir():
@@ -33,40 +34,45 @@ class BenchmarkTrainConfig(anvil_train.TrainConfig):
 class BenchmarkTrainApp(anvil_train.TrainApp):
     config_class = BenchmarkTrainConfig
     """Subclass the train app to define our own settings"""
+
     def add_positional_arguments(self, parser):
-        pass # intentionally don't set the config positional
+        pass  # intentionally don't set the config positional
 
     def get_commandline_arguments(self, cmdline=None):
         args = App.get_commandline_arguments(self, cmdline)
-        args.update(dict(
-            output=BENCHMARK_OUTPUT,
-            config_yml=benchmark_config.training_path,
-            retrain=None, # don't allow retraining
-        ))
+        args.update(
+            dict(
+                output=BENCHMARK_OUTPUT,
+                config_yml=benchmark_config.training_path,
+                retrain=None,  # don't allow retraining
+            )
+        )
         return args
+
 
 class BenchmarkSampleApp(anvil_sample.SampleApp):
     """Subclass the sample app to define out own settings"""
+
     def add_positional_arguments(self, parser):
-        pass # see above
+        pass  # see above
 
     def get_commandline_arguments(self, cmdline=None):
         args = super().get_commandline_arguments(cmdline)
-        args.update(dict(
-            output=BENCHMARK_OUTPUT,
-            config_yml=benchmark_config.sample_path,
-        ))
+        args.update(
+            dict(output=BENCHMARK_OUTPUT, config_yml=benchmark_config.sample_path)
+        )
         return args
 
 
 def main():
     """Main loop of benchmark"""
-    train_app = BenchmarkTrainApp(
-        "benchmark-train", providers=anvil_train.PROVIDERS)
+    train_app = BenchmarkTrainApp("benchmark-train", providers=anvil_train.PROVIDERS)
     sample_app = BenchmarkSampleApp(
-        "benchmark-sample", providers=anvil_sample.PROVIDERS)
+        "benchmark-sample", providers=anvil_sample.PROVIDERS
+    )
     train_app.main()
     sample_app.main()
+
 
 if __name__ == "__main__":
     main()
