@@ -9,7 +9,12 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
-from anvil.train import adam, adadelta, stochastic_gradient_descent, reduce_lr_on_plateau
+from anvil.train import (
+    adam,
+    adadelta,
+    stochastic_gradient_descent,
+    reduce_lr_on_plateau,
+)
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
 from anvil.distributions import *
@@ -163,11 +168,6 @@ class ConfigParser(Config):
     @explicit_node
     def produce_scheduler(self):
         return reduce_lr_on_plateau
-
-    def parse_scheduler_kwargs(self, kwargs: dict):
-        if "patience" not in kwargs:
-            kwargs["patience"] = 500  # problem setting default in config parser?
-        return kwargs
 
     def parse_target_length(self, targ: int):
         return targ

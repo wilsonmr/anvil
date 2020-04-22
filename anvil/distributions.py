@@ -1,7 +1,7 @@
 """
 distributions.py
 
-Module containing classes corresponding to different base distributions.
+Module containing classes corresponding to different probability distributions.
 """
 from math import pi, log, sqrt
 import torch
@@ -36,9 +36,11 @@ class NormalDist:
         self.log_normalisation = 0.5 * self.size_out * log(2 * pi * self.sigma)
 
     def __call__(self, sample_size) -> tuple:
-        """Return a tuple (sample, log_density) for a sample of "sample_size"
-        states drawn from the standard uniform distribution with mean 0,
-        variance 1.
+        """Return a tuple (sample, log_density) for a sample of 'sample_size'
+        states drawn from the normal distribution.
+        
+        Return shape: (sample_size, config_size) for the sample,
+        (sample_size, 1) for the log density.
         """
         sample = torch.randn(sample_size, self.size_out)
 
@@ -72,9 +74,11 @@ class UniformDist:
         self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
 
     def __call__(self, sample_size):
-        """Return tensor of values drawn from uniform distribution.
+        """Return a tuple (sample, log_density) for a sample of 'sample_size'
+        states drawn from a uniform distribution.
         
-        Return shape: (sample_size, config_size).
+        Return shape: (sample_size, config_size) for the sample,
+        (sample_size, 1) for the log density.
         """
         sample = torch.rand(sample_size, self.size_out) * self.x_range - self.x_max
         return sample, torch.zeros((sample_size, 1))
@@ -127,11 +131,20 @@ class VonMisesDist:
         ).sample
 
     def __call__(self, sample_size):
+        """Return a tuple (sample, log_density) for a sample of 'sample_size'
+        states drawn from the von Mises distribution.
+        
+        Return shape: (sample_size, config_size) for the sample,
+        (sample_size, 1) for the log density.
+        """
         sample = self.generator((sample_size, self.size_out))
         log_density = self.log_density(sample)
         return sample, log_density
 
     def log_density(self, sample):
+        """Logarithm of the normalised probability density function for the
+        von Mises distribution, given a sample.
+        """
         return (
             self.kappa * torch.cos(sample - self.mean).sum(dim=1, keepdim=True)
             - self.log_normalisation
@@ -159,9 +172,11 @@ class SphericalUniformDist:
 
     def __call__(self, sample_size):
         r"""Return tensor of values drawn from uniform distribution
-        on a unit 2-dimensional sphere.
+        on a unit 2-dimensional sphere, along with the corresponding
+        log probability density.
         
-        Return shape: (sample_size, config_size).
+        Return shape: (sample_size, config_size) for the sample,
+        (sample_size, 1) for the log density.
         
         Notes
         -----
@@ -174,6 +189,7 @@ class SphericalUniformDist:
         polar = torch.acos(1 - 2 * torch.rand(sample_size, self.lattice_size))
         azimuth = torch.rand(sample_size, self.lattice_size) * 2 * pi
 
+        # Quicker to do this than call log_density method
         log_density = torch.log(torch.sin(polar)).sum(dim=1, keepdim=True)
 
         sample = torch.stack((polar, azimuth), dim=-1).view(-1, self.size_out)
