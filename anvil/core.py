@@ -7,7 +7,6 @@ from pathlib import Path
 from glob import glob
 
 import torch
-import torch.nn as nn
 
 from reportengine.compat import yaml
 
@@ -22,80 +21,6 @@ class InvalidTrainingOutputError(Exception):
 
 class TrainingRuncardNotFound(InvalidTrainingOutputError):
     pass
-
-
-class PhiFourAction(nn.Module):
-    """Extend the nn.Module class to return the phi^4 action given either
-    a single state size (1, length * length) or a stack of N states
-    (N, length * length). See Notes about action definition.
-
-    Parameters
-    ----------
-    geometry:
-        define the geometry of the lattice, including dimension, size and
-        how the state is split into two parts
-    m_sq: float
-        the value of the bare mass squared
-    lam: float
-        the value of the bare coupling
-
-    Examples
-    --------
-    Consider the toy example of the action acting on a random state
-
-    >>> action = PhiFourAction(2, 1, 1)
-    >>> state = torch.rand((1, 2*2))
-    >>> action(state)
-    tensor([[0.9138]])
-
-    Now consider a stack of states
-
-    >>> stack_of_states = torch.rand((5, 2*2))
-    >>> action(stack_of_states)
-    tensor([[3.7782],
-            [2.8707],
-            [4.0511],
-            [2.2342],
-            [2.6494]])
-
-    Notes
-    -----
-    that this is the action as defined in
-    https://doi.org/10.1103/PhysRevD.100.034515 which might differ from the
-    current version on the arxiv.
-
-    """
-
-    def __init__(self, m_sq, lam, geometry, use_arxiv_version=False):
-        super(PhiFourAction, self).__init__()
-        self.geometry = geometry
-        self.shift = self.geometry.get_shift()
-        self.lam = lam
-        self.m_sq = m_sq
-        self.length = self.geometry.length
-        if use_arxiv_version:
-            self.version_factor = 2
-        else:
-            self.version_factor = 1
-
-    def forward(self, phi_state: torch.Tensor) -> torch.Tensor:
-        """Perform forward pass, returning action for stack of states.
-
-        see class Notes for details on definition of action.
-        """
-        action = (
-            self.version_factor * (2 + 0.5 * self.m_sq) * phi_state ** 2  # phi^2 terms
-            + self.lam * phi_state ** 4  # phi^4 term
-            - self.version_factor
-            * torch.sum(
-                phi_state[:, self.shift] * phi_state.view(-1, 1, self.length ** 2),
-                dim=1,
-            )  # derivative
-        ).sum(
-            dim=1, keepdim=True  # sum across sites
-        )
-        return action
-
 
 class Checkpoint:
     """Class which saves and loads checkpoints and allows checkpoints to be
