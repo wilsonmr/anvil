@@ -7,6 +7,8 @@ from math import pi, log, sqrt
 import torch
 import torch.nn as nn
 
+from scipy.special import i0
+
 
 class NormalDist:
     """
@@ -19,61 +21,219 @@ class NormalDist:
 
     Inputs:
     -------
-    field_dimension: int
-        Number of independent field components at each lattice site.
-        Default = 1, i.e. a scalar field.
-    lattice_volume: int
-        Number of lattice sites.
+    config_size: int
+        Number of Units specifying a single configuration.
     """
 
-    def __init__(self, lattice_volume, field_dimension=1):
-        self.lattice_volume = lattice_volume
-        self.field_dimension = field_dimension
+    def __init__(self, config_size, *, scale, loc):
+        self.size_out = config_size
+        self.sigma = scale
+        self.mean = loc
 
-        # Number of components per field configuration =
-        # size of output Tensor at dimension 1
-        self.size_out = self.lattice_volume * self.field_dimension
+        self.exp_coeff = 1 / (2 * self.sigma ** 2)
 
         # Pre-calculate normalisation for log density
-        self.log_normalisation = self._log_normalisation()
+        self.log_normalisation = 0.5 * self.size_out * log(2 * pi * self.sigma)
 
-    def __call__(self, n_sample) -> tuple:
-        """Return a tuple (sample, log_density) for a sample of n_sample states
-        drawn from the standard uniform distribution.
-        
-        See docstrings for instance methods generator, log_density for more details.
+    def __call__(self, sample_size) -> tuple:
+        """Return a tuple (sample, log_density) for a sample of "sample_size"
+        states drawn from the standard uniform distribution with mean 0,
+        variance 1.
         """
-        sample = self.generator(n_sample)
+        sample = torch.randn(sample_size, self.size_out)
+
+        return sample, self.log_density(sample)
+
+    def log_density(self, sample):
+        exponent = -self.exp_coeff * torch.sum(
+            (sample - self.mean).pow(2), dim=1, keepdim=True
+        )
+        return exponent - self.log_normalisation
+
+
+class UniformDist:
+    """Class which handles the generation of a sample of field configurations
+    following the uniform distribution on some interval.
+
+    Inputs:
+    -------
+    config_size: int
+        Number of units specifying a single configuration.
+    interval: tuple
+        Low and high limits for the interval
+    """
+
+    def __init__(self, config_size, *, interval):
+        self.size_out = config_size
+
+        self.x_min, self.x_max = interval
+        self.x_range = self.x_max - self.x_min
+
+        self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
+
+    def __call__(self, sample_size):
+        """Return tensor of values drawn from uniform distribution.
+        
+        Return shape: (sample_size, config_size).
+        """
+        sample = torch.rand(sample_size, self.size_out) * self.x_range - self.x_max
+        return sample, torch.zeros((sample_size, 1))
+
+
+class VonMisesDist:
+    """Class implementing the von Mises distribution, which is the
+    circular analogue of the normal distribution.
+
+    The von Mises distribution has two parameters: a 'contentration'
+    and a 'location'. The location is the mean '\mu', directly analogous to
+    the normal case. The concentration '\kappa' parameterises the
+    sharpness of the peak, and is analogous to the inverse of the
+    variance of the normal distribution.
+
+    The probability density function is:
+
+        p(x) = \exp( \kappa * \cos(x - \mu) ) / ( 2 * pi * I_0(\kappa) )
+
+    where I_0(\kappa) is the order-0 modified Bessel function of the
+    first kind.
+
+    Inputs:
+    -------
+    config_size: int
+        number of units specifying a single configuration.
+    concentration: float
+        parameter dictating sharpness of the peak.
+    loc: float
+        mean of the distribution.
+
+    Notes:
+    ------
+    The von Mises distribution was implemented in PyTorch 1.5 as a
+    torch.distribution object. This class currently uses the PyTorch
+    implementation to draw a random sample, but does not use it for
+    the log density calculation. There's no good reason for this other
+    than it's nice to see the calculation written out.
+    """
+
+    def __init__(self, config_size, *, concentration, loc):
+        self.size_out = config_size
+        self.kappa = concentration
+        self.mean = loc
+
+        self.log_normalisation = self.size_out * log(2 * pi * i0(self.kappa))
+
+        self.generator = torch.distributions.von_mises.VonMises(
+            loc=loc, concentration=concentration
+        ).sample
+        
+    def __call__(self, sample_size):
+        sample = self.generator(sample_size)
         log_density = self.log_density(sample)
         return sample, log_density
 
-    def generator(self, n_sample):
-        """Return tensor of values drawn from the standard normal distribution
-        with mean 0, variance 1.
+    def log_density(self, sample):
+        return (
+            self.kappa * torch.cos(sample - self.mean).sum(dim=1, keepdim=True)
+            - self.log_normalisation
+        )
+
+
+class SphericalUniformDist:
+    """
+    Class which handles the generation of a sample of field configurations
+    following the uniform distribution on a unit sphere.
+
+    Inputs:
+    -------
+    config_size: int
+        Number of units specifying a single configuration.
+        Assumed to be twice the number of lattice sites.
+        (i.e. assume single field in theory, for now)
+    """
+
+    def __init__(self, config_size):
+        # Number of components per field configuration =
+        # size of output Tensor at dimension 1
+        self.size_out = config_size
+        self.lattice_size = config_size // 2
+
+    def __call__(self, sample_size):
+        r"""Return tensor of values drawn from uniform distribution
+        on a unit 2-dimensional sphere.
         
-        Return shape: (n_sample, field_dimension * lattice_volume).
+        Return shape: (sample_size, config_size).
+        
+        Notes
+        -----
+        Uses inversion sampling to map random variables x ~ [0, 1] to the 
+        polar angle \theta which has the marginalised density \sin\theta,
+        via the inverse of its cumulative distribution.
+
+                        \theta = \arccos( 1 - 2 x )
         """
-        return torch.randn(n_sample, self.size_out)
+        polar = torch.acos(1 - 2 * torch.rand(sample_size, self.lattice_size))
+        azimuth = torch.rand(sample_size, self.lattice_size) * 2 * pi
 
-    def _log_normalisation(self) -> float:
-        """logarithm of the normalisation for the density function."""
-        return log(sqrt(pow(2 * pi, self.size_out)))
+        log_density = torch.log(torch.sin(polar)).sum(dim=1, keepdim=True)
 
-    def log_density(self, sample: torch.Tensor) -> torch.Tensor:
-        """Return log probability density of a sample generated from
-        the __call__ method above.
+        sample = torch.stack((polar, azimuth), dim=-1).view(-1, self.size_out)
 
-        Return shape: (n_sample, 1) where n_sample is the number of
-        field configurations (the first dimension of sample).
+        return sample, log_density
+
+    def log_density(self, sample):
+        r"""Takes a sample of shape (sample_size, config_size) and
+        computes the logarithm of the probability density function for
+        the spherical uniform distribution.
+
+        It is assumed that the tensor follows the __call__ method above
+        in that, when a view of shape (sample_size, config_size / 2, 2)
+        is taken, the 0th element in the 2nd dimension is the polar angle.
+        In other words, every second element of the input tensor, starting
+        at the 0th element, is a polar angle.
+        
+        The density function is equal to the surface area element
+        for the 2-sphere expressed in spherical coordinates, which,
+        for lattice site 'n' containing polar angle '\theta_n', is
+
+                    | \det J_n | = \sin \theta_n 
         """
-        exponent = -torch.sum(0.5 * sample.pow(2), dim=1, keepdim=True)
-        return exponent - self.log_normalisation
+        return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
 
-def normal_distribution(lattice_size, field_dimension=1):
-    """returns an instance of the NormalDist class"""
-    return NormalDist(
-        lattice_volume=lattice_size, field_dimension=field_dimension,
-    )
+
+def standard_normal_distribution(config_size):
+    """returns an instance of the NormalDist class with mean 0 and
+    variance 1"""
+    return NormalDist(config_size)
+
+
+def normal_distribution(config_size, scale=1, loc=0):
+    """Returns an instance of the NormalDist class"""
+    return NormalDist(config_size, scale=scale, loc=loc)
+
+
+def uniform_distribution(config_size, interval=(-1, 1)):
+    """Returns an instance of the UniformDist class.
+
+    The default interval is intentionall zero-centered,
+    anticipating use as a base distribution."""
+    return UniformDist(config_size, interval=interval)
+
+
+def circular_uniform_distribution(config_size):
+    """Returns an instance of the UniformDist class with interval
+    [0, 2 * pi)"""
+    return UniformDist(config_size, interval=(0, 2 * pi))
+
+
+def von_mises_distribution(config_size, concentration=1, loc=0):
+    """Returns and instance of the VonMisesDist class."""
+    return VonMisesDist(config_size, concentration=concentration, loc=loc)
+
+
+def spherical_uniform_distribution(config_size):
+    """Returns an instance of the SphericalUniformDist class"""
+    return SphericalUniformDist(config_size)
+
 
 class PhiFourAction(nn.Module):
     """Extend the nn.Module class to return the phi^4 action given either
@@ -149,6 +309,10 @@ class PhiFourAction(nn.Module):
             dim=1, keepdim=True  # sum across sites
         )
         return -action
+
+    def log_density(phi_state):
+        return self.forward(phi_state)
+
 
 def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
     """returns instance of PhiFourAction"""
