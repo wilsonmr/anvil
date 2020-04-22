@@ -1,7 +1,7 @@
 # Lattice
 lattice_length: 6
 lattice_dimension: 2
-
+theory: phi_four
 # Action
 m_sq: 4
 lam: 0
