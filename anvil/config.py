@@ -122,8 +122,8 @@ class ConfigParser(Config):
         # file - hopefully doesn't cause any issues..
         return training_output.as_input()
 
-    def produce_training_geometry(self, training_output):
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+    def produce_training_geometry(self, training_context):
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
