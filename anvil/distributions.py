@@ -219,7 +219,7 @@ class SphericalUniformDist:
 def standard_normal_distribution(config_size):
     """returns an instance of the NormalDist class with mean 0 and
     variance 1"""
-    return NormalDist(config_size)
+    return NormalDist(config_size, scale=1, loc=0)
 
 
 def normal_distribution(config_size, scale=1, loc=0):
@@ -305,6 +305,8 @@ class PhiFourAction(nn.Module):
         else:
             self.version_factor = 1
 
+        self.log_density = self.forward
+
     def forward(self, phi_state: torch.Tensor) -> torch.Tensor:
         """Perform forward pass, returning -action for stack of states. Note
         here the minus sign since we want to return the log density of the
@@ -324,9 +326,6 @@ class PhiFourAction(nn.Module):
             dim=1, keepdim=True  # sum across sites
         )
         return -action
-
-    def log_density(phi_state):
-        return self.forward(phi_state)
 
 
 class XYHamiltonian(nn.Module):
@@ -352,6 +351,8 @@ class XYHamiltonian(nn.Module):
         self.beta = beta
         self.lattice_size = geometry.length ** 2
         self.shift = geometry.get_shift()
+
+        self.log_density = self.forward
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         """
@@ -392,6 +393,8 @@ class HeisenbergHamiltonian(nn.Module):
         self.beta = beta
         self.lattice_size = geometry.length ** 2
         self.shift = geometry.get_shift()
+
+        self.log_density = self.forward
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         r"""

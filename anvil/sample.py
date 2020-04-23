@@ -44,7 +44,9 @@ def sample_batch(
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    target: Module
+    base_dist: distribution object
+        the base distribution.
+    target_dist: distribution object or Module
         the target distribution with which the loaded_model was trained,
         used to calculate the acceptance condition
     batch_size: int
@@ -90,7 +92,9 @@ def sample_batch(
     return phi[chain_indices, :], model_log_density[chain_indices, :], history
 
 
-def thermalised_state(loaded_model, base, target, thermalisation) -> torch.Tensor:
+def thermalised_state(
+    loaded_model, base_dist, target_dist, thermalisation
+) -> torch.Tensor:
     r"""
     A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -98,7 +102,9 @@ def thermalised_state(loaded_model, base, target, thermalisation) -> torch.Tenso
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    target: Module
+    base_dist: distribution object
+        the base distribution.
+    target_dist: distribution object or Module
         the target distribution with which the loaded_model was trained,
         used to calculate the acceptance condition
 
@@ -111,14 +117,14 @@ def thermalised_state(loaded_model, base, target, thermalisation) -> torch.Tenso
         return thermalisation
 
     states, current_log_density, _ = sample_batch(
-        loaded_model, base, target, thermalisation
+        loaded_model, base_dist, target_dist, thermalisation
     )
     log.info(f"Thermalisation: discarded {thermalisation} configurations.")
     return states[-1], current_log_density[-1]
 
 
 def chain_autocorrelation(
-    loaded_model, base, target, thermalised_state, sample_interval=None
+    loaded_model, base_dist, target_dist, thermalised_state, sample_interval=None
 ) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
@@ -147,7 +153,9 @@ def chain_autocorrelation(
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    target: Module
+    base_dist: distribution object
+        the base distribution.
+    target_dist: distribution object or Module
         the target distribution with which the loaded_model was trained,
         used to calculate the acceptance condition
     initial_state:
@@ -167,7 +175,7 @@ def chain_autocorrelation(
 
     # Sample some states
     _, _, history = sample_batch(
-        loaded_model, base, target, batch_size, *thermalised_state
+        loaded_model, base_dist, target_dist, batch_size, *thermalised_state
     )
 
     accepted = float(torch.sum(history))
@@ -205,8 +213,8 @@ def chain_autocorrelation(
 
 def sample(
     loaded_model,
-    base,
-    target,
+    base_dist,
+    target_dist,
     target_length: int,
     thermalised_state,
     chain_autocorrelation,
@@ -219,10 +227,9 @@ def sample(
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    base: Distribution object
-        object containing methods related to the base distribution, including
-        its generation and calculation of the log density
-    target: Module
+    base_dist: distribution object
+        the base distribution.
+    target_dist: distribution object or Module
         the target distribution with which the loaded_model was trained,
         used to calculate the acceptance condition
     target_length: int
@@ -231,7 +238,7 @@ def sample(
     Returns
     -------
     decorrelated_chain: torch.Tensor
-        a sample of states from loaded_model, size = (target_length, base.size_out)
+        a sample of states from loaded_model, size = (target_length, base_dist.size_out)
     """
 
     # Thermalise
@@ -250,7 +257,7 @@ def sample(
     actual_length = dec_samp_per_batch * n_batches
 
     decorrelated_chain = torch.empty(
-        (actual_length, base.size_out), dtype=torch.float32
+        (actual_length, base_dist.size_out), dtype=torch.float32
     )
     accepted = 0
 
@@ -263,7 +270,12 @@ def sample(
     for batch in pbar:
         # Generate sub-chain of batch_size configurations
         batch_chain, batch_log_density, batch_history = sample_batch(
-            loaded_model, base, target, batch_size, current_state, current_log_density,
+            loaded_model,
+            base_dist,
+            target_dist,
+            batch_size,
+            current_state,
+            current_log_density,
         )
         current_state = batch_chain[-1]
         current_log_density = batch_log_density[-1]
