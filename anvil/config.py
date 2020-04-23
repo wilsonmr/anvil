@@ -47,6 +47,18 @@ class ConfigParser(Config):
     def parse_base(self, base: str):
         return base
 
+    def parse_mean(self, mean: (float, int)):
+        return mean
+
+    def parse_sigma(self, sigma: (float, int)):
+        return sigma
+
+    def parse_support(self, supp: list):
+        return supp
+
+    def parse_concentration(self, conc: float):
+        return conc
+
     def parse_m_sq(self, m: (float, int)):
         return m
 

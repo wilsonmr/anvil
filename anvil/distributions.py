@@ -21,14 +21,18 @@ class NormalDist:
 
     Inputs:
     -------
-    config_size: int
-        Number of Units specifying a single configuration.
+    lattice_size: int
+        Number of nodes on the lattice.
+    sigma: float
+        Standard deviation for the distribution.
+    mean: float
+        Mean for the distribution.
     """
 
-    def __init__(self, config_size, *, scale, loc):
-        self.size_out = config_size
-        self.sigma = scale
-        self.mean = loc
+    def __init__(self, lattice_size, *, sigma, mean):
+        self.size_out = lattice_size
+        self.sigma = sigma
+        self.mean = mean
 
         self.exp_coeff = 1 / (2 * self.sigma ** 2)
 
@@ -39,7 +43,7 @@ class NormalDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the normal distribution.
         
-        Return shape: (sample_size, config_size) for the sample,
+        Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
         sample = torch.randn(sample_size, self.size_out)
@@ -59,16 +63,16 @@ class UniformDist:
 
     Inputs:
     -------
-    config_size: int
-        Number of units specifying a single configuration.
-    interval: tuple
-        Low and high limits for the interval
+    lattice_size: int
+        Number of nodes on the lattice.
+    support: tuple
+        Low and high limits for the interval.
     """
 
-    def __init__(self, config_size, *, interval):
-        self.size_out = config_size
+    def __init__(self, lattice_size, *, support):
+        self.size_out = lattice_size
 
-        self.x_min, self.x_max = interval
+        self.x_min, self.x_max = support
         self.x_range = self.x_max - self.x_min
 
         self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
@@ -77,7 +81,7 @@ class UniformDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from a uniform distribution.
         
-        Return shape: (sample_size, config_size) for the sample,
+        Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
         sample = torch.rand(sample_size, self.size_out) * self.x_range - self.x_max
@@ -103,11 +107,11 @@ class VonMisesDist:
 
     Inputs:
     -------
-    config_size: int
-        number of units specifying a single configuration.
+    lattice_size: int
+        number of nodes on the lattice.
     concentration: float
         parameter dictating sharpness of the peak.
-    loc: float
+    mean: float
         mean of the distribution.
 
     Notes:
@@ -119,10 +123,10 @@ class VonMisesDist:
     than it's nice to see the calculation written out.
     """
 
-    def __init__(self, config_size, *, concentration, loc):
-        self.size_out = config_size
+    def __init__(self, lattice_size, *, concentration, mean):
+        self.size_out = lattice_size
         self.kappa = concentration
-        self.mean = loc
+        self.mean = mean
 
         self.log_normalisation = self.size_out * log(2 * pi * i0(self.kappa))
 
@@ -134,7 +138,7 @@ class VonMisesDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the von Mises distribution.
         
-        Return shape: (sample_size, config_size) for the sample,
+        Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
         sample = self.generator((sample_size, self.size_out))
@@ -158,24 +162,20 @@ class SphericalUniformDist:
 
     Inputs:
     -------
-    config_size: int
-        Number of units specifying a single configuration.
-        Assumed to be twice the number of lattice sites.
-        (i.e. assume single field in theory, for now)
+    lattice_size: int
+        number of nodes on the lattice
     """
 
-    def __init__(self, config_size):
-        # Number of components per field configuration =
-        # size of output Tensor at dimension 1
-        self.size_out = config_size
-        self.lattice_size = config_size // 2
+    def __init__(self, lattice_size):
+        # Two components for each lattice site
+        self.size_out = lattice_size * 2
 
     def __call__(self, sample_size):
         r"""Return tensor of values drawn from uniform distribution
         on a unit 2-dimensional sphere, along with the corresponding
         log probability density.
         
-        Return shape: (sample_size, config_size) for the sample,
+        Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         
         Notes
@@ -197,12 +197,12 @@ class SphericalUniformDist:
         return sample, log_density
 
     def log_density(self, sample):
-        r"""Takes a sample of shape (sample_size, config_size) and
+        r"""Takes a sample of shape (sample_size, lattice_size) and
         computes the logarithm of the probability density function for
         the spherical uniform distribution.
 
         It is assumed that the tensor follows the __call__ method above
-        in that, when a view of shape (sample_size, config_size / 2, 2)
+        in that, when a view of shape (sample_size, lattice_size / 2, 2)
         is taken, the 0th element in the 2nd dimension is the polar angle.
         In other words, every second element of the input tensor, starting
         at the 0th element, is a polar angle.
@@ -216,39 +216,39 @@ class SphericalUniformDist:
         return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
 
 
-def standard_normal_distribution(config_size):
+def standard_normal_distribution(lattice_size):
     """returns an instance of the NormalDist class with mean 0 and
     variance 1"""
-    return NormalDist(config_size, scale=1, loc=0)
+    return NormalDist(lattice_size, sigma=1, mean=0)
 
 
-def normal_distribution(config_size, scale=1, loc=0):
+def normal_distribution(lattice_size, sigma=1, mean=0):
     """Returns an instance of the NormalDist class"""
-    return NormalDist(config_size, scale=scale, loc=loc)
+    return NormalDist(lattice_size, sigma=sigma, mean=mean)
 
 
-def uniform_distribution(config_size, interval=(-1, 1)):
+def uniform_distribution(lattice_size, support=(-1, 1)):
     """Returns an instance of the UniformDist class.
 
-    The default interval is intentionall zero-centered,
+    The default interval is intentionally zero-centered,
     anticipating use as a base distribution."""
-    return UniformDist(config_size, interval=interval)
+    return UniformDist(lattice_size, support=support)
 
 
-def circular_uniform_distribution(config_size):
+def circular_uniform_distribution(lattice_size):
     """Returns an instance of the UniformDist class with interval
     [0, 2 * pi)"""
-    return UniformDist(config_size, interval=(0, 2 * pi))
+    return UniformDist(lattice_size, support=(0, 2 * pi))
 
 
-def von_mises_distribution(config_size, concentration=1, loc=0):
+def von_mises_distribution(lattice_size, concentration=1, mean=0):
     """Returns and instance of the VonMisesDist class."""
-    return VonMisesDist(config_size, concentration=concentration, loc=loc)
+    return VonMisesDist(lattice_size, concentration=concentration, mean=mean)
 
 
-def spherical_uniform_distribution(config_size):
+def spherical_uniform_distribution(lattice_size):
     """Returns an instance of the SphericalUniformDist class"""
-    return SphericalUniformDist(config_size)
+    return SphericalUniformDist(lattice_size)
 
 
 class PhiFourAction(nn.Module):
