@@ -450,3 +450,21 @@ def xy_hamiltonian(beta, geometry):
 
 def heisenberg_hamiltonian(beta, geometry):
     return HeisenbergHamiltonian(beta, geometry)
+
+
+BASE_OPTIONS = {
+    "standard_normal": standard_normal_distribution,
+    "normal": normal_distribution,
+    "uniform": uniform_distribution,
+    "circular_uniform": circular_uniform_distribution,
+    "von_mises": von_mises_distribution,
+    "spherical_uniform": spherical_uniform_distribution,
+}
+TARGET_OPTIONS = dict(
+    {
+        "phi_four": phi_four_action,
+        "xy": xy_hamiltonian,
+        "heisenberg": heisenberg_hamiltonian,
+    },
+    **BASE_OPTIONS
+)

@@ -94,6 +94,7 @@ def train(
 def adam(
     loaded_model,
     loaded_checkpoint,
+    *,
     lr=0.001,
     betas=(0.9, 0.999),
     eps=1e-08,
@@ -114,7 +115,7 @@ def adam(
 
 
 def adadelta(
-    loaded_model, loaded_checkpoint, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0
+    loaded_model, loaded_checkpoint, *, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0
 ):
     optimizer = optim.Adadelta(
         loaded_model.parameters(), lr=lr, rho=rho, eps=eps, weight_decay=weight_decay
@@ -127,6 +128,7 @@ def adadelta(
 def stochastic_gradient_descent(
     loaded_model,
     loaded_checkpoint,
+    *,
     lr,
     momentum=0,
     dampening=0,
@@ -146,12 +148,38 @@ def stochastic_gradient_descent(
     return optimizer
 
 
+def rms_prop(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    lr=0.01,
+    alpha=0.99,
+    eps=1e-08,
+    weight_decay=0,
+    momentum=0,
+    centered=False,
+):
+    optimizer = optim.RMSprop(
+        loaded_model.parameters(),
+        lr=lr,
+        alpha=alpha,
+        eps=eps,
+        weight_decay=weight_decay,
+        momentum=momentum,
+        centered=centered,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
 def reduce_lr_on_plateau(
     loaded_optimizer,
+    *,
     mode="min",
     factor=0.1,
-    patience=500,
-    verbose=True,
+    patience=500,  # not the PyTorch default
+    verbose=False,
     threshold=0.0001,
     threshold_mode="rel",
     cooldown=0,
@@ -170,3 +198,11 @@ def reduce_lr_on_plateau(
         min_lr=min_lr,
         eps=eps,
     )
+
+
+OPTIMIZER_OPTIONS = {
+    "adam": adam,
+    "adadelta": adadelta,
+    "sgd": stochastic_gradient_descent,
+    "rms_prop": rms_prop,
+}

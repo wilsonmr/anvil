@@ -9,33 +9,12 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
-from anvil.train import (
-    adam,
-    adadelta,
-    stochastic_gradient_descent,
-    reduce_lr_on_plateau,
-)
+from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
-from anvil.distributions import *
+from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 log = logging.getLogger(__name__)
-
-BASE_OPTIONS = {
-    "standard_normal": standard_normal_distribution,
-    "normal": normal_distribution,
-    "uniform": uniform_distribution,
-    "circular_uniform": circular_uniform_distribution,
-    "von_mises": von_mises_distribution,
-    "spherical_uniform": spherical_uniform_distribution,
-}
-TARGET_OPTIONS = dict({"phi_four": phi_four_action,}, **BASE_OPTIONS)
-
-OPTIMIZER_OPTIONS = {
-    "adam": adam,
-    "adadelta": adadelta,
-    "sgd": stochastic_gradient_descent,
-}
 
 
 class ConfigParser(Config):
