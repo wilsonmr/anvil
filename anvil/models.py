@@ -102,8 +102,8 @@ class AffineLayer(nn.Module):
                 for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
             ]
         )
-        # No ReLU on final layers: need to be able to scale data by
-        # 0 < s, not 1 < s, and enact both +/- shifts
+        # By default not activation function on final layer
+        # TODO: REALLY need flexibility to specify this in the runcard
         self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1])]
         self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
 

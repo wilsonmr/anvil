@@ -22,7 +22,8 @@ save_interval: 1000
 
 # Optimizer
 optimizer: 'adam'
-lr: 0.01
+learning_rate: 0.001
 
 # Scheduler
-factor: 0.5
+verbose_scheduler: true
+lr_reduction_factor: 0.5

@@ -95,19 +95,19 @@ def adam(
     loaded_model,
     loaded_checkpoint,
     *,
-    lr=0.001,
-    betas=(0.9, 0.999),
-    eps=1e-08,
-    weight_decay=0,
-    amsgrad=False,
+    learning_rate=0.001,
+    adam_betas=(0.9, 0.999),
+    optimizer_stability_factor=1e-08,
+    optimizer_weight_decay=0,
+    adam_use_amsgrad=False,
 ):
     optimizer = optim.Adam(
         loaded_model.parameters(),
-        lr=lr,
-        betas=betas,
-        eps=eps,
-        weight_decay=weight_decay,
-        amsgrad=amsgrad,
+        lr=learning_rate,
+        betas=adam_betas,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
+        amsgrad=adam_use_amsgrad,
     )
     if loaded_checkpoint is not None:
         optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
@@ -115,10 +115,20 @@ def adam(
 
 
 def adadelta(
-    loaded_model, loaded_checkpoint, *, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate=1.0,
+    adadelta_rho=0.9,
+    optimizer_stability_factor=1e-06,
+    optimizer_weight_decay=0,
 ):
     optimizer = optim.Adadelta(
-        loaded_model.parameters(), lr=lr, rho=rho, eps=eps, weight_decay=weight_decay
+        loaded_model.parameters(),
+        lr=learning_rate,
+        rho=adadelta_rho,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
     )
     if loaded_checkpoint is not None:
         optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
@@ -129,19 +139,19 @@ def stochastic_gradient_descent(
     loaded_model,
     loaded_checkpoint,
     *,
-    lr,
-    momentum=0,
-    dampening=0,
-    weight_decay=0,
-    nesterov=False,
+    learning_rate,
+    sgd_momentum=0,
+    sgd_dampening=0,
+    optimizer_weight_decay=0,
+    sgd_use_nesterov=False,
 ):
     optimizer = optim.SGD(
         loaded_model.parameters(),
-        lr=lr,
-        momentum=momentum,
-        dampening=dampening,
-        weight_decay=weight_decay,
-        nesterov=nesterov,
+        lr=learning_rate,
+        momentum=optimizer_momentum,
+        dampening=optimizer_dampening,
+        weight_decay=optimizer_weight_decay,
+        nesterov=sgd_use_nesterov,
     )
     if loaded_checkpoint is not None:
         optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
@@ -152,21 +162,21 @@ def rms_prop(
     loaded_model,
     loaded_checkpoint,
     *,
-    lr=0.01,
-    alpha=0.99,
-    eps=1e-08,
-    weight_decay=0,
-    momentum=0,
-    centered=False,
+    learning_rate=0.01,
+    rmsprop_smoothing=0.99,
+    optimizer_stability_factor=1e-08,
+    optimizer_weight_decay=0,
+    optimizer_momentum=0,
+    rmsprop_use_centered=False,
 ):
     optimizer = optim.RMSprop(
         loaded_model.parameters(),
-        lr=lr,
-        alpha=alpha,
-        eps=eps,
-        weight_decay=weight_decay,
-        momentum=momentum,
-        centered=centered,
+        lr=learning_Rate,
+        alpha=rmsprop_smoothing,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
+        momentum=optimizer_momentum,
+        centered=rmsprop_use_centered,
     )
     if loaded_checkpoint is not None:
         optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
@@ -176,27 +186,25 @@ def rms_prop(
 def reduce_lr_on_plateau(
     loaded_optimizer,
     *,
-    mode="min",
-    factor=0.1,
+    lr_reduction_factor=0.1,
+    min_learning_rate=0,
     patience=500,  # not the PyTorch default
-    verbose=False,
-    threshold=0.0001,
-    threshold_mode="rel",
     cooldown=0,
-    min_lr=0,
-    eps=1e-08,
+    verbose_scheduler=False,
+    scheduler_threshold=0.0001,
+    scheduler_threshold_mode="rel",
+    scheduler_stability_factor=1e-08,
 ):
     return optim.lr_scheduler.ReduceLROnPlateau(
         loaded_optimizer,
-        mode=mode,
-        factor=factor,
+        factor=lr_reduction_factor,
         patience=patience,
-        verbose=verbose,
-        threshold=threshold,
-        threshold_mode=threshold_mode,
+        verbose=verbose_scheduler,
+        threshold=scheduler_threshold,
+        threshold_mode=scheduler_threshold_mode,
         cooldown=cooldown,
-        min_lr=min_lr,
-        eps=eps,
+        min_lr=min_learning_rate,
+        eps=scheduler_stability_factor,
     )
 
 
