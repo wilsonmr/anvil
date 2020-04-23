@@ -10,13 +10,21 @@ from anvil.config import ConfigParser
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.sample", "anvil.observables", "anvil.plot", "anvil.table", "anvil.checkpoint", "reportengine.report"]
+PROVIDERS = [
+    "anvil.sample",
+    "anvil.observables",
+    "anvil.plot",
+    "anvil.table",
+    "anvil.checkpoint",
+    "reportengine.report",
+    "anvil.benchmarks",
+]
 
 
 class SampleApp(App):
     config_class = ConfigParser
 
-    def __init__(self, name="validphys", *, providers):
+    def __init__(self, name="anvil-sample", *, providers):
         super().__init__(name, providers)
 
 

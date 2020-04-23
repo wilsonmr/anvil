@@ -88,7 +88,7 @@ class TrainApp(App):
     config_class = TrainConfig
     environment_class = TrainEnv
 
-    def __init__(self, name="validphys", *, providers):
+    def __init__(self, name="anvil-train", *, providers):
         super().__init__(name, providers)
 
     @property
