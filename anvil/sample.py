@@ -6,8 +6,7 @@ Module containing functions related to sampling from a trained model
 
 from math import exp, isfinite, ceil
 import logging
-
-from numpy.random import uniform
+from random import random
 import torch
 
 from tqdm import tqdm
@@ -22,7 +21,14 @@ class LogRatioNanError(Exception):
     pass
 
 
-def sample_batch(loaded_model, action, batch_size, current_state=None):
+def sample_batch(
+    loaded_model,
+    base,
+    target,
+    batch_size,
+    current_state=None,
+    current_log_density=None,
+):
     r"""
     Sample using Metroplis-Hastings algorithm from a large number of phi
     configurations.
@@ -39,9 +45,9 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    action: Module
-        the action upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+    target: Module
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
     batch_size: int
         the number of states to generate from the loaded_model
     current_state: torch.Tensor or None
@@ -55,35 +61,37 @@ def sample_batch(loaded_model, action, batch_size, current_state=None):
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z = loaded_model.generator(batch_size + 1)
-        phi = loaded_model.inverse_map(z)  # map using trained loaded_model to phi
+        z, base_log_density = base(batch_size + 1)
+        phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
+        model_log_density = base_log_density + map_log_density
+
         if current_state is not None:
             phi[0] = current_state
-        log_ptilde = loaded_model(phi)
+            model_log_density[0] = current_log_density
+
     history = torch.zeros(batch_size, dtype=torch.bool)  # accept/reject history
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 
-    log_ratio = log_ptilde + action(phi)
+    log_ratio = model_log_density - target(phi)
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
             "could run into nans based on minimum and maximum log of ratio of probabilities"
         )
 
-    rand_batch = uniform(size=batch_size + 1)  # gen batch of random uniform numbers
     i = 0  # phi index of current state
     for j in range(1, batch_size + 1):  # j = phi index of proposed state
         condition = min(1, exp(float(log_ratio[i] - log_ratio[j])))
-        if rand_batch[j] <= condition:  # accepted
+        if random() <= condition:  # accepted
             chain_indices[j - 1] = j
             history[j - 1] = True
             i = j
         else:  # rejected
             chain_indices[j - 1] = i
 
-    return phi[chain_indices, :], history
+    return phi[chain_indices, :], model_log_density[chain_indices, :], history
 
 
-def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
+def thermalised_state(loaded_model, base, target, thermalisation) -> torch.Tensor:
     r"""
     A (hopefully) short initial sampling phase to allow the system to thermalise.
 
@@ -91,9 +99,9 @@ def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    action: Module
-        the action upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+    target: Module
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
 
     Returns
     -------
@@ -103,13 +111,15 @@ def thermalised_state(loaded_model, action, thermalisation) -> torch.Tensor:
     if thermalisation is None:
         return thermalisation
 
-    states, _ = sample_batch(loaded_model, action, thermalisation)
+    states, current_log_density, _ = sample_batch(
+        loaded_model, base, target, thermalisation
+    )
     log.info(f"Thermalisation: discarded {thermalisation} configurations.")
-    return states[-1]
+    return states[-1], current_log_density[-1]
 
 
 def chain_autocorrelation(
-    loaded_model, action, thermalised_state, sample_interval=None
+    loaded_model, base, target, thermalised_state, sample_interval=None
 ) -> float:
     r"""
     Compute an observable-independent measure of the integrated autocorrelation
@@ -138,9 +148,9 @@ def chain_autocorrelation(
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    action: Module
-        the action upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+    target: Module
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
     initial_state:
         the current state of the Markov chain, after thermalisation
 
@@ -157,7 +167,9 @@ def chain_autocorrelation(
     batch_size = 10000
 
     # Sample some states
-    _, history = sample_batch(loaded_model, action, batch_size, thermalised_state)
+    _, _, history = sample_batch(
+        loaded_model, base, target, batch_size, *thermalised_state
+    )
 
     accepted = float(torch.sum(history))
     n_states = len(history)
@@ -193,7 +205,12 @@ def chain_autocorrelation(
 
 
 def sample(
-    loaded_model, action, target_length: int, thermalised_state, chain_autocorrelation
+    loaded_model,
+    base,
+    target,
+    target_length: int,
+    thermalised_state,
+    chain_autocorrelation,
 ) -> torch.Tensor:
     r"""
     Produces a Markov chain with approximately target_length decorrelated configurations,
@@ -203,21 +220,23 @@ def sample(
     ----------
     loaded_model: Module
         loaded_model which is going to be used to generate sample states
-    action: Module
-        the action upon which the loaded_model was trained, used to calculate the
-        acceptance condition
+    base: Distribution object
+        object containing methods related to the base distribution, including
+        its generation and calculation of the log density
+    target: Module
+        the target distribution with which the loaded_model was trained,
+        used to calculate the acceptance condition
     target_length: int
         the desired number of states to generate from the loaded_model
 
     Returns
     -------
     decorrelated_chain: torch.Tensor
-        a sample of states from loaded_model, size = (target_length, loaded_model.size_in)
-
+        a sample of states from loaded_model, size = (target_length, base.size_out)
     """
 
     # Thermalise
-    current_state = thermalised_state
+    current_state, current_log_density = thermalised_state
 
     # Calculate sampling interval from integrated autocorrelation time
     sample_interval = chain_autocorrelation
@@ -232,7 +251,7 @@ def sample(
     actual_length = dec_samp_per_batch * n_batches
 
     decorrelated_chain = torch.empty(
-        (actual_length, loaded_model.size_in), dtype=torch.float32
+        (actual_length, base.size_out), dtype=torch.float32
     )
     accepted = 0
 
@@ -244,10 +263,11 @@ def sample(
     pbar = tqdm(range(n_batches), desc="batch")
     for batch in pbar:
         # Generate sub-chain of batch_size configurations
-        batch_chain, batch_history = sample_batch(
-            loaded_model, action, batch_size, current_state
+        batch_chain, batch_log_density, batch_history = sample_batch(
+            loaded_model, base, target, batch_size, current_state, current_log_density,
         )
         current_state = batch_chain[-1]
+        current_log_density = batch_log_density[-1]
 
         accepted += torch.sum(batch_history)
 

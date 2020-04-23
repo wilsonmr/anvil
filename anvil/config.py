@@ -6,15 +6,14 @@ Module to parse runcards
 import logging
 
 from reportengine.report import Config
-from reportengine.configparser import ConfigError, element_of
+from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import PhiFourAction, TrainingOutput
+from anvil.core import TrainingOutput
 from anvil.models import RealNVP
 from anvil.geometry import Geometry2D
-from anvil.distributions import NormalDist
+from anvil.distributions import normal_distribution, phi_four_action
 
 log = logging.getLogger(__name__)
-
 
 class ConfigParser(Config):
     """Extend the reportengine Config class for anvil-specific
@@ -37,6 +36,9 @@ class ConfigParser(Config):
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
+    def parse_theory(self, theory: str):
+        return theory
+
     def parse_m_sq(self, m: (float, int)):
         return m
 
@@ -46,9 +48,15 @@ class ConfigParser(Config):
     def parse_use_arxiv_version(self, do_use: bool):
         return do_use
 
-    def produce_action(self, m_sq, lam, geometry, use_arxiv_version):
-        return PhiFourAction(
-            m_sq, lam, geometry=geometry, use_arxiv_version=use_arxiv_version
+    @explicit_node
+    def produce_target(self, theory):
+        """Return the function which initialises the correct action"""
+        if theory == "phi_four":
+            return phi_four_action
+        raise ConfigError(
+            f"Selected theory: {theory}, has not been implemented yet",
+            theory,
+            ["phi_four"],
         )
 
     def parse_hidden_nodes(self, hid_spec):
@@ -68,22 +76,19 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_generator(
-        self,
-        lattice_size: int,
-        base_dist: str = "normal",
-        field_dimension: int = 1,
-    ):
+    @explicit_node
+    def produce_base(self, base_dist: str = "normal",):
+        """Return the action which loads appropriate base distribution"""
         if base_dist == "normal":
-            return NormalDist(
-                lattice_volume=lattice_size,
-                field_dimension=field_dimension,
-            )
-        else:
-            raise NotImplementedError
+            return normal_distribution
+        raise ConfigError(
+            f"Base distribution: {base_dist}, has not been implemented yet",
+            base_dist,
+            ["normal"],
+        )
 
-    def produce_model(self, generator, n_affine, network_kwargs):
-        model = RealNVP(generator=generator, n_affine=n_affine, **network_kwargs)
+    def produce_model(self, lattice_size, n_affine, network_kwargs):
+        model = RealNVP(size_in=lattice_size, n_affine=n_affine, **network_kwargs)
         return model
 
     def parse_epochs(self, epochs: int):
@@ -113,16 +118,12 @@ class ConfigParser(Config):
 
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
-            _, geometry = self.parse_from_(None, "geometry", write=False)
-            _, model = self.parse_from_(None, "model", write=False)
-            _, action = self.parse_from_(None, "action", write=False)
-            _, cps = self.parse_from_(None, "checkpoints", write=False)
+        # NOTE: This seems a bit hacky, exposing the entire training configuration
+        # file - hopefully doesn't cause any issues..
+        return training_output.as_input()
 
-        return dict(geometry=geometry, model=model, action=action, checkpoints=cps)
-
-    def produce_training_geometry(self, training_output):
-        with self.set_context(ns=self._curr_ns.new_child(training_output.as_input())):
+    def produce_training_geometry(self, training_context):
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
@@ -130,7 +131,7 @@ class ConfigParser(Config):
         valid_optimizers = ("adam", "adadelta")
         if optim not in valid_optimizers:
             raise ConfigError(
-                f"optimizer must be one of {', '.join([opt for opt in valid_optimizers])}"
+                f"Invalid optimizer choice: {optim}", optim, valid_optimizers
             )
         return optim
 
@@ -173,11 +174,11 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_n_boot(self, n_samples: int):
-        if n_samples < 2:
+    def parse_n_boot(self, n_boot: int):
+        if n_boot < 2:
             raise ConfigError("n_boot must be greater than 1")
-        log.warning(f"Using user specified n_boot: {n_samples}")
-        return n_samples
+        log.warning(f"Using user specified n_boot: {n_boot}")
+        return n_boot
 
     @element_of("windows")
     def parse_window(self, window: float):
