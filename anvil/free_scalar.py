@@ -1,5 +1,5 @@
 """
-free_theory.py
+free_scalar.py
 
 module containing the FreeScalarEigenmodes class used to compare with model
 trained to free scalar theory

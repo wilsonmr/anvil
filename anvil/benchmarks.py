@@ -7,7 +7,7 @@ is working correctly.
     
 Notes
 -----
-See the docstring for anvil.free_theory.FreeScalarEigenmodes for an explanation
+See the docstring for anvil.free_scalar.FreeScalarEigenmodes for an explanation
 of the theoretical predictions and how to match them to quantities derived from
 a sample of generated field configurations.
 """
@@ -22,7 +22,7 @@ from reportengine import collect
 from reportengine.figure import figure
 from reportengine.table import table
 
-from anvil.free_theory import FreeScalarEigenmodes
+from anvil.free_scalar import FreeScalarEigenmodes
 from anvil.checks import check_trained_with_free_theory
 
 
