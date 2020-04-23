@@ -63,6 +63,9 @@ class BenchmarkSampleApp(anvil_sample.SampleApp):
         )
         return args
 
+    def init_logging(self, args):
+        pass # logging already initialised in training.
+
 
 def main():
     """Main loop of benchmark"""
