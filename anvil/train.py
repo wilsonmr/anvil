@@ -140,8 +140,8 @@ def stochastic_gradient_descent(
     loaded_checkpoint,
     *,
     learning_rate,
-    sgd_momentum=0,
-    sgd_dampening=0,
+    optimizer_momentum=0,
+    optimizer_dampening=0,
     optimizer_weight_decay=0,
     sgd_use_nesterov=False,
 ):
