@@ -46,7 +46,9 @@ class NormalDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.randn(sample_size, self.size_out)
+        sample = torch.empty(sample_size, self.size_out).normal_(
+            mean=self.mean, std=self.sigma
+        )
 
         return sample, self.log_density(sample)
 
@@ -71,9 +73,7 @@ class UniformDist:
 
     def __init__(self, lattice_size, *, support):
         self.size_out = lattice_size
-
-        self.x_min, self.x_max = support
-        self.x_range = self.x_max - self.x_min
+        self.support = support
 
         self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
 
@@ -84,7 +84,7 @@ class UniformDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.rand(sample_size, self.size_out) * self.x_range - self.x_max
+        sample = torch.empty(sample_size, self.size_out).uniform_(*self.support)
         return sample, torch.zeros((sample_size, 1))
 
 

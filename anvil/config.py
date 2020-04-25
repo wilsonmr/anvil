@@ -10,7 +10,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import RealNVP
+from anvil.models import real_nvp
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
@@ -90,16 +90,11 @@ class ConfigParser(Config):
                 f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
             )
 
-    def parse_hidden_nodes(self, hid_spec):
-        return hid_spec
+    def parse_network_spec(self, net_spec: dict):
+        return net_spec
 
-    def produce_network_kwargs(self, hidden_nodes):
-        """Returns a dictionary that is the necessary kwargs for the NVP class
-        This means in the future if we change the class to have more flexibility
-        with regard to network spec then we can use this function to bridge
-        backwards compatibility"""
-        hidden_nodes = tuple(hidden_nodes)
-        return dict(affine_hidden_shape=hidden_nodes)
+    def parse_standardise_inputs(self, do_stand: bool):
+        return do_stand
 
     def parse_n_affine(self, n: int):
         return n
@@ -107,9 +102,9 @@ class ConfigParser(Config):
     def parse_n_batch(self, nb: int):
         return nb
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(size_in=lattice_size, n_affine=n_affine, **network_kwargs)
-        return model
+    @explicit_node
+    def produce_model(self):
+        return real_nvp
 
     def parse_epochs(self, epochs: int):
         return epochs

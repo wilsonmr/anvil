@@ -19,6 +19,73 @@ from math import sqrt, pi, log
 import torch
 import torch.nn as nn
 
+ACTIVATION_LAYERS = {
+    "relu": nn.ReLU,
+    "leaky_relu": nn.LeakyReLU,
+    "sigmoid": nn.Sigmoid,
+    "tanh": nn.Tanh,
+    "identity": nn.Identity,
+    None: nn.Identity,
+}
+
+
+class NeuralNetwork(nn.Module):
+    def __init__(
+        self,
+        size_in: int,
+        size_out: int,
+        hidden_shape: list = [24,],
+        activation: str = "leaky_relu",
+        final_activation: str = "identity",
+        do_batch_norm: bool = False,
+        name: str = "net",
+    ):
+        super(NeuralNetwork, self).__init__()
+
+        self.name = name
+
+        self.size_in = size_in
+        self.size_out = size_out
+        self.hidden_shape = hidden_shape
+
+        if do_batch_norm:
+            self.batch_norm = nn.BatchNorm1d
+        else:
+            self.batch_norm = nn.Identity
+
+        self.activation_func = ACTIVATION_LAYERS[activation]
+        self.final_activation_func = ACTIVATION_LAYERS[final_activation]
+
+        self.network = self._construct_network()
+
+    def __str__(self):
+        output = ""
+        print(f"Network: {self.name}")
+        print("-----------")
+        print(f"Shape: ", self.size_in, *self.hidden_shape, self.size_out)
+        print(f"Activation function: {self.activation_func}")
+        return output
+
+
+    def _block(self, size_in, size_out, activation_func):
+        return [
+            nn.Linear(size_in, size_out),
+            self.batch_norm(size_out),
+            activation_func(),
+        ]
+
+    def _construct_network(self):
+        layers = self._block(self.size_in, self.hidden_shape[0], self.activation_func)
+        for f_in, f_out in zip(self.hidden_shape[:-1], self.hidden_shape[1:]):
+            layers += self._block(f_in, f_out, self.activation_func)
+        layers += self._block(
+                self.hidden_shape[-1], self.size_out, self.final_activation_func
+            )
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.network(x)
+
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
@@ -83,29 +150,20 @@ class AffineLayer(nn.Module):
     """
 
     def __init__(
-        self, size_in: int, s_hidden_shape: tuple, t_hidden_shape: tuple, i_affine: int
+        self,
+        i_affine: int,
+        size_in: int,
+        s_network_spec: dict,
+        t_network_spec: dict,
+        standardise_inputs: bool = True,
     ):
         super(AffineLayer, self).__init__()
         size_half = int(size_in / 2)
-        s_shape = [size_half, *s_hidden_shape, size_half]
-        t_shape = [size_half, *t_hidden_shape, size_half]
 
-        self.s_layers = nn.ModuleList(
-            [
-                self._block(s_in, s_out)
-                for s_in, s_out in zip(s_shape[:-2], s_shape[1:-1])
-            ]
-        )
-        self.t_layers = nn.ModuleList(
-            [
-                self._block(t_in, t_out)
-                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
-            ]
-        )
-        # By default not activation function on final layer
-        # TODO: REALLY need flexibility to specify this in the runcard
-        self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1])]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
+        self.s_network = NeuralNetwork(size_half, size_half, **s_network_spec, name=f"s{i_affine}")
+        self.t_network = NeuralNetwork(size_half, size_half, **t_network_spec, name=f"t{i_affine}")
+
+        #print(self.s_network)
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -120,79 +178,19 @@ class AffineLayer(nn.Module):
                 (a[1], a[0]), *args, **kwargs
             )
 
-    def _block(self, f_in, f_out):
-        """Defines a single block within the neural networks.
+        if standardise_inputs == True:
+            self.standardise = lambda x: (x - x.mean()) / x.std()
+        else:
+            self.standardise = lambda x: x
 
-        Currently hard coded to be a dense layed followed by a leaky ReLU,
-        but could potentially specify in runcard.
-        """
-        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
-
-    def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
-        """Internal method which performs the forward pass of the network
-        s.
-
-        Input data x_input should be a torch tensor of size D, with the
-        appropriate mask_mat applied such that elements corresponding to
-        partition b are set to zero
-
-        """
-        for s_layer in self.s_layers:
-            x_input = s_layer(x_input)
-        return x_input
-
-    def _t_forward(self, x_input: torch.Tensor) -> torch.Tensor:
-        """Internal method which performs the forward pass of the network
-        t.
-
-        Input data x_input should be a torch tensor of size D, with the
-        appropriate mask_mat applied such that elements corresponding to
-        partition b are set to zero
-
-        """
-        for t_layer in self.t_layers:
-            x_input = t_layer(x_input)
-        return x_input
-
-    def coupling_layer(self, phi_input) -> torch.Tensor:
-        r"""performs the transformation of a single coupling layer, denoted
-        g_i(\phi).
-
-        Affine transformation, z = g_i(\phi), defined as:
-
-        z_a = \phi_a
-        z_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
-
-        see eq. (9) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            stack of transformed vectors z, with same shape as input
-
-        """
-        # since inputs are like (N_states, D) we need to index correct halves
-        # of if input states
-        phi_a = phi_input[:, self._a_ind]
-        phi_b = phi_input[:, self._b_ind]
-        s_out = self._s_forward(phi_a)
-        t_out = self._t_forward(phi_a)
-        z_b = s_out.exp() * phi_b + t_out
-        return self.join_func([phi_a, z_b], dim=1)  # put back together state
-
-    def forward(self, z_input) -> torch.Tensor:
+    def forward(self, x_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
-        g_i^{-1}(z)
+        g_i^{-1}(x)
 
-        inverse transformation, \phi = g_i^{-1}(z), defined as:
+        inverse transformation, \phi = g_i^{-1}(x), defined as:
 
-        \phi_a = z_a
-        \phi_b = (z_b - t_i(z_a)) * exp(-s_i(z_a))
+        \phi_a = x_a
+        \phi_b = (x_b - t_i(x_a)) * exp(-s_i(x_a))
 
         see eq. (10) of https://arxiv.org/pdf/1904.12072.pdf
             
@@ -204,8 +202,8 @@ class AffineLayer(nn.Module):
 
         Parameters
         ----------
-        z_input: torch.Tensor
-            stack of vectors z, shape (N_states, D)
+        x_input: torch.Tensor
+            stack of vectors x, shape (N_states, D)
 
         Returns
         -------
@@ -215,12 +213,13 @@ class AffineLayer(nn.Module):
                 logarithm of the jacobian determinant for the inverse of the
                 transformation applied here.
         """
-        z_a = z_input[:, self._a_ind]
-        z_b = z_input[:, self._b_ind]
-        s_out = self._s_forward(z_a)
-        t_out = self._t_forward(z_a)
-        phi_b = (z_b - t_out) * torch.exp(-s_out)
-        return self.join_func([z_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+        x_a_stand = self.standardise(x_a)
+        s_out = self.s_network(x_a_stand)
+        t_out = self.t_network(x_a_stand)
+        phi_b = (x_b - t_out) * torch.exp(-s_out)
+        return self.join_func([x_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
 
 
 class RealNVP(nn.Module):
@@ -254,13 +253,23 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, size_in, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
+        self,
+        *,
+        size_in,
+        n_affine: int,
+        network_spec: dict,
+        standardise_inputs: bool = True
     ):
         super(RealNVP, self).__init__()
 
+        s_network_spec = network_spec["s"]
+        t_network_spec = network_spec["t"]
+
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
+                AffineLayer(
+                    i, size_in, s_network_spec, t_network_spec, standardise_inputs
+                )
                 for i in range(n_affine)
             ]
         )
@@ -298,6 +307,15 @@ class RealNVP(nn.Module):
             # TODO: make this yield, then make a yield from wrapper?
 
         return phi_out, log_density
+
+
+def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs):
+    return RealNVP(
+        size_in=lattice_size,
+        n_affine=n_affine,
+        network_spec=network_spec,
+        standardise_inputs=standardise_inputs,
+    )
 
 
 if __name__ == "__main__":
