@@ -64,17 +64,20 @@ def train(
                 },
                 f"{outpath}/checkpoint_{i}.pt",
             )
-        # gen simple states
+        # gen simple states (gradients not tracked)
         z, base_log_density = base_dist(n_batch)
+
+        # apply inverse map, calc log density of forward map (gradients tracked)
         phi, map_log_density = loaded_model(z)
 
+        # compute loss function (gradients tracked)
         model_log_density = base_log_density + map_log_density
         target_log_density = target_dist.log_density(phi)
-
-        loaded_model.zero_grad()  # get rid of stored gradients
         current_loss = shifted_kl(model_log_density, target_log_density)
-        current_loss.backward()  # calc gradients
 
+        # backprop and step model parameters
+        loaded_optimizer.zero_grad()  # zero gradients from prev minibatch
+        current_loss.backward()  # accumulate new gradients
         loaded_optimizer.step()
         scheduler.step(current_loss)
 
