@@ -2,28 +2,28 @@
 lattice_length: 6
 lattice_dimension: 2
 
-theory: "phi_four"
-
+# Target
+target: "phi_four"
 m_sq: 4
 lam: 0
 use_arxiv_version: False
 
+# Base
+base: "standard_normal"
+
 # Networks
 hidden_nodes: [24]
-n_affine: 2
-n_batch: 2000
+n_affine: 4
+n_batch: 1000
 
 # Training length
-epochs: 5000
+epochs: 3000
 save_interval: 1000
 
-# Optimizer ('adam', 'adadelta')
+# Optimizer
 optimizer: 'adam'
-optimizer_kwargs:
-    lr: 0.01
+learning_rate: 0.001
 
 # Scheduler
-scheduler_kwargs:
-    verbose: true
-    factor: 0.5
-    patience: 500
+verbose_scheduler: true
+lr_reduction_factor: 0.5

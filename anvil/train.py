@@ -38,8 +38,8 @@ def shifted_kl(
 
 def train(
     loaded_model,
-    base,
-    target,
+    base_dist,
+    target_dist,
     *,
     train_range,
     save_interval,
@@ -47,16 +47,12 @@ def train(
     outpath,
     current_loss,
     loaded_optimizer,
-    scheduler_kwargs={"patience": 500},
+    scheduler,
 ):
     """training loop of model"""
-    # create your optimizer and a scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        loaded_optimizer, **scheduler_kwargs
-    )
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = base.size_out
+    n_units = base_dist.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -68,17 +64,20 @@ def train(
                 },
                 f"{outpath}/checkpoint_{i}.pt",
             )
-        # gen simple states
-        z, base_log_density = base(n_batch)
+        # gen simple states (gradients not tracked)
+        z, base_log_density = base_dist(n_batch)
+
+        # apply inverse map, calc log density of forward map (gradients tracked)
         phi, map_log_density = loaded_model(z)
 
+        # compute loss function (gradients tracked)
         model_log_density = base_log_density + map_log_density
-        target_log_density = target(phi)  # term from parameterisatiom goes here
-
-        loaded_model.zero_grad()  # get rid of stored gradients
+        target_log_density = target_dist.log_density(phi)
         current_loss = shifted_kl(model_log_density, target_log_density)
-        current_loss.backward()  # calc gradients
 
+        # backprop and step model parameters
+        loaded_optimizer.zero_grad()  # zero gradients from prev minibatch
+        current_loss.backward()  # accumulate new gradients
         loaded_optimizer.step()
         scheduler.step(current_loss)
 
@@ -93,3 +92,128 @@ def train(
         },
         f"{outpath}/checkpoint_{train_range[-1]}.pt",
     )
+
+
+def adam(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate=0.001,
+    adam_betas=(0.9, 0.999),
+    optimizer_stability_factor=1e-08,
+    optimizer_weight_decay=0,
+    adam_use_amsgrad=False,
+):
+    optimizer = optim.Adam(
+        loaded_model.parameters(),
+        lr=learning_rate,
+        betas=adam_betas,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
+        amsgrad=adam_use_amsgrad,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def adadelta(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate=1.0,
+    adadelta_rho=0.9,
+    optimizer_stability_factor=1e-06,
+    optimizer_weight_decay=0,
+):
+    optimizer = optim.Adadelta(
+        loaded_model.parameters(),
+        lr=learning_rate,
+        rho=adadelta_rho,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def stochastic_gradient_descent(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate,
+    optimizer_momentum=0,
+    optimizer_dampening=0,
+    optimizer_weight_decay=0,
+    sgd_use_nesterov=False,
+):
+    optimizer = optim.SGD(
+        loaded_model.parameters(),
+        lr=learning_rate,
+        momentum=optimizer_momentum,
+        dampening=optimizer_dampening,
+        weight_decay=optimizer_weight_decay,
+        nesterov=sgd_use_nesterov,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def rms_prop(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate=0.01,
+    rmsprop_smoothing=0.99,
+    optimizer_stability_factor=1e-08,
+    optimizer_weight_decay=0,
+    optimizer_momentum=0,
+    rmsprop_use_centered=False,
+):
+    optimizer = optim.RMSprop(
+        loaded_model.parameters(),
+        lr=learning_Rate,
+        alpha=rmsprop_smoothing,
+        eps=optimizer_stability_factor,
+        weight_decay=optimizer_weight_decay,
+        momentum=optimizer_momentum,
+        centered=rmsprop_use_centered,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
+
+def reduce_lr_on_plateau(
+    loaded_optimizer,
+    *,
+    lr_reduction_factor=0.1,
+    min_learning_rate=0,
+    patience=500,  # not the PyTorch default
+    cooldown=0,
+    verbose_scheduler=False,
+    scheduler_threshold=0.0001,
+    scheduler_threshold_mode="rel",
+    scheduler_stability_factor=1e-08,
+):
+    return optim.lr_scheduler.ReduceLROnPlateau(
+        loaded_optimizer,
+        factor=lr_reduction_factor,
+        patience=patience,
+        verbose=verbose_scheduler,
+        threshold=scheduler_threshold,
+        threshold_mode=scheduler_threshold_mode,
+        cooldown=cooldown,
+        min_lr=min_learning_rate,
+        eps=scheduler_stability_factor,
+    )
+
+
+OPTIMIZER_OPTIONS = {
+    "adam": adam,
+    "adadelta": adadelta,
+    "sgd": stochastic_gradient_descent,
+    "rms_prop": rms_prop,
+}

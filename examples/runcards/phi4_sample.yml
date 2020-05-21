@@ -1,4 +1,4 @@
-training_output: phi4_train
+training_output: train
 
 cp_id: -1
 target_length: 10000
