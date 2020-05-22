@@ -352,7 +352,7 @@ class RealNVP(nn.Module):
         return phi_out, log_density
 
 
-def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs = False):
+def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
         size_in=lattice_size,

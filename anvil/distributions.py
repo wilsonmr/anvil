@@ -70,6 +70,7 @@ class UniformDist:
     support: tuple
         Low and high limits for the interval.
     """
+
     def __init__(self, lattice_size, *, support):
         self.size_out = lattice_size
 
@@ -216,6 +217,7 @@ class SphericalUniformDist:
                     | \det J_n | = \sin \theta_n 
         """
         return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
+
 
 def standard_normal_distribution(lattice_size):
     """returns an instance of the NormalDist class with mean 0 and

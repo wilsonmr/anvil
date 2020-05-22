@@ -118,7 +118,7 @@ class ConfigParser(Config):
         """Flag specifying whether to standardise input vectors before
         passing them through a neural network."""
         return do_stand
-       
+
     @explicit_node
     def produce_target_dist(self, target):
         """Return the function which initialises the correct action"""
