@@ -52,7 +52,6 @@ def train(
     """training loop of model"""
     # let's use tqdm to see progress
     pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    n_units = base_dist.size_out
     for i in pbar:
         if (i % save_interval) == 0:
             torch.save(
@@ -65,10 +64,10 @@ def train(
                 f"{outpath}/checkpoint_{i}.pt",
             )
         # gen simple states (gradients not tracked)
-        z, base_log_density = base_dist(n_batch)
+        x, base_log_density = base_dist(n_batch)
 
         # apply inverse map, calc log density of forward map (gradients tracked)
-        phi, map_log_density = loaded_model(z)
+        phi, map_log_density = loaded_model(x)
 
         # compute loss function (gradients tracked)
         model_log_density = base_log_density + map_log_density
@@ -92,7 +91,7 @@ def train(
         },
         f"{outpath}/checkpoint_{train_range[-1]}.pt",
     )
-
+    return loaded_model
 
 def adam(
     loaded_model,

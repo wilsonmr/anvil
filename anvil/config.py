@@ -10,7 +10,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import real_nvp
+from anvil.models import MODEL_OPTIONS
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
@@ -149,10 +149,19 @@ class ConfigParser(Config):
         """Batch size for training."""
         return nb
 
+    def parse_model(self, model: str):
+        """Label for normalising flow model."""
+        return model
+
     @explicit_node
-    def produce_model(self):
-        # NOTE this is behind other PR's with more than one model
-        return real_nvp
+    def produce_flow_model(self, model):
+        """Return the action which instantiates the normalising flow model."""
+        try:
+            return MODEL_OPTIONS[model]
+        except KeyError:
+            raise ConfigError(
+                f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
+            )
 
     def parse_epochs(self, epochs: int):
         """Number of epochs to train. Equivalent to number of passes

@@ -37,7 +37,7 @@ class NormalDist:
         self.exp_coeff = 1 / (2 * self.sigma ** 2)
 
         # Pre-calculate normalisation for log density
-        self.log_normalisation = 0.5 * self.size_out * log(2 * pi * self.sigma)
+        self.log_normalisation = self.size_out * log(sqrt(2 * pi) * self.sigma)
 
     def __call__(self, sample_size) -> tuple:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
@@ -57,6 +57,15 @@ class NormalDist:
             (sample - self.mean).pow(2), dim=1, keepdim=True
         )
         return exponent - self.log_normalisation
+
+    @property
+    def pdf(self):
+        x = torch.linspace(-5 * self.sigma, 5 * self.sigma, 10000)
+        return (
+            x,
+            torch.exp(-self.exp_coeff * (x - self.mean) ** 2)
+            / (sqrt(2 * pi) * self.sigma),
+        )
 
 
 class UniformDist:
@@ -89,6 +98,12 @@ class UniformDist:
             self.x_min, self.x_max
         )
         return sample, torch.zeros((sample_size, 1))
+
+    @property
+    def pdf(self):
+        x = torch.linspace(self.x_min, self.x_max, 10000)
+        dens = 1 / (self.x_max - self.x_min)
+        return x, torch.zeros_like(x) + dens
 
 
 class VonMisesDist:
@@ -157,6 +172,13 @@ class VonMisesDist:
             - self.log_normalisation
         )
 
+    @property
+    def pdf(self):
+        x = torch.linspace(0, 2 * pi, 10000)
+        return torch.exp(self.kappa * torch.cos(x - self.mean)) / (
+            2 * pi * i0(self.kappa)
+        )
+
 
 class SphericalUniformDist:
     """
@@ -171,6 +193,7 @@ class SphericalUniformDist:
 
     def __init__(self, lattice_size):
         # Two components for each lattice site
+        self.lattice_size = lattice_size
         self.size_out = lattice_size * 2
 
     def __call__(self, sample_size):
@@ -217,6 +240,12 @@ class SphericalUniformDist:
                     | \det J_n | = \sin \theta_n 
         """
         return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
+
+    @property
+    def pdf(self):
+        pol = torch.linspace(0, pi, 10000)
+        az = torch.linspace(0, 2 * pi, 10000)
+        return (pol, torch.sin(pol)), (az, torch.zeros_like(az) + 1 / (2 * pi))
 
 
 def standard_normal_distribution(lattice_size):

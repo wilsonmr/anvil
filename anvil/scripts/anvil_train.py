@@ -10,7 +10,7 @@ from anvil.config import ConfigParser, ConfigError
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.train", "anvil.checkpoint",]
+PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.models", "anvil.plot"]
 
 TRAINING_ACTIONS = ["train"]
 
@@ -47,7 +47,8 @@ class TrainConfig(ConfigParser):
             "training_output": str(kwargs["environment"].output_path),
             "cp_id": kwargs["environment"].extra_args["retrain"],
             "outpath": str(kwargs["environment"].output_path / "checkpoints"),
-            "actions_": ["train"],
+            "figures_dir": str(kwargs["environment"].output_path / "figures"),
+            "actions_": ["train", "plot_distributions"],
         }
         for key, value in extra_input.items():
             file_content.setdefault(key, value)
@@ -78,6 +79,7 @@ class TrainEnv(Environment):
         self.output_path.mkdir()
         (self.output_path / "checkpoints").mkdir()
         (self.output_path / "logs").mkdir()
+        (self.output_path / "figures").mkdir()
         self.input_folder = self.output_path / INPUT_FOLDER_NAME
         self.input_folder.mkdir()
 

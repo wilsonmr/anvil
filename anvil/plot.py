@@ -4,11 +4,49 @@ plot.py
 module containing all actions for plotting observables
 
 """
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from reportengine.figure import figure, figuregen
+
+
+def plot_distributions(train, base_dist, target_dist, lattice_size, figures_dir):
+    """Plot the distributions of base coordinates 'x' and output coordinates'phi' and,
+    if known, plot the pdf of the target distribution."""
+    trained_model = train
+    sample_size = 10000
+
+    # Generate a large sample from the base distribution and pass it through the trained model
+    with torch.no_grad():
+        x, _ = base_dist(sample_size)
+        phi, _ = trained_model(x)
+
+    # Convert to shape (n_coords, sample_size * lattice_size)
+    x = x.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+    phi = phi.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+
+    # Include target density if known
+    pdf = None
+    if hasattr(target_dist, "pdf"):
+        pdf = target_dist.pdf
+
+    n_coords = x.shape[0]
+    for i in range(n_coords):
+        fig, ax = plt.subplots()
+
+        ax.hist(x[i], bins=50, density=True, histtype="step", label="base")
+        ax.hist(phi[i], bins=50, density=True, histtype="step", label="model")
+        if pdf is not None:
+            ax.plot(*pdf[i], label="target")
+
+        ax.set_title(f"Coordinate {i}")
+        ax.legend()
+        fig.tight_layout()
+        plt.savefig(f"{figures_dir}/coordinate_{i}.png")
+
+    return
 
 
 @figure

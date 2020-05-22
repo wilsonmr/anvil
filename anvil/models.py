@@ -347,20 +347,88 @@ class RealNVP(nn.Module):
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
-            # TODO: make this yield, then make a yield from wrapper?
+            # TODO: make this yield, th/sizeen make a yield from wrapper?
 
         return phi_out, log_density
 
+class ProjectCircle(nn.Module):
+    def __init__(self, inner_flow):
+        super().__init__()
+        self.inner_flow = inner_flow
+
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
+
+        # Projection
+        phi_out = torch.tan(0.5 * (z_input - pi))
+        log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
+
+        # Inner flow on real line e.g. RealNVP
+        phi_out, log_density_inner = self.inner_flow(phi_out)
+
+        # Inverse projection
+        phi_out = 2 * torch.atan(phi_out) + pi
+        log_density_proj += (-2 * torch.log(torch.cos(0.5 * (phi_out - pi)))).sum(
+            dim=1, keepdim=True
+        )
+
+        return phi_out, log_density_proj + log_density_inner
+
+class ProjectSphere(nn.Module):
+    def __init__(self, inner_flow, size_in):
+        super().__init__()
+        self.inner_flow = inner_flow
+        self.size_in = size_in
+
+    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
+        polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
+
+        # Projection
+        # -1 factor because coordinate = azimuth - pi (*-1 is faster than shift)
+        x_coords = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
+            (torch.cos(azimuth), torch.sin(azimuth)), dim=2
+        )
+        rad_sq = x_coords.pow(2).sum(dim=2)
+        log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
+            dim=1, keepdim=True
+        )
+
+        # Inner flow on real plane e.g. RealNVP
+        x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
+        x_1, x_2 = x_coords.view(-1, self.size_in // 2, 2).split(1, dim=2)
+
+        # Inverse projection
+        polar = 2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2)))
+        phi_out = torch.cat((polar, torch.atan2(x_2, x_1) + pi,), dim=2)  # azimuth
+        log_density_proj += (
+            torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
+        ).sum(dim=1)
+
+        return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
 def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
-        size_in=lattice_size,
+        size_in=2 * lattice_size,
         n_affine=n_affine,
         network_spec=network_spec,
         standardise_inputs=standardise_inputs,
     )
 
+def stereographic_projection(real_nvp, target, lattice_size):
+    """Returns an instance of either ProjectCircle or ProjectSphere, depending on the
+    dimensionality of the fields."""
+    if target == "o2":
+        return ProjectCircle(real_nvp)
+    elif target == "o3":
+        return ProjectSphere(real_nvp, size_in=2 * lattice_size)
+    # Should raise config error. 
+    return
+    
+
+MODEL_OPTIONS = {
+        "real_nvp": real_nvp,
+        "projection": stereographic_projection,
+}
 
 if __name__ == "__main__":
     pass
