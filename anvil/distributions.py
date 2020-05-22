@@ -70,10 +70,10 @@ class UniformDist:
     support: tuple
         Low and high limits for the interval.
     """
-
     def __init__(self, lattice_size, *, support):
         self.size_out = lattice_size
-        self.support = support
+
+        self.x_min, self.x_max = support
 
         self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
 
@@ -84,7 +84,9 @@ class UniformDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.empty(sample_size, self.size_out).uniform_(*self.support)
+        sample = torch.empty(sample_size, self.size_out).uniform_(
+            self.x_min, self.x_max
+        )
         return sample, torch.zeros((sample_size, 1))
 
 
@@ -215,7 +217,6 @@ class SphericalUniformDist:
         """
         return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
 
-
 def standard_normal_distribution(lattice_size):
     """returns an instance of the NormalDist class with mean 0 and
     variance 1"""
@@ -251,10 +252,10 @@ def spherical_uniform_distribution(lattice_size):
     return SphericalUniformDist(lattice_size)
 
 
-class PhiFourAction(nn.Module):
-    """Extend the nn.Module class to return the phi^4 action given either
-    a single state size (1, length * length) or a stack of N states
-    (N, length * length). See Notes about action definition.
+class PhiFourAction:
+    """Return the phi^4 action given either a single state size
+    (1, length * length) or a stack of N states (N, length * length).
+    See Notes about action definition.
 
     The forward pass returns the corresponding log density (unnormalised) which
     is equal to -S
@@ -305,9 +306,7 @@ class PhiFourAction(nn.Module):
         else:
             self.version_factor = 1
 
-        self.log_density = self.forward
-
-    def forward(self, phi_state: torch.Tensor) -> torch.Tensor:
+    def log_density(self, phi_state: torch.Tensor) -> torch.Tensor:
         """Perform forward pass, returning -action for stack of states. Note
         here the minus sign since we want to return the log density of the
         corresponding unnormalised distribution
@@ -328,14 +327,16 @@ class PhiFourAction(nn.Module):
         return -action
 
 
-class XYHamiltonian(nn.Module):
-    """
-    Extend the nn.Module class to return the Hamiltonian for the classical
-    XY spin model (also known as the O(2) model), given a stack of polar
-    angles with shape (sample_size, lattice_size).
+class O2Action:
+    r"""
+    The (shifted) action for the O(2) non-linear sigma model, calculated
+    from a stack of polar angles with shape (sample_size, lattice_size).
+    
+    The action is shifted by -2 * V * \beta, making it equivalent to \beta
+    times the Hamiltonian for the classical XY spin model.
 
-    The spins are defined as having modulus 1, such that they take values
-    on the unit circle.
+    The fields or 'spins' are defined as having modulus 1, such that they
+    take values on the unit circle.
 
     Parameters
     ----------
@@ -352,31 +353,32 @@ class XYHamiltonian(nn.Module):
         self.lattice_size = geometry.length ** 2
         self.shift = geometry.get_shift()
 
-        self.log_density = self.forward
-
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
+    def log_density(self, state: torch.Tensor) -> torch.Tensor:
         """
-        Compute XY Hamiltonian from a stack of angles (not Euclidean field components)
+        Compute action from a stack of angles (not Euclidean field components)
         with shape (sample_size, lattice_size).
         """
-        hamiltonian = -self.beta * torch.cos(
+        action = -self.beta * torch.cos(
             state[:, self.shift] - state.view(-1, 1, self.lattice_size)
         ).sum(
             dim=1,
         ).sum(  # sum over two shift directions (+ve nearest neighbours)
             dim=1, keepdim=True
         )  # sum over lattice sites
-        return -hamiltonian
+        return -action
 
 
-class HeisenbergHamiltonian(nn.Module):
-    """
-    Extend the nn.Module class to return the Hamiltonian for the classical
-    Heisenberg model (also known as the O(3) model), given a stack of polar
-    angles with shape (sample_size, 2 * lattice_size).
+class O3Action:
+    r"""
+    The (shifted) action for the O(3) non-linear sigma model, calculated from
+    a stack of polar and azimuthal angles with shape
+    (sample_size, 2 * lattice_size).
 
-    The spins are defined as having modulus 1, such that they take values
-    on the unit 2-sphere, and can be parameterised by two angles using
+    The action is shifted by -2 * V * \beta, making it equivalent to \beta
+    times the Hamiltonian for the classical Heisenberg spin model.
+
+    The field or 'spins' are defined as having modulus 1, such that they take
+    values on the unit 2-sphere, and can be parameterised by two angles using
     spherical polar coordinates (with the radial coordinate equal to one).
 
     Parameters
@@ -394,11 +396,9 @@ class HeisenbergHamiltonian(nn.Module):
         self.lattice_size = geometry.length ** 2
         self.shift = geometry.get_shift()
 
-        self.log_density = self.forward
-
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
+    def log_density(self, state: torch.Tensor) -> torch.Tensor:
         r"""
-        Compute classical Heisenberg Hamiltonian from a stack of angles with shape
+        Compute the O(3) action from a stack of angles with shape
         (sample_size, 2 * volume).
 
         Also computes the logarithm of the 'volume element' for the probability
@@ -421,7 +421,7 @@ class HeisenbergHamiltonian(nn.Module):
         cos_polar = torch.cos(polar)
         sin_polar = torch.sin(polar)
 
-        hamiltonian = -self.beta * (
+        action = -self.beta * (
             cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.lattice_size)
             + sin_polar[:, self.shift]
             * sin_polar.view(-1, 1, self.lattice_size)
@@ -434,7 +434,7 @@ class HeisenbergHamiltonian(nn.Module):
 
         log_volume_element = torch.log(sin_polar).sum(dim=1, keepdim=True)
 
-        return log_volume_element - hamiltonian
+        return log_volume_element - action
 
 
 def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
@@ -444,12 +444,12 @@ def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
     )
 
 
-def xy_hamiltonian(beta, geometry):
-    return XYHamiltonian(beta, geometry)
+def o2_action(beta, geometry):
+    return O2Action(beta, geometry)
 
 
-def heisenberg_hamiltonian(beta, geometry):
-    return HeisenbergHamiltonian(beta, geometry)
+def o3_action(beta, geometry):
+    return O3Action(beta, geometry)
 
 
 BASE_OPTIONS = {
@@ -461,10 +461,5 @@ BASE_OPTIONS = {
     "spherical_uniform": spherical_uniform_distribution,
 }
 TARGET_OPTIONS = dict(
-    {
-        "phi_four": phi_four_action,
-        "xy": xy_hamiltonian,
-        "heisenberg": heisenberg_hamiltonian,
-    },
-    **BASE_OPTIONS
+    {"phi_four": phi_four_action, "o2": o2_action, "o3": o3_action,}, **BASE_OPTIONS
 )

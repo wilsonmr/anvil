@@ -36,7 +36,6 @@ class ConfigParser(Config):
         return pow(lattice_length, lattice_dimension)
 
     def produce_config_size(self, lattice_size, target_dimension=1):
-        # NOTE: non-fixed target_dimension appears in another PR. This will be updated.
         return target_dimension * lattice_size
 
     def produce_geometry(self, lattice_length):
@@ -119,6 +118,28 @@ class ConfigParser(Config):
         """Flag specifying whether to standardise input vectors before
         passing them through a neural network."""
         return do_stand
+       
+    @explicit_node
+    def produce_target_dist(self, target):
+        """Return the function which initialises the correct action"""
+        try:
+            return TARGET_OPTIONS[target]
+        except KeyError:
+            raise ConfigError(
+                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
+            )
+
+    @explicit_node
+    def produce_base_dist(
+        self, base,
+    ):
+        """Return the action which loads appropriate base distribution"""
+        try:
+            return BASE_OPTIONS[base]
+        except KeyError:
+            raise ConfigError(
+                f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
+            )
 
     def parse_n_affine(self, n: int):
         """Number of affine layers."""
