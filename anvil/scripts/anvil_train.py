@@ -48,7 +48,7 @@ class TrainConfig(ConfigParser):
             "cp_id": kwargs["environment"].extra_args["retrain"],
             "outpath": str(kwargs["environment"].output_path / "checkpoints"),
             "figures_dir": str(kwargs["environment"].output_path / "figures"),
-            "actions_": ["train", "plot_distributions"],
+            "actions_": ["plot_distributions"],
         }
         for key, value in extra_input.items():
             file_content.setdefault(key, value)

@@ -405,22 +405,22 @@ class ProjectSphere(nn.Module):
 
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
-def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs=False):
+def real_nvp(config_size, n_affine, network_spec, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
-        size_in=2 * lattice_size,
+        size_in=config_size,
         n_affine=n_affine,
         network_spec=network_spec,
         standardise_inputs=standardise_inputs,
     )
 
-def stereographic_projection(real_nvp, target, lattice_size):
+def stereographic_projection(real_nvp, target, config_size):
     """Returns an instance of either ProjectCircle or ProjectSphere, depending on the
     dimensionality of the fields."""
     if target == "o2":
         return ProjectCircle(real_nvp)
     elif target == "o3":
-        return ProjectSphere(real_nvp, size_in=2 * lattice_size)
+        return ProjectSphere(real_nvp, size_in=config_size)
     # Should raise config error. 
     return
     

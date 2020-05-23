@@ -35,8 +35,10 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_config_size(self, lattice_size, target_dimension=1):
-        return target_dimension * lattice_size
+    def produce_config_size(self, lattice_size, target):
+        if target == "o3":
+            return 2 * lattice_size
+        return lattice_size
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
