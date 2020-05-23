@@ -4,6 +4,7 @@ geometry.py
 Module containing transformations related to geometry.
 """
 from math import ceil
+from itertools import product
 
 import torch
 
@@ -28,6 +29,8 @@ class Geometry2D:
 
     def __init__(self, length):
         self.length = length
+        self.dimensions = (length, length)  # jmr - temporary
+        self.volume = length ** 2  # jmr
         # TODO: Make the split pattern flexible and controllable at level of instance
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True
@@ -182,3 +185,16 @@ class Geometry2D:
                 self.lexisplit
             ]
         return shift_index
+
+    def two_point_iterator(self):
+        """Generator which yields all the lattice shifts.
+
+        Notes
+        -----
+        The order in which the shifts are generated is defined by the lexicographical
+        order of the Cartesian product of one-dimensional shifts. See the documentation
+        for itertools.product for details.
+        """
+        for shift_cart in product(range(self.length), range(self.length)):
+            yield self.get_shift((shift_cart,), ((0, 1),)).flatten()
+

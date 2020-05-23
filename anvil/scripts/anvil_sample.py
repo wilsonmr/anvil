@@ -12,12 +12,14 @@ log = logging.getLogger(__name__)
 
 PROVIDERS = [
     "anvil.sample",
+    "anvil.models",
     "anvil.observables",
     "anvil.plot",
     "anvil.table",
     "anvil.checkpoint",
     "reportengine.report",
     "anvil.benchmarks",
+    "anvil.fields",
 ]
 
 
