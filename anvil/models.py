@@ -351,6 +351,7 @@ class RealNVP(nn.Module):
 
         return phi_out, log_density
 
+
 class ProjectCircle(nn.Module):
     def __init__(self, inner_flow):
         super().__init__()
@@ -372,6 +373,7 @@ class ProjectCircle(nn.Module):
         )
 
         return phi_out, log_density_proj + log_density_inner
+
 
 class ProjectSphere(nn.Module):
     def __init__(self, inner_flow, size_in):
@@ -405,6 +407,7 @@ class ProjectSphere(nn.Module):
 
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
+
 def real_nvp(config_size, n_affine, network_spec, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
@@ -414,6 +417,7 @@ def real_nvp(config_size, n_affine, network_spec, standardise_inputs=False):
         standardise_inputs=standardise_inputs,
     )
 
+
 def stereographic_projection(real_nvp, target, config_size):
     """Returns an instance of either ProjectCircle or ProjectSphere, depending on the
     dimensionality of the fields."""
@@ -421,13 +425,13 @@ def stereographic_projection(real_nvp, target, config_size):
         return ProjectCircle(real_nvp)
     elif target == "o3":
         return ProjectSphere(real_nvp, size_in=config_size)
-    # Should raise config error. 
+    # Should raise config error.
     return
-    
+
 
 MODEL_OPTIONS = {
-        "real_nvp": real_nvp,
-        "projection": stereographic_projection,
+    "real_nvp": real_nvp,
+    "projection": stereographic_projection,
 }
 
 if __name__ == "__main__":

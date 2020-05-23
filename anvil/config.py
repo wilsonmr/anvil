@@ -101,6 +101,10 @@ class ConfigParser(Config):
         of the phi^4 action."""
         return do_use
 
+    def parse_beta(self, beta: (float, int)):
+        """Inverse temperature."""
+        return beta
+
     def parse_network_spec(self, net_spec: dict):
         """A dictionary where each element is itself a dictionary containing the
         parameters required to construct a neural network."""
