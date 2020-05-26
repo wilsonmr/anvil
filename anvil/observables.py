@@ -9,14 +9,12 @@ from anvil.utils import bootstrap_sample
 
 
 def autocorrelation(chain):
-    """Calculate the one-dimensional normalised autocorrelation function on the final
-    dimension of numpy array, given as an argument. Return positive shifts only."""
-    chain_shifted = chain - chain.mean(
-        axis=-1, keepdims=True
-    )  # expect ensemble dimension at -1
+    """Calculate the one-dimensional normalised autocorrelation function for a one-
+    dimensional numpy array, given as an argument. Return positive shifts only."""
+    chain_shifted = chain - chain.mean()
     auto = correlate(chain_shifted, chain_shifted, mode="same")
-    t0 = auto.shape[-1] // 2  # this is true for mode="same"
-    return auto[..., t0:] / auto[..., [t0]]  # normalise and take +ve shifts
+    t0 = auto.size // 2  # this is true for mode="same"
+    return auto[t0:] / auto[t0]  # normalise and take +ve shifts
 
 
 def optimal_window(integrated, mult=2.0, eps=1e-6):
@@ -113,7 +111,12 @@ def two_point_correlator_series(field_ensemble):
 
 
 def two_point_correlator_autocorr(two_point_correlator_series):
-    return autocorrelation(two_point_correlator_series)
+    return np.array(
+        [
+            autocorrelation(two_point_correlator_series[i])
+            for i in range(two_point_correlator_series.shape[0])
+        ]
+    )
 
 
 def two_point_correlator_integrated_autocorr(two_point_correlator_autocorr):
