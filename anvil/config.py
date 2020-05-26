@@ -37,7 +37,7 @@ class ConfigParser(Config):
         return pow(lattice_length, lattice_dimension)
 
     def produce_config_size(self, lattice_size, target):
-        """number of nodes in a single field configuration"""
+        """Size of a single configuration or input vector for neural network."""
         if target == "o3":
             return 2 * lattice_size
         return lattice_size

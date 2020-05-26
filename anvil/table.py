@@ -29,8 +29,16 @@ def table_two_point_scalars(ising_energy, susceptibility):
 
 @table
 def table_correlation_length(
-    exponential_correlation_length, low_momentum_correlation_length
+    exponential_correlation_length,
+    second_moment_correlation_length,
+    low_momentum_correlation_length,
 ):
+    """Tabulate three estimators of correlation length, with values and errors
+    taken as the mean and standard deviation of the bootstrap sample.
+    
+    The exponential correlation length is provided as a function of 't' separations,
+    so to get a scalar estimate the weighted average over positive t>1 is taken.
+    """
     # Weighted average of positive shifts, ignoring first point
     T = exponential_correlation_length.shape[0]
     ecl_values = exponential_correlation_length[1 : T // 2 + 1].mean(axis=-1)
@@ -41,12 +49,20 @@ def table_correlation_length(
 
     res = [
         [ecl_mean, ecl_error],
+        [
+            second_moment_correlation_length.mean(),
+            second_moment_correlation_length.std(),
+        ],
         [low_momentum_correlation_length.mean(), low_momentum_correlation_length.std()],
     ]
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
-        index=["Exp corr length", "Low mom corr length"],
+        index=[
+            "Exponential correlation length",
+            "Second moment correlation length",
+            "Low momentum correlation length",
+        ],
     )
     return df
 
@@ -117,6 +133,8 @@ def table_two_point_correlator_autocorr(two_point_correlator_autocorr):
 
 @table
 def table_topological_observables(topological_charge, topological_susceptibility):
+    """Tabulate the topological charge and susceptibility, with values and errors
+    taken as the mean and standard deviation of the bootstrap sample."""
     res = [
         [topological_charge.mean(), topological_charge.std()],
         [topological_susceptibility.mean(), topological_susceptibility.std()],

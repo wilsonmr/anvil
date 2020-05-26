@@ -6,22 +6,41 @@ from anvil.utils import Multiprocessing, bootstrap_sample, spher_to_eucl, unit_n
 from reportengine import collect
 
 
-class Field:
+class ScalarField:
     """
-    Base class for field objects
+    Class for ensembles of scalar fields. 
+    
+    Parameters
+    ----------
+    input_coords: numpy.ndarray
+        The coordinates of the field ensemble.
+        Valid inputs may have dimensions:
+            - (lattice_volume, ensemble_size)
+            - (lattice_volume, *, ensemble_size)
+        The final dimension will always be treated as the ensemble dimension in the
+        context of calculating ensemble averages.
+    lattice: anvil.geometry.Geometry
+        Lattice object upon which the fields are defined. Must have the same number of
+        sites as the 0th dimension of `input_coords`.
+
+    Notes
+    -----
+    (1) The lattice field theory is assumed to possess a translational symmetry in the
+        directions specified by the primitive lattice vectors. This allows the definition
+        of a two point correlation function that is a function of separations only (not
+        absolute coordinates) by averaging over the lattice sites.
     """
 
     minimum_dimensions = 2
 
-    def __init__(self, input_coords, lattice, **theory_kwargs):
+    def __init__(self, input_coords, lattice):
 
         self.lattice = lattice  # must do this before setting coords!
         self.coords = input_coords
 
-        # Unpack theory kwargs
-        self.__dict__.update(theory_kwargs)
-
-        self.shift = self.lattice.get_shift().transpose(0, 1)
+        self.shift = self.lattice.get_shift().transpose(
+            0, 1
+        )  # dimensions swapped wrt training
 
     def _valid_ensemble(self, array_in):
         # Check that 0th dimension of input data matches the number of lattice sites
@@ -37,8 +56,8 @@ class Field:
 
     @property
     def coords(self):
-        """The set of coordinates which define the configuration or ensemble.
-        numpy.ndarray, dimensions (lattice_volume, N, *, ensemble_size)"""
+        """The set of coordinates which define the ensemble.
+        numpy.ndarray, dimensions (lattice_volume, *, ensemble_size)"""
         return self._coords
 
     @coords.setter
@@ -68,14 +87,15 @@ class Field:
         extra_dims = correlator_dict[0].shape  # bootstrap/concurrent sample dimension
 
         correlator = np.array([correlator_dict[i] for i in range(self.lattice.volume)])
-        return correlator.reshape((*self.lattice.dimensions, *extra_dims))
+        return correlator.reshape(
+            (self.lattice.length, self.lattice.length, *extra_dims)
+        )
 
     @property
     def two_point_correlator_series(self):
         """The volume-averaged two point correlation function for the first few shifts
         along a single axis.
         numpy.ndarray, dimensions (n_shifts, *, ensemble_size)"""
-
         n_shifts = min(4, self.lattice.length // 2 + 1)
         correlator = []
         for i in range(n_shifts):
@@ -86,27 +106,26 @@ class Field:
     @property
     def two_point_correlator(self):
         """Two point correlation function. Uses multiprocessing.
-        numpy.ndarray, dimensions (*lattice_dimensions, *, 1)"""
+        numpy.ndarray, dimensions (*lattice_dimensions, *)"""
         return self._two_point_correlator()
 
     def boot_two_point_correlator(self, bootstrap_sample_size):
         """Two point correlation function for a bootstrap sample of ensembles
-        numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size, 1)"""
+        numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
         return self._two_point_correlator(
             bootstrap=True, bootstrap_sample_size=bootstrap_sample_size
         )
 
 
-class ClassicalSpinField(Field):
+class ClassicalSpinField(ScalarField):
     """
-    Field class for classical spin fields.
+    Class for ensembles of classical spin fields.
 
     Parameters
     ----------
     input_coords: numpy.ndarray
         The coordinates of the spin configuration or ensemble.
         Valid inputs may have dimensions:
-            - (lattice_volume, N)
             - (lattice_volume, N, ensemble_size)
             - (lattice_volume, N, *, ensemble_size)
         where N is the Euclidean dimension of the spins.
@@ -115,39 +134,21 @@ class ClassicalSpinField(Field):
     lattice: anvil.geometry.Geometry
         Lattice object upon which the spins are defined. Must have the same number of
         sites as the 0th dimension of `input_coords`.
-    beta: float
-        A theory parameter specifying the coupling strength for interactions between
-        spins at different lattice sites. The inverse of the temperature.
-
-
-    Notes
-    -----
-    (1) The lattice field theory is assumed to possess a translational symmetry in the
-        directions specified by the primitive lattice vectors. This allows the definition
-        of a two point correlation function that is a function of separations only (not
-        absolute coordinates) by averaging over the lattice sites.
-        return self._calc_vol_avg_two_point_correlator(self.spins)
     """
 
     minimum_dimensions = 3
 
-    def __init__(self, input_coords, lattice, beta=1.0):
-        super().__init__(input_coords, lattice, beta=beta)
+    def __init__(self, input_coords, lattice):
+        super().__init__(input_coords, lattice)
 
-        self.spins = self.coords
-        self.euclidean_dimension = self.spins.shape[1]
-
-        # Global shift in O(N) action (only important for absolute quantities)
-        self._action_shift = (
-            self.beta * len(self.lattice.dimensions) * self.lattice.volume
-        )
+        self.spins = self.coords  # alias
 
     @classmethod
-    def from_spherical(cls, input_coords, lattice, beta=1.0):
+    def from_spherical(cls, input_coords, lattice):
         """Instantiate class with fields in the spherical representation, i.e.
         parameterised by a set of angles. Input coordinates must have dimensions
         (lattice_size * N-1, ensemble_size)."""
-        return cls(spher_to_eucl(input_coords), lattice, beta=beta)
+        return cls(spher_to_eucl(input_coords), lattice)
 
     @property
     def spins(self):
@@ -172,13 +173,6 @@ class ClassicalSpinField(Field):
         ).sum(
             axis=(0, 1)
         )  # sum over dimensions and volume
-
-    @property
-    def action(self):
-        """The O(N) action for each configuration in the ensemble.
-        numpy.ndarray, dimensions (*, ensemble_size)"""
-        # TODO: take action class as parameter so we can use improved actions
-        return self.beta * self.hamiltonian + self._action_shift
 
     @property
     def magnetisation_sq(self):
@@ -237,40 +231,26 @@ class ClassicalSpinField(Field):
         return charge
 
 
-def generic_field(sample_training_output, training_geometry):
-    return Field(sample_training_output, training_geometry)
+def scalar_field(sample_training_output, training_geometry):
+    return ScalarField(sample_training_output, training_geometry)
 
 
-def scalar_field(
-    sample_training_output, training_geometry, m_sq, lam, use_arxiv_version
-):
-    return Field(
-        sample_training_output,
-        training_geometry,
-        m_sq=m_sq,
-        lam=lam,
-        use_arxiv_version=use_arxiv_version,
-    )
-
-
-def o2_field(sample_training_output, training_geometry, beta):
+def o2_field(sample_training_output, training_geometry):
     return ClassicalSpinField.from_spherical(
         sample_training_output.reshape(training_geometry.length ** 2, 1, -1),
         training_geometry,
-        beta=beta,
     )
 
 
-def o3_field(sample_training_output, training_geometry, beta):
+def o3_field(sample_training_output, training_geometry):
     return ClassicalSpinField.from_spherical(
         sample_training_output.reshape(training_geometry.length ** 2, 2, -1),
         training_geometry,
-        beta=beta,
     )
 
 
 FIELD_OPTIONS = {
-    None: generic_field,
+    None: scalar_field,
     "phi_four": scalar_field,
     "o2": o2_field,
     "o3": o3_field,

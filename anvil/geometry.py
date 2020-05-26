@@ -29,8 +29,7 @@ class Geometry2D:
 
     def __init__(self, length):
         self.length = length
-        self.dimensions = (length, length)  # jmr - temporary
-        self.volume = length ** 2  # jmr
+        self.volume = length ** 2
         # TODO: Make the split pattern flexible and controllable at level of instance
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True
@@ -187,7 +186,7 @@ class Geometry2D:
         return shift_index
 
     def two_point_iterator(self):
-        """Generator which yields all the lattice shifts.
+        """Generator which yields all the lattice shifts as one-dimensional tensors.
 
         Notes
         -----

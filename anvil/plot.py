@@ -243,7 +243,7 @@ def plot_two_point_correlator_integrated_autocorr(
             color=color,
             label=f"$x=$ (0, {i})",
         )
-        ax.annotate(fr"$\tau_G=${tau:.2g}", xy=(0.05, 0.05), xycoords="axes fraction")
+    ax.annotate(fr"$\tau_G=${tau:.2g}", xy=(0.05, 0.05), xycoords="axes fraction")
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0.5)
     ax.legend()
@@ -252,6 +252,8 @@ def plot_two_point_correlator_integrated_autocorr(
 
 @figure
 def plot_topological_charge_series(topological_charge_series):
+    """Plot the topological charge of the ensemble as a series, ordered by the positions
+    of the configurations in the Markov chain."""
     fig, ax = plt.subplots()
     ax.set_title("Topological charge")
     ax.set_ylabel("$Q(t)$")
@@ -264,8 +266,11 @@ def plot_topological_charge_series(topological_charge_series):
 
 @figure
 def plot_topological_charge_autocorr(
-    topological_charge_autocorr, topological_charge_optimal_window
+    topological_charge_autocorr, topological_charge_optimal_window,
 ):
+    """Plot the autocorrelation of the topological charge series. Also plot a vertical
+    line to denote the location of the optimal window, which minimises the error on the
+    integrated autocorrelation."""
     cut = max(10, 2 * topological_charge_optimal_window)
 
     fig, ax = plt.subplots()
@@ -288,6 +293,9 @@ def plot_topological_charge_autocorr(
 def plot_topological_charge_integrated_autocorr(
     topological_charge_integrated_autocorr, topological_charge_optimal_window
 ):
+    """Plot the integrated autocorrelation of the topological charge series. Also plot a
+    vertical line to denote the location of the optimal window, which minimises the error
+    on the integrated autocorrelation."""
     cut = max(10, 2 * np.max(topological_charge_optimal_window))
     tau = topological_charge_integrated_autocorr[topological_charge_optimal_window]
 
