@@ -14,8 +14,6 @@ RealNVP: nn.Module
     distribution \phi^n, where n refers to the dimensionality of the data.
 
 """
-from math import sqrt, pi, log
-
 import torch
 import torch.nn as nn
 
@@ -155,11 +153,9 @@ class AffineLayer(nn.Module):
     size_in: int
         number of dimensions, D, of input/output data. Data should be fed to
         affine layer in shape (N_states, size_in).
-    s_network_spec: dict
-        Dictionary containing the parameters specifying the 's' network,
-        including the intermediate vector sizes and activation functions.
-        See the `NeuralNetwork` class for details.
-    t_network_spec: dict
+    s_network: NeuralNetwork
+        The 's' network, see the `NeuralNetwork` class for details.
+    t_network: NeuralNetwork
         As above, for the 't' network
     i_affine: int
         index of this affine layer in full set of affine transformations,
@@ -190,19 +186,15 @@ class AffineLayer(nn.Module):
         self,
         i_affine: int,
         size_in: int,
-        s_network_spec: dict,
-        t_network_spec: dict,
+        s_network,
+        t_network,
         standardise_inputs: bool,
     ):
         super(AffineLayer, self).__init__()
         size_half = size_in // 2
 
-        self.s_network = NeuralNetwork(
-            size_half, size_half, **s_network_spec, name=f"s{i_affine}"
-        )
-        self.t_network = NeuralNetwork(
-            size_half, size_half, **t_network_spec, name=f"t{i_affine}"
-        )
+        self.s_network = s_network
+        self.t_network = t_network
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
@@ -217,7 +209,7 @@ class AffineLayer(nn.Module):
                 (a[1], a[0]), *args, **kwargs
             )
 
-        if standardise_inputs == True:
+        if standardise_inputs:
             self.standardise = lambda x: (x - x.mean()) / x.std()
         else:
             self.standardise = lambda x: x
@@ -232,10 +224,10 @@ class AffineLayer(nn.Module):
         \phi_b = (x_b - t_i(x_a)) * exp(-s_i(x_a))
 
         see eq. (10) of https://arxiv.org/pdf/1904.12072.pdf
-            
+
         Also computes the logarithm of the jacobian determinant for the
         forward transformation (inverse of the above), which is equal to
-        the logarithm of 
+        the logarithm of
 
         \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
 
@@ -281,9 +273,10 @@ class RealNVP(nn.Module):
         the second dimension of the input data.
     n_affine: int
         Number of affine layers, it is recommended to choose an even number
-    network_spec: dict
-        Dictionary containing the parameters needed to construct the neural
-        networks in the affine coupling layers.
+    s_networks
+        List of s neural networks for each affine layer
+    t_networks
+        List of t neural networks for each affine layer
     standardise_inputs: bool
         Flag dictating whether or not input vectors are standardised (i.e.
         zero mean, unit variance) before being passed to a neural network.
@@ -299,21 +292,18 @@ class RealNVP(nn.Module):
         self,
         *,
         size_in: int,
-        n_affine: int,
-        network_spec: dict,
+        s_networks,
+        t_networks,
         standardise_inputs: bool,
     ):
         super(RealNVP, self).__init__()
 
-        s_network_spec = network_spec["s"]
-        t_network_spec = network_spec["t"]
-
         self.affine_layers = nn.ModuleList(
             [
                 AffineLayer(
-                    i, size_in, s_network_spec, t_network_spec, standardise_inputs
+                    i, size_in, s_network, t_network, standardise_inputs
                 )
-                for i in range(n_affine)
+                for i, (s_network, t_network) in enumerate(zip(s_networks, t_networks))
             ]
         )
 
@@ -324,7 +314,7 @@ class RealNVP(nn.Module):
     def forward(self, x_input: torch.Tensor) -> torch.Tensor:
         r"""Function which maps simple distribution, x ~ r, to target distribution
         \phi ~ p, and at the same time calculates the density of the output
-        distribution using the change of variables formula, according to 
+        distribution using the change of variables formula, according to
         eq. (8) of https://arxiv.org/pdf/1904.12072.pdf.
 
         Parameters
@@ -351,16 +341,11 @@ class RealNVP(nn.Module):
 
         return phi_out, log_density
 
-
-def real_nvp(lattice_size, n_affine, network_spec, standardise_inputs=False):
+def real_nvp(lattice_size, s_networks, t_networks, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
         size_in=lattice_size,
-        n_affine=n_affine,
-        network_spec=network_spec,
+        s_networks=s_networks,
+        t_networks=t_networks,
         standardise_inputs=standardise_inputs,
     )
-
-
-if __name__ == "__main__":
-    pass

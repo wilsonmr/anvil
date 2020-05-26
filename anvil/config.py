@@ -119,28 +119,6 @@ class ConfigParser(Config):
         passing them through a neural network."""
         return do_stand
 
-    @explicit_node
-    def produce_target_dist(self, target):
-        """Return the function which initialises the correct action"""
-        try:
-            return TARGET_OPTIONS[target]
-        except KeyError:
-            raise ConfigError(
-                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
-            )
-
-    @explicit_node
-    def produce_base_dist(
-        self, base,
-    ):
-        """Return the action which loads appropriate base distribution"""
-        try:
-            return BASE_OPTIONS[base]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
-            )
-
     def parse_n_affine(self, n: int):
         """Number of affine layers."""
         return n
@@ -264,3 +242,22 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
+
+    def produce_affine_layer_index(self, n_affine):
+        """Given n_affine, the number of affine layers, produces a list
+        with n_affine elements, the ith element is {i_affine: i}
+
+        we can use affine_layer_index to collect over when producing the model
+
+        """
+        return [{"i_affine": i} for i in range(n_affine)]
+
+    def produce_size_half(self, lattice_size):
+        """Given the lattice size, return an integer of lattice_size/2 which
+        is the number of nodes which are part of phi_A or phi_B.
+
+        """
+        # NOTE: we may want to make this more flexible
+        if (lattice_size % 2) != 0:
+            raise ConfigError("Lattice size is expected to be an even number")
+        return int(lattice_size/2)
