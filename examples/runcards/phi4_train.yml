@@ -16,18 +16,17 @@ n_affine: 4
 
 # Networks
 standardise_inputs: true
-network_spec:
-    s:
-        hidden_shape: [24]
-        activation: leaky_relu
-        final_activation: leaky_relu
-        do_batch_norm: false
-    t:
-        hidden_shape: [24]
-        activation: leaky_relu
-        final_activation: null
-        do_batch_norm: false
+s_network_spec:
+    hidden_shape: [24]
+    activation: leaky_relu
+    final_activation: leaky_relu
+    do_batch_norm: false
 
+t_network_spec:
+    hidden_shape: [24]
+    activation: leaky_relu
+    final_activation: null
+    do_batch_norm: false
 
 # Training
 n_batch: 1000
