@@ -337,7 +337,7 @@ def spherical_uniform_distribution(lattice_size):
     return SphericalUniformDist(lattice_size)
 
 
-def semicircle_distribution(lattice_size, radius=1, mean=0):
+def semicircle_distribution(lattice_size, radius=pi, mean=0):
     """Returns an instance of the SemicircleDist class."""
     return SemicircleDist(lattice_size, radius=radius, mean=mean)
 

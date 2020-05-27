@@ -97,6 +97,10 @@ class ConfigParser(Config):
         """Concentration parameter of von Mises distribution."""
         return conc
 
+    def parse_radius(self, rad: (int, float, str)):
+        """Radius for semicircle distribution."""
+        return rad
+
     def parse_m_sq(self, m: (float, int)):
         """Bare mass squared in scalar theory."""
         return m
