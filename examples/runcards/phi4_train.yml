@@ -9,6 +9,7 @@ lam: 0
 use_arxiv_version: False
 
 # Base
+model: real_nvp
 base: standard_normal
 
 # Model
