@@ -10,13 +10,14 @@ from anvil.config import ConfigParser, ConfigError
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.models", "anvil.plot"]
+PROVIDERS = ["anvil.train", "anvil.checkpoint"]
 
 TRAINING_ACTIONS = ["train"]
 
 RUNCARD_COPY_FILENAME = "runcard.yml"
 
 INPUT_FOLDER_NAME = "input"
+
 
 class TrainError(Exception):
     pass
@@ -47,8 +48,7 @@ class TrainConfig(ConfigParser):
             "training_output": str(kwargs["environment"].output_path),
             "cp_id": kwargs["environment"].extra_args["retrain"],
             "outpath": str(kwargs["environment"].output_path / "checkpoints"),
-            "figures_dir": str(kwargs["environment"].output_path / "figures"),
-            "actions_": ["plot_distributions"],
+            "actions_": ["train"],
         }
         for key, value in extra_input.items():
             file_content.setdefault(key, value)
@@ -79,7 +79,6 @@ class TrainEnv(Environment):
         self.output_path.mkdir()
         (self.output_path / "checkpoints").mkdir()
         (self.output_path / "logs").mkdir()
-        (self.output_path / "figures").mkdir()
         self.input_folder = self.output_path / INPUT_FOLDER_NAME
         self.input_folder.mkdir()
 

@@ -402,13 +402,21 @@ def real_nvp(config_size, s_networks, t_networks, standardise_inputs=False):
     )
 
 
-def stereographic_projection(real_nvp, target, config_size):
+def stereographic_projection(
+    target, config_size, s_networks, t_networks, standardise_inputs=False
+):
     """Returns an instance of either ProjectCircle or ProjectSphere, depending on the
     dimensionality of the fields."""
+    inner_flow = RealNVP(
+        size_in=config_size,
+        s_networks=s_networks,
+        t_networks=t_networks,
+        standardise_inputs=standardise_inputs,
+    )
     if target == "o2":
-        return ProjectCircle(real_nvp)
+        return ProjectCircle(inner_flow)
     elif target == "o3":
-        return ProjectSphere(real_nvp, size_in=config_size)
+        return ProjectSphere(inner_flow, size_in=config_size)
     # Should raise config error.
     return
 
@@ -417,6 +425,3 @@ MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "projection": stereographic_projection,
 }
-
-if __name__ == "__main__":
-    pass
