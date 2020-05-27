@@ -17,6 +17,8 @@ RealNVP: nn.Module
 import torch
 import torch.nn as nn
 
+from math import pi
+
 ACTIVATION_LAYERS = {
     "relu": nn.ReLU,
     "leaky_relu": nn.LeakyReLU,
@@ -153,17 +155,9 @@ class AffineLayer(nn.Module):
     size_in: int
         number of dimensions, D, of input/output data. Data should be fed to
         affine layer in shape (N_states, size_in).
-<<<<<<< HEAD
-    s_network_spec: dict
-        Dictionary containing the parameters specifying the 's' network,
-        including the intermediate vector sizes and activation functions.
-        See the `NeuralNetwork` class for details.
-    t_network_spec: dict
-=======
     s_network: NeuralNetwork
         The 's' network, see the `NeuralNetwork` class for details.
     t_network: NeuralNetwork
->>>>>>> master
         As above, for the 't' network
     i_affine: int
         index of this affine layer in full set of affine transformations,
@@ -280,16 +274,10 @@ class RealNVP(nn.Module):
         the second dimension of the input data.
     n_affine: int
         Number of affine layers, it is recommended to choose an even number
-<<<<<<< HEAD
-    network_spec: dict
-        Dictionary containing the parameters needed to construct the neural
-        networks in the affine coupling layers.
-=======
     s_networks
         List of s neural networks for each affine layer
     t_networks
         List of t neural networks for each affine layer
->>>>>>> master
     standardise_inputs: bool
         Flag dictating whether or not input vectors are standardised (i.e.
         zero mean, unit variance) before being passed to a neural network.
@@ -305,9 +293,6 @@ class RealNVP(nn.Module):
         self, *, size_in: int, s_networks, t_networks, standardise_inputs: bool,
     ):
         super(RealNVP, self).__init__()
-
-        s_network_spec = network_spec["s"]
-        t_network_spec = network_spec["t"]
 
         self.affine_layers = nn.ModuleList(
             [
@@ -346,7 +331,7 @@ class RealNVP(nn.Module):
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
-            # TODO: make this yield, th/sizeen make a yield from wrapper?
+            # TODO: make this yield, then make a yield from wrapper?
 
         return phi_out, log_density
 
