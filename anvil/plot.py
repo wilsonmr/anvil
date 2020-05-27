@@ -30,7 +30,7 @@ def field_component(i, x_base, phi_model, phi_target=None):
 def field_components(loaded_model, base_dist, target_dist, lattice_size):
     """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
     if known, plot the pdf of the target distribution."""
-    sample_size = 10000
+    sample_size = 100000
 
     # Generate a large sample from the base distribution and pass it through the trained model
     with torch.no_grad():
