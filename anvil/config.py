@@ -36,9 +36,19 @@ class ConfigParser(Config):
         return pow(lattice_length, lattice_dimension)
 
     def produce_config_size(self, lattice_size, target):
+        """number of nodes in a single field configuration"""
         if target == "o3":
             return 2 * lattice_size
         return lattice_size
+
+    def produce_size_half(self, config_size):
+        """Given the number of nodes in a field configuration, return an integer
+        of config_size/2 which is the size of the input vector for each coupling layer.
+        """
+        # NOTE: we may want to make this more flexible
+        if (config_size % 2) != 0:
+            raise ConfigError("Config size is expected to be an even number")
+        return int(config_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
@@ -105,34 +115,6 @@ class ConfigParser(Config):
         """Inverse temperature."""
         return beta
 
-    def parse_network_spec(self, net_spec: dict):
-        """A dictionary where each element is itself a dictionary containing the
-        parameters required to construct a neural network."""
-        required_networks = ("s", "t")  # NOTE: real_nvp. Will generalise in future PR
-        for k in required_networks:
-            if k not in net_spec:
-                raise ConfigError(
-                    f"network_spec should contain keys {required_networks} but contains keys {net_spec.keys()}"
-                )
-            if not isinstance(net_spec[k], dict):
-                raise ConfigError(
-                    f"network spec does not contain a dictionary associated to key {k}"
-                )
-        return net_spec
-
-    def parse_standardise_inputs(self, do_stand: bool):
-        """Flag specifying whether to standardise input vectors before
-        passing them through a neural network."""
-        return do_stand
-
-    def parse_n_affine(self, n: int):
-        """Number of affine layers."""
-        return n
-
-    def parse_n_batch(self, nb: int):
-        """Batch size for training."""
-        return nb
-
     def parse_model(self, model: str):
         """Label for normalising flow model."""
         return model
@@ -146,6 +128,27 @@ class ConfigParser(Config):
             raise ConfigError(
                 f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
             )
+
+    def parse_standardise_inputs(self, do_stand: bool):
+        """Flag specifying whether to standardise input vectors before
+        passing them through a neural network."""
+        return do_stand
+
+    def parse_n_affine(self, n: int):
+        """Number of affine layers."""
+        return n
+
+    def produce_affine_layer_index(self, n_affine):
+        """Given n_affine, the number of affine layers, produces a list
+        with n_affine elements, the ith element is {i_affine: i}
+
+        we can use affine_layer_index to collect over when producing the model
+        """
+        return [{"i_affine": i} for i in range(n_affine)]
+
+    def parse_n_batch(self, nb: int):
+        """Batch size for training."""
+        return nb
 
     def parse_epochs(self, epochs: int):
         """Number of epochs to train. Equivalent to number of passes
@@ -257,22 +260,3 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
-
-    def produce_affine_layer_index(self, n_affine):
-        """Given n_affine, the number of affine layers, produces a list
-        with n_affine elements, the ith element is {i_affine: i}
-
-        we can use affine_layer_index to collect over when producing the model
-
-        """
-        return [{"i_affine": i} for i in range(n_affine)]
-
-    def produce_size_half(self, lattice_size):
-        """Given the lattice size, return an integer of lattice_size/2 which
-        is the number of nodes which are part of phi_A or phi_B.
-
-        """
-        # NOTE: we may want to make this more flexible
-        if (lattice_size % 2) != 0:
-            raise ConfigError("Lattice size is expected to be an even number")
-        return int(lattice_size / 2)

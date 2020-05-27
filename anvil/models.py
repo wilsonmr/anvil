@@ -392,10 +392,10 @@ class ProjectSphere(nn.Module):
         return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
 
 
-def real_nvp(lattice_size, s_networks, t_networks, standardise_inputs=False):
+def real_nvp(config_size, s_networks, t_networks, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
-        size_in=lattice_size,
+        size_in=config_size,
         s_networks=s_networks,
         t_networks=t_networks,
         standardise_inputs=standardise_inputs,

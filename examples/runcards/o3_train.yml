@@ -3,11 +3,11 @@ lattice_length: 6
 lattice_dimension: 2
 
 # Target
-target: o2
-beta: 0.7
+target: o3
+beta: 1.0
 
 # Base
-base: circular_uniform
+base: spherical_uniform
 
 # Model
 model: projection
