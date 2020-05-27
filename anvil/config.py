@@ -10,7 +10,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import RealNVP
+from anvil.models import real_nvp
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
@@ -42,34 +42,15 @@ class ConfigParser(Config):
         return Geometry2D(lattice_length)
 
     def parse_target(self, target: str):
+        """String specifying target distrbution."""
         return target
 
     def parse_base(self, base: str):
+        """String specifying base distribution."""
         return base
 
-    def parse_mean(self, mean: (float, int)):
-        return mean
-
-    def parse_sigma(self, sigma: (float, int)):
-        return sigma
-
-    def parse_support(self, supp: list):
-        return supp
-
-    def parse_concentration(self, conc: float):
-        return conc
-
-    def parse_m_sq(self, m: (float, int)):
-        return m
-
-    def parse_lam(self, lam: (float, int)):
-        return lam
-
-    def parse_use_arxiv_version(self, do_use: bool):
-        return do_use
-
     @explicit_node
-    def produce_target_dist(self, target):
+    def produce_target_dist(self, target: str):
         """Return the function which initialises the correct action"""
         try:
             return TARGET_OPTIONS[target]
@@ -79,9 +60,7 @@ class ConfigParser(Config):
             )
 
     @explicit_node
-    def produce_base_dist(
-        self, base,
-    ):
+    def produce_base_dist(self, base: str):
         """Return the action which loads appropriate base distribution"""
         try:
             return BASE_OPTIONS[base]
@@ -90,31 +69,76 @@ class ConfigParser(Config):
                 f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
             )
 
-    def parse_hidden_nodes(self, hid_spec):
-        return hid_spec
+    def parse_mean(self, mean: (float, int)):
+        """Mean of normal or von Mises distribution."""
+        return mean
 
-    def produce_network_kwargs(self, hidden_nodes):
-        """Returns a dictionary that is the necessary kwargs for the NVP class
-        This means in the future if we change the class to have more flexibility
-        with regard to network spec then we can use this function to bridge
-        backwards compatibility"""
-        hidden_nodes = tuple(hidden_nodes)
-        return dict(affine_hidden_shape=hidden_nodes)
+    def parse_sigma(self, sigma: (float, int)):
+        """Standard deviation of normal distribution."""
+        return sigma
+
+    def parse_support(self, supp: list):
+        """Support of uniform distrbution."""
+        return supp
+
+    def parse_concentration(self, conc: float):
+        """Concentration parameter of von Mises distribution."""
+        return conc
+
+    def parse_m_sq(self, m: (float, int)):
+        """Bare mass squared in scalar theory."""
+        return m
+
+    def parse_lam(self, lam: (float, int)):
+        """Coefficient of quartic interaction in phi^4 theory."""
+        return lam
+
+    def parse_use_arxiv_version(self, do_use: bool):
+        """If true, use the conventional phi^4 action. If false,
+        there is an additional factor of 1/2 for the kinetic part
+        of the phi^4 action."""
+        return do_use
+
+    def parse_network_spec(self, net_spec: dict):
+        """A dictionary where each element is itself a dictionary containing the
+        parameters required to construct a neural network."""
+        required_networks = ("s", "t")  # NOTE: real_nvp. Will generalise in future PR
+        for k in required_networks:
+            if k not in net_spec:
+                raise ConfigError(
+                    f"network_spec should contain keys {required_networks} but contains keys {net_spec.keys()}"
+                )
+            if not isinstance(net_spec[k], dict):
+                raise ConfigError(
+                    f"network spec does not contain a dictionary associated to key {k}"
+                )
+        return net_spec
+
+    def parse_standardise_inputs(self, do_stand: bool):
+        """Flag specifying whether to standardise input vectors before
+        passing them through a neural network."""
+        return do_stand
 
     def parse_n_affine(self, n: int):
+        """Number of affine layers."""
         return n
 
     def parse_n_batch(self, nb: int):
+        """Batch size for training."""
         return nb
 
-    def produce_model(self, lattice_size, n_affine, network_kwargs):
-        model = RealNVP(size_in=lattice_size, n_affine=n_affine, **network_kwargs)
-        return model
+    @explicit_node
+    def produce_model(self):
+        # NOTE this is behind other PR's with more than one model
+        return real_nvp
 
     def parse_epochs(self, epochs: int):
+        """Number of epochs to train. Equivalent to number of passes
+        multiplied by the batch size."""
         return epochs
 
     def parse_save_interval(self, save_int: int):
+        """Interval at which the model state is saved, in units of epochs."""
         return save_int
 
     @element_of("training_outputs")
@@ -143,12 +167,15 @@ class ConfigParser(Config):
         return training_output.as_input()
 
     def produce_training_geometry(self, training_context):
+        """Produces the geometry object used in training."""
         with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
     @explicit_node
     def produce_loaded_optimizer(self, optimizer):
+        """Returns an action which itself returns a torch.optim.Optimizer object
+        that knows about the current state of the model."""
         try:
             return OPTIMIZER_OPTIONS[optimizer]
         except KeyError:
@@ -158,12 +185,16 @@ class ConfigParser(Config):
 
     @explicit_node
     def produce_scheduler(self):
+        """Currently fixed to ReduceLROnPlateau"""
         return reduce_lr_on_plateau
 
     def parse_target_length(self, targ: int):
+        """Target number of decorrelated field configurations to generate."""
         return targ
 
     def parse_thermalisation(self, therm: (int, type(None))):
+        """Number of Markov chain steps to discard to allow the chain to
+        reach an approximately stationary distribution."""
         if therm is None:
             log.warning("Not Performing thermalisation")
             return therm
@@ -174,6 +205,13 @@ class ConfigParser(Config):
         return therm
 
     def parse_sample_interval(self, interval: (int, type(None))):
+        """Number of Markov chain steps to discard between appending configurations
+        to the sample. Should be large enough so that configurations have become
+        decorrelated.
+
+        Can be specified by the user in the runcard, or left to an automatic
+        calculation based on the acceptance rate of the Metropolis-Hastings algorith.
+        """
         if interval is None:
             return interval
         if interval < 1:
@@ -182,6 +220,7 @@ class ConfigParser(Config):
         return interval
 
     def parse_n_boot(self, n_boot: int):
+        """Size of the bootstrap sample."""
         if n_boot < 2:
             raise ConfigError("n_boot must be greater than 1")
         log.warning(f"Using user specified n_boot: {n_boot}")
@@ -189,7 +228,36 @@ class ConfigParser(Config):
 
     @element_of("windows")
     def parse_window(self, window: float):
+        """A numerical factor featuring in the calculation of the optimal 'window'
+        size, which is then used to measure the integrated autocorrelation time of
+        observables.
+
+        Suggested values are between 1 and 2. However, this should be judged by
+        checking that the integrated autocorrelation has approximately plateaued
+        at the optimal window size.
+
+        See `automatic_windowing_function` in the observables module for more details.
+        """
         if window < 0:
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
+
+    def produce_affine_layer_index(self, n_affine):
+        """Given n_affine, the number of affine layers, produces a list
+        with n_affine elements, the ith element is {i_affine: i}
+
+        we can use affine_layer_index to collect over when producing the model
+
+        """
+        return [{"i_affine": i} for i in range(n_affine)]
+
+    def produce_size_half(self, lattice_size):
+        """Given the lattice size, return an integer of lattice_size/2 which
+        is the number of nodes which are part of phi_A or phi_B.
+
+        """
+        # NOTE: we may want to make this more flexible
+        if (lattice_size % 2) != 0:
+            raise ConfigError("Lattice size is expected to be an even number")
+        return int(lattice_size/2)

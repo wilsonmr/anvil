@@ -14,20 +14,126 @@ RealNVP: nn.Module
     distribution \phi^n, where n refers to the dimensionality of the data.
 
 """
-from math import sqrt, pi, log
-
 import torch
 import torch.nn as nn
+
+ACTIVATION_LAYERS = {
+    "relu": nn.ReLU,
+    "leaky_relu": nn.LeakyReLU,
+    "sigmoid": nn.Sigmoid,
+    "tanh": nn.Tanh,
+    None: nn.Identity,
+}
+
+
+class NeuralNetwork(nn.Module):
+    """Generic class for neural networks used in coupling layers.
+
+    Networks consist of 'blocks' of
+        - Dense (linear) layer
+        - Batch normalisation layer
+        - Activation function
+
+    Parameters
+    ----------
+    size_in: int
+        Number of nodes in the input layer
+    size_out: int
+        Number of nodes in the output layer
+    hidden_shape: list
+        List specifying the number of nodes in the intermediate layers
+    activation: (str, None)
+        Key representing the activation function used for each layer
+        except the final one.
+    final_activation: (str, None)
+        Key representing the activation function used on the final
+        layer.
+    do_batch_norm: bool
+        Flag dictating whether batch normalisation should be performed
+        before the activation function.
+    name: str
+        A label for the neural network, used for diagnostics.
+
+    Methods
+    -------
+    forward:
+        The forward pass of the network, mapping a batch of input vectors
+        with 'size_in' nodes to a batch of output vectors of 'size_out'
+        nodes.
+    """
+
+    def __init__(
+        self,
+        size_in: int,
+        size_out: int,
+        hidden_shape: list = [24,],
+        activation: (str, None) = "leaky_relu",
+        final_activation: (str, None) = None,
+        do_batch_norm: bool = False,
+        name: str = "network",
+    ):
+        super(NeuralNetwork, self).__init__()
+        self.name = name
+        self.size_in = size_in
+        self.size_out = size_out
+        self.hidden_shape = hidden_shape
+
+        if do_batch_norm:
+            self.batch_norm = nn.BatchNorm1d
+        else:
+            self.batch_norm = nn.Identity
+
+        self.activation_func = ACTIVATION_LAYERS[activation]
+        self.final_activation_func = ACTIVATION_LAYERS[final_activation]
+
+        # nn.Sequential object containing the network layers
+        self.network = self._construct_network()
+
+    def __str__(self):
+        return f"Network: {self.name}\n------------\n{self.network}"
+
+    def _block(self, f_in, f_out, activation_func):
+        """Constructs a single 'dense block' which maps 'f_in' inputs to
+        'f_out' output features. Returns a list with three elements:
+            - Dense (linear) layer
+            - Batch normalisation (or identity if this is switched off)
+            - Activation function
+        """
+        return [
+            nn.Linear(f_in, f_out),
+            self.batch_norm(f_out),
+            activation_func(),
+        ]
+
+    def _construct_network(self):
+        """Constructs the neural network from multiple calls to _block.
+        Returns a torch.nn.Sequential object which has the 'forward' method built in.
+        """
+        layers = self._block(self.size_in, self.hidden_shape[0], self.activation_func)
+        for f_in, f_out in zip(self.hidden_shape[:-1], self.hidden_shape[1:]):
+            layers += self._block(f_in, f_out, self.activation_func)
+        layers += self._block(
+            self.hidden_shape[-1], self.size_out, self.final_activation_func
+        )
+        return nn.Sequential(*layers)
+
+    def forward(self, x: torch.tensor):
+        """Forward pass of the network.
+        
+        Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
+        shape (n_batch, size_out)
+        """
+        return self.network(x)
 
 
 class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
 
-    Affine transformation, z = g_i(\phi), defined as:
+    Affine transformation, x = g_i(\phi), defined as:
 
-        z_a = \phi_a
-        z_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
+        x_a = \phi_a
+        x_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
 
     where D-dimensional phi has been split into two D/2-dimensional pieces
     \phi_a and \phi_b. s_i and t_i are neural networks, whose parameters are
@@ -46,13 +152,11 @@ class AffineLayer(nn.Module):
     ----------
     size_in: int
         number of dimensions, D, of input/output data. Data should be fed to
-        network in shape (N_states, size_in).
-    s_hidden_shape: tuple
-        tuple which gives the number of nodes in the hidden layers of neural
-        network s_i, can be a single layer network with 16 nodes e.g (16,)
-    t_hidden_shape: tuple
-        tuple which gives the number of nodes in the hidden layers of neural
-        network t_i.
+        affine layer in shape (N_states, size_in).
+    s_network: NeuralNetwork
+        The 's' network, see the `NeuralNetwork` class for details.
+    t_network: NeuralNetwork
+        As above, for the 't' network
     i_affine: int
         index of this affine layer in full set of affine transformations,
         dictates which half of the data is transformed as a and b, since
@@ -61,56 +165,41 @@ class AffineLayer(nn.Module):
 
     Attributes
     ----------
-    s_layers: torch.nn.ModuleList
+    s_network: torch.nn.Module
         the dense layers of network s, values are intialised as per the
         default initialisation of `nn.Linear`
-    t_layers: torch.nn.ModuleList
+    t_network: torch.nn.Module
         the dense layers of network t, values are intialised as per the
         default initialisation of `nn.Linear`
 
     Methods
     -------
-    coupling_layer(phi_input):
-        performs the transformation of a single coupling layer, denoted
-        g_i(\phi)
-    inverse_coupling_layer(z_input):
-        performs the transformation of the inverse coupling layer, denoted
-        g_i^{-1}(z)
-    det_jacobian(phi_input):
-        returns the contribution to the determinant of the jacobian
+    forward(x_input):
+        performs the transformation of the *inverse* coupling layer, denoted
+        g_i^{-1}(x). Returns the output vector along with the contribution
+        to the determinant of the jacobian of the *forward* transformation.
         = \frac{\partial g(\phi)}{\partial \phi}
 
     """
 
     def __init__(
-        self, size_in: int, s_hidden_shape: tuple, t_hidden_shape: tuple, i_affine: int
+        self,
+        i_affine: int,
+        size_in: int,
+        s_network,
+        t_network,
+        standardise_inputs: bool,
     ):
         super(AffineLayer, self).__init__()
-        size_half = int(size_in / 2)
-        s_shape = [size_half, *s_hidden_shape, size_half]
-        t_shape = [size_half, *t_hidden_shape, size_half]
+        size_half = size_in // 2
 
-        self.s_layers = nn.ModuleList(
-            [
-                self._block(s_in, s_out)
-                for s_in, s_out in zip(s_shape[:-2], s_shape[1:-1])
-            ]
-        )
-        self.t_layers = nn.ModuleList(
-            [
-                self._block(t_in, t_out)
-                for t_in, t_out in zip(t_shape[:-2], t_shape[1:-1])
-            ]
-        )
-        # By default not activation function on final layer
-        # TODO: REALLY need flexibility to specify this in the runcard
-        self.s_layers += [nn.Linear(s_shape[-2], s_shape[-1])]
-        self.t_layers += [nn.Linear(t_shape[-2], t_shape[-1])]
+        self.s_network = s_network
+        self.t_network = t_network
 
         if (i_affine % 2) == 0:  # starts at zero
             # a is first half of input vector
-            self._a_ind = slice(0, int(size_half))
-            self._b_ind = slice(int(size_half), size_in)
+            self._a_ind = slice(0, size_half)
+            self._b_ind = slice(size_half, size_in)
             self.join_func = torch.cat
         else:
             # a is second half of input vector
@@ -120,92 +209,32 @@ class AffineLayer(nn.Module):
                 (a[1], a[0]), *args, **kwargs
             )
 
-    def _block(self, f_in, f_out):
-        """Defines a single block within the neural networks.
+        if standardise_inputs:
+            self.standardise = lambda x: (x - x.mean()) / x.std()
+        else:
+            self.standardise = lambda x: x
 
-        Currently hard coded to be a dense layed followed by a leaky ReLU,
-        but could potentially specify in runcard.
-        """
-        return nn.Sequential(nn.Linear(f_in, f_out), nn.LeakyReLU(),)
-
-    def _s_forward(self, x_input: torch.Tensor) -> torch.Tensor:
-        """Internal method which performs the forward pass of the network
-        s.
-
-        Input data x_input should be a torch tensor of size D, with the
-        appropriate mask_mat applied such that elements corresponding to
-        partition b are set to zero
-
-        """
-        for s_layer in self.s_layers:
-            x_input = s_layer(x_input)
-        return x_input
-
-    def _t_forward(self, x_input: torch.Tensor) -> torch.Tensor:
-        """Internal method which performs the forward pass of the network
-        t.
-
-        Input data x_input should be a torch tensor of size D, with the
-        appropriate mask_mat applied such that elements corresponding to
-        partition b are set to zero
-
-        """
-        for t_layer in self.t_layers:
-            x_input = t_layer(x_input)
-        return x_input
-
-    def coupling_layer(self, phi_input) -> torch.Tensor:
-        r"""performs the transformation of a single coupling layer, denoted
-        g_i(\phi).
-
-        Affine transformation, z = g_i(\phi), defined as:
-
-        z_a = \phi_a
-        z_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
-
-        see eq. (9) of https://arxiv.org/pdf/1904.12072.pdf
-
-        Parameters
-        ----------
-        phi_input: torch.Tensor
-            stack of vectors \phi, shape (N_states, D)
-
-        Returns
-        -------
-        out: torch.Tensor
-            stack of transformed vectors z, with same shape as input
-
-        """
-        # since inputs are like (N_states, D) we need to index correct halves
-        # of if input states
-        phi_a = phi_input[:, self._a_ind]
-        phi_b = phi_input[:, self._b_ind]
-        s_out = self._s_forward(phi_a)
-        t_out = self._t_forward(phi_a)
-        z_b = s_out.exp() * phi_b + t_out
-        return self.join_func([phi_a, z_b], dim=1)  # put back together state
-
-    def forward(self, z_input) -> torch.Tensor:
+    def forward(self, x_input) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
-        g_i^{-1}(z)
+        g_i^{-1}(x)
 
-        inverse transformation, \phi = g_i^{-1}(z), defined as:
+        inverse transformation, \phi = g_i^{-1}(x), defined as:
 
-        \phi_a = z_a
-        \phi_b = (z_b - t_i(z_a)) * exp(-s_i(z_a))
+        \phi_a = x_a
+        \phi_b = (x_b - t_i(x_a)) * exp(-s_i(x_a))
 
         see eq. (10) of https://arxiv.org/pdf/1904.12072.pdf
-            
+
         Also computes the logarithm of the jacobian determinant for the
         forward transformation (inverse of the above), which is equal to
-        the logarithm of 
+        the logarithm of
 
         \frac{\partial g(\phi)}{\partial \phi} = prod_j exp(s_i(\phi)_j)
 
         Parameters
         ----------
-        z_input: torch.Tensor
-            stack of vectors z, shape (N_states, D)
+        x_input: torch.Tensor
+            stack of vectors x, shape (N_states, D)
 
         Returns
         -------
@@ -215,12 +244,13 @@ class AffineLayer(nn.Module):
                 logarithm of the jacobian determinant for the inverse of the
                 transformation applied here.
         """
-        z_a = z_input[:, self._a_ind]
-        z_b = z_input[:, self._b_ind]
-        s_out = self._s_forward(z_a)
-        t_out = self._t_forward(z_a)
-        phi_b = (z_b - t_out) * torch.exp(-s_out)
-        return self.join_func([z_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+        x_a_stand = self.standardise(x_a)
+        s_out = self.s_network(x_a_stand)
+        t_out = self.t_network(x_a_stand)
+        phi_b = (x_b - t_out) * torch.exp(-s_out)
+        return self.join_func([x_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
 
 
 class RealNVP(nn.Module):
@@ -239,12 +269,17 @@ class RealNVP(nn.Module):
     Parameters
     ----------
     size_in: int
-        number of units defining a single field configuration. The size of
+        Number of units defining a single field configuration. The size of
         the second dimension of the input data.
     n_affine: int
-        number of affine layers, it is recommended to choose an even number
-    affine_hidden_shape: tuple
-        tuple defining the number of nodes in the hidden layers of s and t.
+        Number of affine layers, it is recommended to choose an even number
+    s_networks
+        List of s neural networks for each affine layer
+    t_networks
+        List of t neural networks for each affine layer
+    standardise_inputs: bool
+        Flag dictating whether or not input vectors are standardised (i.e.
+        zero mean, unit variance) before being passed to a neural network.
 
     Attributes
     ----------
@@ -254,30 +289,37 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self, *, size_in, n_affine: int = 2, affine_hidden_shape: tuple = (16,)
+        self,
+        *,
+        size_in: int,
+        s_networks,
+        t_networks,
+        standardise_inputs: bool,
     ):
         super(RealNVP, self).__init__()
 
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(size_in, affine_hidden_shape, affine_hidden_shape, i)
-                for i in range(n_affine)
+                AffineLayer(
+                    i, size_in, s_network, t_network, standardise_inputs
+                )
+                for i, (s_network, t_network) in enumerate(zip(s_networks, t_networks))
             ]
         )
 
-    def map(self, x_input: torch.Tensor):
+    def map(self, phi_input: torch.Tensor):
         """Function that maps field configuration to simple distribution"""
         raise NotImplementedError
 
-    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
-        r"""Function which maps simple distribution, z, to target distribution
-        \phi, and at the same time calculates the density of the output
-        distribution using the change of variables formula, according to 
+    def forward(self, x_input: torch.Tensor) -> torch.Tensor:
+        r"""Function which maps simple distribution, x ~ r, to target distribution
+        \phi ~ p, and at the same time calculates the density of the output
+        distribution using the change of variables formula, according to
         eq. (8) of https://arxiv.org/pdf/1904.12072.pdf.
 
         Parameters
         ----------
-        z_input: torch.Tensor
+        x_input: torch.Tensor
             stack of simple distribution state vectors, shape (N_states, D)
 
         Returns
@@ -289,8 +331,8 @@ class RealNVP(nn.Module):
             logarithm of the probability density of the output distribution,
             with shape (n_states, 1)
         """
-        log_density = torch.zeros((z_input.shape[0], 1))
-        phi_out = z_input
+        log_density = torch.zeros((x_input.shape[0], 1))
+        phi_out = x_input
 
         for layer in reversed(self.affine_layers):  # reverse layers!
             phi_out, log_det_jacob = layer(phi_out)
@@ -299,6 +341,11 @@ class RealNVP(nn.Module):
 
         return phi_out, log_density
 
-
-if __name__ == "__main__":
-    pass
+def real_nvp(lattice_size, s_networks, t_networks, standardise_inputs=False):
+    """Returns an instance of the RealNVP class."""
+    return RealNVP(
+        size_in=lattice_size,
+        s_networks=s_networks,
+        t_networks=t_networks,
+        standardise_inputs=standardise_inputs,
+    )
