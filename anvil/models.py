@@ -245,13 +245,16 @@ class AffineLayer(nn.Module):
                 logarithm of the jacobian determinant for the inverse of the
                 transformation applied here.
         """
-        x_a = x_input[:, self._a_ind]
-        x_b = x_input[:, self._b_ind]
+        x_a = x_input[..., self._a_ind]
+        x_b = x_input[..., self._b_ind]
         x_a_stand = self.standardise(x_a)
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
         phi_b = (x_b - t_out) * torch.exp(-s_out)
-        return self.join_func([x_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
+        return (
+            self.join_func([x_a, phi_b], dim=-1),
+            s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1)
+        )
 
 
 class RealNVP(nn.Module):
@@ -325,14 +328,12 @@ class RealNVP(nn.Module):
             logarithm of the probability density of the output distribution,
             with shape (n_states, 1)
         """
-        log_density = torch.zeros((x_input.shape[0], 1))
         phi_out = x_input
-
-        for layer in reversed(self.affine_layers):  # reverse layers!
+        rev_layers = reversed(self.affine_layers) # reverse layers!
+        phi_out, log_density = next(rev_layers)(phi_out)
+        for layer in rev_layers:
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
-            # TODO: make this yield, then make a yield from wrapper?
-
         return phi_out, log_density
 
 
