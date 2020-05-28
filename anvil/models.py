@@ -13,9 +13,18 @@ RealNVP: nn.Module
     transformation, which maps a simple distribution z^n to a complicated
     distribution \phi^n, where n refers to the dimensionality of the data.
 
+ProjectCircle: nn.Module
+    Model which wraps around Real NVP to enable learning maps between distributions
+    defined on the unit circle.
+
+ProjectSphere: nn.Module
+    Model which wraps around Real NVP to enable learning maps between distributions
+    defined on the unit sphere.
 """
 import torch
 import torch.nn as nn
+
+from math import pi
 
 ACTIVATION_LAYERS = {
     "relu": nn.ReLU,
@@ -192,7 +201,6 @@ class AffineLayer(nn.Module):
     ):
         super(AffineLayer, self).__init__()
         size_half = size_in // 2
-
         self.s_network = s_network
         self.t_network = t_network
 
@@ -244,13 +252,16 @@ class AffineLayer(nn.Module):
                 logarithm of the jacobian determinant for the inverse of the
                 transformation applied here.
         """
-        x_a = x_input[:, self._a_ind]
-        x_b = x_input[:, self._b_ind]
+        x_a = x_input[..., self._a_ind]
+        x_b = x_input[..., self._b_ind]
         x_a_stand = self.standardise(x_a)
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
         phi_b = (x_b - t_out) * torch.exp(-s_out)
-        return self.join_func([x_a, phi_b], dim=1), s_out.sum(dim=1, keepdim=True)
+        return (
+            self.join_func([x_a, phi_b], dim=-1),
+            s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1),
+        )
 
 
 class RealNVP(nn.Module):
@@ -289,20 +300,13 @@ class RealNVP(nn.Module):
     """
 
     def __init__(
-        self,
-        *,
-        size_in: int,
-        s_networks,
-        t_networks,
-        standardise_inputs: bool,
+        self, *, size_in: int, s_networks, t_networks, standardise_inputs: bool,
     ):
         super(RealNVP, self).__init__()
 
         self.affine_layers = nn.ModuleList(
             [
-                AffineLayer(
-                    i, size_in, s_network, t_network, standardise_inputs
-                )
+                AffineLayer(i, size_in, s_network, t_network, standardise_inputs)
                 for i, (s_network, t_network) in enumerate(zip(s_networks, t_networks))
             ]
         )
@@ -320,7 +324,7 @@ class RealNVP(nn.Module):
         Parameters
         ----------
         x_input: torch.Tensor
-            stack of simple distribution state vectors, shape (N_states, D)
+            stack of simple distribution state vectors, shape (N_states, config_size)
 
         Returns
         -------
@@ -331,21 +335,163 @@ class RealNVP(nn.Module):
             logarithm of the probability density of the output distribution,
             with shape (n_states, 1)
         """
-        log_density = torch.zeros((x_input.shape[0], 1))
         phi_out = x_input
-
-        for layer in reversed(self.affine_layers):  # reverse layers!
+        rev_layers = reversed(self.affine_layers)  # reverse layers!
+        phi_out, log_density = next(rev_layers)(phi_out)
+        for layer in rev_layers:
             phi_out, log_det_jacob = layer(phi_out)
             log_density += log_det_jacob
-            # TODO: make this yield, then make a yield from wrapper?
-
         return phi_out, log_density
 
-def real_nvp(lattice_size, s_networks, t_networks, standardise_inputs=False):
+
+class ProjectCircle(nn.Module):
+    r"""Extension to nn.Module which enables the use of Real NVP to map data points
+    that take values on a unit circle, by applying the stereographic projection map
+    (and its inverse) before (and after) Real NVP.
+
+
+    Parameters
+    ----------
+    inner_flow: nn.Module
+        A normalising flow which maps input vectors in R^N to output vectors in R^N.
+        Currently the only option implemented is Real NVP.
+    """
+
+    def __init__(self, inner_flow):
+        super().__init__()
+        self.inner_flow = inner_flow
+
+    def forward(self, x_input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the projection model.
+
+        Parameters
+        ----------
+        x_input: torch.Tensor
+            stack of simple distribution state vectors whose elements take values
+            on the unit circle, dimensions (N_states, lattice_size)
+
+        Returns
+        -------
+        phi_out: torch.Tensor
+            stack of transformed states, which are drawn from an approximation
+            of the target distribution, same shape as input.
+        log_density: torch.Tensor
+            logarithm of the probability density of the output distribution,
+            with shape (n_states, 1)
+        """
+
+        # Projection
+        phi_out = torch.tan(0.5 * (x_input - pi))
+        log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
+
+        # Inner flow on real line e.g. RealNVP
+        phi_out, log_density_inner = self.inner_flow(phi_out)
+
+        # Inverse projection
+        phi_out = 2 * torch.atan(phi_out) + pi
+        log_density_proj += (-2 * torch.log(torch.cos(0.5 * (phi_out - pi)))).sum(
+            dim=1, keepdim=True
+        )
+
+        return phi_out, log_density_proj + log_density_inner
+
+
+class ProjectSphere(nn.Module):
+    r"""Extension to nn.Module which enables the use of Real NVP to map data points
+    that take values on a unit circle, by applying the stereographic projection map
+    (and its inverse) before (and after) Real NVP.
+
+
+    Parameters
+    ----------
+    inner_flow: nn.Module
+        A normalising flow which maps input vectors in R^N to output vectors in R^N.
+        Currently the only option implemented is Real NVP.
+    size_in: int
+        two times the lattice size. Only used to reshape the states.
+    """
+
+    def __init__(self, inner_flow, size_in):
+        super().__init__()
+        self.inner_flow = inner_flow
+        self.size_in = size_in
+
+    def forward(self, x_input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the projection model.
+
+        Parameters
+        ----------
+        x_input: torch.Tensor
+            stack of simple distribution state vectors whose elements take values
+            on the unit sphere, dimensions (N_states, 2 * lattice_size)
+
+        Returns
+        -------
+        phi_out: torch.Tensor
+            stack of transformed states, which are drawn from an approximation
+            of the target distribution, same shape as input.
+        log_density: torch.Tensor
+            logarithm of the probability density of the output distribution,
+            with shape (n_states, 1)
+        """
+        polar, azimuth = x_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
+
+        # Projection
+        # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
+        proj_xy = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
+            (torch.cos(azimuth), torch.sin(azimuth)), dim=2
+        )
+        proj_rsq = proj_xy.pow(2).sum(dim=2)
+        log_density_proj = (-0.5 * torch.log(proj_rsq) - torch.log1p(proj_rsq)).sum(
+            dim=1, keepdim=True
+        )
+
+        # Inner flow on real plane e.g. RealNVP
+        proj_xy, log_density_inner = self.inner_flow(proj_xy.view(-1, self.size_in))
+        proj_x, proj_y = proj_xy.view(-1, self.size_in // 2, 2).split(1, dim=2)
+
+        # Inverse projection
+        polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
+        phi_out = torch.cat(
+            (polar, torch.atan2(proj_x, proj_y) + pi,), dim=2
+        )  # azimuth
+        log_density_proj += (
+            torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
+        ).sum(dim=1)
+
+        return phi_out.view(-1, self.size_in), log_density_proj + log_density_inner
+
+
+def real_nvp(config_size, s_networks, t_networks, standardise_inputs=False):
     """Returns an instance of the RealNVP class."""
     return RealNVP(
-        size_in=lattice_size,
+        size_in=config_size,
         s_networks=s_networks,
         t_networks=t_networks,
         standardise_inputs=standardise_inputs,
     )
+
+
+def stereographic_projection(
+    target, config_size, s_networks, t_networks, standardise_inputs=False
+):
+    """Returns an instance of either ProjectCircle or ProjectSphere, depending on the
+    dimensionality of the fields."""
+    inner_flow = RealNVP(
+        size_in=config_size,
+        s_networks=s_networks,
+        t_networks=t_networks,
+        standardise_inputs=standardise_inputs,
+    )
+    if target == "o2":
+        return ProjectCircle(inner_flow)
+    elif target == "o3":
+        return ProjectSphere(inner_flow, size_in=config_size)
+    # Should raise config error.
+    return
+
+
+MODEL_OPTIONS = {
+    "real_nvp": real_nvp,
+    "projection": stereographic_projection,
+}

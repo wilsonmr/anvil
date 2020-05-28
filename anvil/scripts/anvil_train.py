@@ -10,13 +10,14 @@ from anvil.config import ConfigParser, ConfigError
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.train", "anvil.checkpoint",]
+PROVIDERS = ["anvil.train", "anvil.checkpoint"]
 
 TRAINING_ACTIONS = ["train"]
 
 RUNCARD_COPY_FILENAME = "runcard.yml"
 
 INPUT_FOLDER_NAME = "input"
+
 
 class TrainError(Exception):
     pass

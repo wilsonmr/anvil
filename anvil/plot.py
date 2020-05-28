@@ -4,11 +4,59 @@ plot.py
 module containing all actions for plotting observables
 
 """
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from reportengine.figure import figure, figuregen
+from reportengine import collect
+
+
+def field_component(i, x_base, phi_model, phi_target=None):
+    fig, ax = plt.subplots()
+
+    ax.hist(x_base, bins=50, density=True, histtype="step", label="base")
+    ax.hist(phi_model, bins=50, density=True, histtype="step", label="model")
+    if phi_target is not None:
+        ax.plot(*phi_target, label="target")
+
+    ax.set_title(f"Coordinate {i}")
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
+def field_components(loaded_model, base_dist, target_dist, lattice_size):
+    """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
+    if known, plot the pdf of the target distribution."""
+    sample_size = 100000
+
+    # Generate a large sample from the base distribution and pass it through the trained model
+    with torch.no_grad():
+        x_base, _ = base_dist(sample_size)
+        phi_model, _ = loaded_model(x_base)
+
+    # Convert to shape (n_coords, sample_size * lattice_size)
+    x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+    phi_model = phi_model.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+
+    # Include target density if known
+    if hasattr(target_dist, "pdf"):
+        phi_target = target_dist.pdf
+    else:
+        phi_target = [None for _ in range(x_base.shape[0])]
+
+    for i in range(x_base.shape[0]):
+        yield field_component(i, x_base[i], phi_model[i], phi_target[i])
+
+
+_plot_field_components = collect("field_components", ("training_context",))
+
+
+@figuregen
+def plot_field_components(_plot_field_components):
+    yield from _plot_field_components[0]
 
 
 @figure

@@ -24,3 +24,5 @@
 {@plot_automatic_windowing_function@}
 ### Table
 {@table_autocorrelation_2pf@}
+## Field components
+{@plot_field_components@}

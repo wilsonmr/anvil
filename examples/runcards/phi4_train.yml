@@ -9,6 +9,7 @@ lam: 0
 use_arxiv_version: False
 
 # Base
+model: real_nvp
 base: standard_normal
 
 # Model
@@ -16,7 +17,6 @@ n_affine: 4
 
 # Networks
 standardise_inputs: true
-
 s_network_spec:
     hidden_shape: [24]
     activation: leaky_relu

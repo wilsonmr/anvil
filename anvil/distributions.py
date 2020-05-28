@@ -37,7 +37,7 @@ class NormalDist:
         self.exp_coeff = 1 / (2 * self.sigma ** 2)
 
         # Pre-calculate normalisation for log density
-        self.log_normalisation = 0.5 * self.size_out * log(2 * pi * self.sigma)
+        self.log_normalisation = self.size_out * log(sqrt(2 * pi) * self.sigma)
 
     def __call__(self, sample_size) -> tuple:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
@@ -57,6 +57,15 @@ class NormalDist:
             (sample - self.mean).pow(2), dim=1, keepdim=True
         )
         return exponent - self.log_normalisation
+
+    @property
+    def pdf(self):
+        x = torch.linspace(-5 * self.sigma, 5 * self.sigma, 10000)
+        return (
+            x,
+            torch.exp(-self.exp_coeff * (x - self.mean) ** 2)
+            / (sqrt(2 * pi) * self.sigma),
+        )
 
 
 class UniformDist:
@@ -89,6 +98,66 @@ class UniformDist:
             self.x_min, self.x_max
         )
         return sample, torch.zeros((sample_size, 1))
+
+    @property
+    def pdf(self):
+        x = torch.linspace(self.x_min, self.x_max, 10000)
+        dens = 1 / (self.x_max - self.x_min)
+        return x, torch.zeros_like(x) + dens
+
+
+class SemicircleDist:
+    """Class which handles the generation of a sample of field configurations
+    following the Wigner semicircle distribution.
+
+    Inputs:
+    -------
+    lattice_size: int
+        Number of nodes on the lattice.
+    radius: (int, float)
+        radius of semicircle
+    mean: (int, float)
+        location of center of distribution. Not really useful.
+    """
+
+    def __init__(self, lattice_size, *, radius, mean):
+        self.size_out = lattice_size
+        self.radius = radius
+        self.mean = mean
+
+        self.log_normalisation = self.size_out * log((pi * self.radius ** 2) / 2)
+
+    def __call__(self, sample_size):
+        """Return a tuple (sample, log_density) for a sample of 'sample_size'
+        states drawn from the semicircle distribution.
+        
+        Return shape: (sample_size, lattice_size) for the sample,
+        (sample_size, 1) for the log density.
+        """
+        sample = (
+            self.radius
+            * torch.sqrt(torch.empty(sample_size, self.size_out).uniform_())
+            * torch.cos(torch.empty(sample_size, self.size_out).uniform_(0, pi))
+            + self.mean
+        )
+        return sample, self.log_density(sample)
+
+    def log_density(self, sample):
+        """Logarithm of the pdf, calculated for a given sample."""
+        return (
+            torch.sum(
+                0.5 * torch.log(self.radius ** 2 - (sample - self.mean) ** 2),
+                dim=1,
+                keepdim=True,
+            )
+            - self.log_normalisation
+        )
+
+    @property
+    def pdf(self):
+        x = torch.linspace(-self.radius, self.radius, 10000)
+        dens = 2 / (pi * self.radius ** 2) * torch.sqrt(self.radius ** 2 - x ** 2)
+        return x + self.mean, dens
 
 
 class VonMisesDist:
@@ -134,7 +203,7 @@ class VonMisesDist:
         self.log_normalisation = self.size_out * log(2 * pi * i0(self.kappa))
 
         self.generator = torch.distributions.von_mises.VonMises(
-            loc=loc, concentration=concentration
+            loc=self.mean, concentration=self.kappa
         ).sample
 
     def __call__(self, sample_size):
@@ -157,6 +226,13 @@ class VonMisesDist:
             - self.log_normalisation
         )
 
+    @property
+    def pdf(self):
+        x = torch.linspace(0, 2 * pi, 10000)
+        return torch.exp(self.kappa * torch.cos(x - self.mean)) / (
+            2 * pi * i0(self.kappa)
+        )
+
 
 class SphericalUniformDist:
     """
@@ -171,6 +247,7 @@ class SphericalUniformDist:
 
     def __init__(self, lattice_size):
         # Two components for each lattice site
+        self.lattice_size = lattice_size
         self.size_out = lattice_size * 2
 
     def __call__(self, sample_size):
@@ -218,6 +295,12 @@ class SphericalUniformDist:
         """
         return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
 
+    @property
+    def pdf(self):
+        pol = torch.linspace(0, pi, 10000)
+        az = torch.linspace(0, 2 * pi, 10000)
+        return (pol, torch.sin(pol)), (az, torch.zeros_like(az) + 1 / (2 * pi))
+
 
 def standard_normal_distribution(lattice_size):
     """returns an instance of the NormalDist class with mean 0 and
@@ -252,6 +335,11 @@ def von_mises_distribution(lattice_size, concentration=1, mean=0):
 def spherical_uniform_distribution(lattice_size):
     """Returns an instance of the SphericalUniformDist class"""
     return SphericalUniformDist(lattice_size)
+
+
+def semicircle_distribution(lattice_size, radius=pi, mean=0):
+    """Returns an instance of the SemicircleDist class."""
+    return SemicircleDist(lattice_size, radius=radius, mean=mean)
 
 
 class PhiFourAction:
@@ -461,6 +549,7 @@ BASE_OPTIONS = {
     "circular_uniform": circular_uniform_distribution,
     "von_mises": von_mises_distribution,
     "spherical_uniform": spherical_uniform_distribution,
+    "semicircle": semicircle_distribution,
 }
 TARGET_OPTIONS = dict(
     {"phi_four": phi_four_action, "o2": o2_action, "o3": o3_action,}, **BASE_OPTIONS

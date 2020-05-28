@@ -10,7 +10,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import real_nvp
+from anvil.models import MODEL_OPTIONS
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
@@ -35,8 +35,20 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_config_size(self, lattice_size, target_dimension=1):
-        return target_dimension * lattice_size
+    def produce_config_size(self, lattice_size, target):
+        """number of nodes in a single field configuration"""
+        if target == "o3":
+            return 2 * lattice_size
+        return lattice_size
+
+    def produce_size_half(self, config_size):
+        """Given the number of nodes in a field configuration, return an integer
+        of config_size/2 which is the size of the input vector for each coupling layer.
+        """
+        # NOTE: we may want to make this more flexible
+        if (config_size % 2) != 0:
+            raise ConfigError("Config size is expected to be an even number")
+        return int(config_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
@@ -85,6 +97,10 @@ class ConfigParser(Config):
         """Concentration parameter of von Mises distribution."""
         return conc
 
+    def parse_radius(self, rad: (int, float, str)):
+        """Radius for semicircle distribution."""
+        return rad
+
     def parse_m_sq(self, m: (float, int)):
         """Bare mass squared in scalar theory."""
         return m
@@ -99,20 +115,23 @@ class ConfigParser(Config):
         of the phi^4 action."""
         return do_use
 
-    def parse_network_spec(self, net_spec: dict):
-        """A dictionary where each element is itself a dictionary containing the
-        parameters required to construct a neural network."""
-        required_networks = ("s", "t")  # NOTE: real_nvp. Will generalise in future PR
-        for k in required_networks:
-            if k not in net_spec:
-                raise ConfigError(
-                    f"network_spec should contain keys {required_networks} but contains keys {net_spec.keys()}"
-                )
-            if not isinstance(net_spec[k], dict):
-                raise ConfigError(
-                    f"network spec does not contain a dictionary associated to key {k}"
-                )
-        return net_spec
+    def parse_beta(self, beta: (float, int)):
+        """Inverse temperature."""
+        return beta
+
+    def parse_model(self, model: str):
+        """Label for normalising flow model."""
+        return model
+
+    @explicit_node
+    def produce_flow_model(self, model):
+        """Return the action which instantiates the normalising flow model."""
+        try:
+            return MODEL_OPTIONS[model]
+        except KeyError:
+            raise ConfigError(
+                f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
+            )
 
     def parse_standardise_inputs(self, do_stand: bool):
         """Flag specifying whether to standardise input vectors before
@@ -123,14 +142,17 @@ class ConfigParser(Config):
         """Number of affine layers."""
         return n
 
+    def produce_affine_layer_index(self, n_affine):
+        """Given n_affine, the number of affine layers, produces a list
+        with n_affine elements, the ith element is {i_affine: i}
+
+        we can use affine_layer_index to collect over when producing the model
+        """
+        return [{"i_affine": i} for i in range(n_affine)]
+
     def parse_n_batch(self, nb: int):
         """Batch size for training."""
         return nb
-
-    @explicit_node
-    def produce_model(self):
-        # NOTE this is behind other PR's with more than one model
-        return real_nvp
 
     def parse_epochs(self, epochs: int):
         """Number of epochs to train. Equivalent to number of passes
@@ -242,22 +264,3 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
-
-    def produce_affine_layer_index(self, n_affine):
-        """Given n_affine, the number of affine layers, produces a list
-        with n_affine elements, the ith element is {i_affine: i}
-
-        we can use affine_layer_index to collect over when producing the model
-
-        """
-        return [{"i_affine": i} for i in range(n_affine)]
-
-    def produce_size_half(self, lattice_size):
-        """Given the lattice size, return an integer of lattice_size/2 which
-        is the number of nodes which are part of phi_A or phi_B.
-
-        """
-        # NOTE: we may want to make this more flexible
-        if (lattice_size % 2) != 0:
-            raise ConfigError("Lattice size is expected to be an even number")
-        return int(lattice_size/2)
