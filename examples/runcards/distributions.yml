@@ -8,9 +8,5 @@ meta:
     title: Field component distributions
     keywords: [example]
 
-template_text: |
-    # Field components
-    {@plot_field_components@}
-
 actions_:
-    - report(main=True)
+    - plot_field_components
