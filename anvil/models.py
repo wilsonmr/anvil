@@ -13,6 +13,13 @@ RealNVP: nn.Module
     transformation, which maps a simple distribution z^n to a complicated
     distribution \phi^n, where n refers to the dimensionality of the data.
 
+ProjectCircle: nn.Module
+    Model which wraps around Real NVP to enable learning maps between distributions
+    defined on the unit circle.
+
+ProjectSphere: nn.Module
+    Model which wraps around Real NVP to enable learning maps between distributions
+    defined on the unit sphere.
 """
 import torch
 import torch.nn as nn
@@ -253,7 +260,7 @@ class AffineLayer(nn.Module):
         phi_b = (x_b - t_out) * torch.exp(-s_out)
         return (
             self.join_func([x_a, phi_b], dim=-1),
-            s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1)
+            s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1),
         )
 
 
@@ -317,7 +324,7 @@ class RealNVP(nn.Module):
         Parameters
         ----------
         x_input: torch.Tensor
-            stack of simple distribution state vectors, shape (N_states, D)
+            stack of simple distribution state vectors, shape (N_states, config_size)
 
         Returns
         -------
@@ -329,7 +336,7 @@ class RealNVP(nn.Module):
             with shape (n_states, 1)
         """
         phi_out = x_input
-        rev_layers = reversed(self.affine_layers) # reverse layers!
+        rev_layers = reversed(self.affine_layers)  # reverse layers!
         phi_out, log_density = next(rev_layers)(phi_out)
         for layer in rev_layers:
             phi_out, log_det_jacob = layer(phi_out)
@@ -338,14 +345,43 @@ class RealNVP(nn.Module):
 
 
 class ProjectCircle(nn.Module):
+    r"""Extension to nn.Module which enables the use of Real NVP to map data points
+    that take values on a unit circle, by applying the stereographic projection map
+    (and its inverse) before (and after) Real NVP.
+
+
+    Parameters
+    ----------
+    inner_flow: nn.Module
+        A normalising flow which maps input vectors in R^N to output vectors in R^N.
+        Currently the only option implemented is Real NVP.
+    """
+
     def __init__(self, inner_flow):
         super().__init__()
         self.inner_flow = inner_flow
 
-    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
+    def forward(self, x_input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the projection model.
+
+        Parameters
+        ----------
+        x_input: torch.Tensor
+            stack of simple distribution state vectors whose elements take values
+            on the unit circle, dimensions (N_states, lattice_size)
+
+        Returns
+        -------
+        phi_out: torch.Tensor
+            stack of transformed states, which are drawn from an approximation
+            of the target distribution, same shape as input.
+        log_density: torch.Tensor
+            logarithm of the probability density of the output distribution,
+            with shape (n_states, 1)
+        """
 
         # Projection
-        phi_out = torch.tan(0.5 * (z_input - pi))
+        phi_out = torch.tan(0.5 * (x_input - pi))
         log_density_proj = (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
 
         # Inner flow on real line e.g. RealNVP
@@ -361,31 +397,64 @@ class ProjectCircle(nn.Module):
 
 
 class ProjectSphere(nn.Module):
+    r"""Extension to nn.Module which enables the use of Real NVP to map data points
+    that take values on a unit circle, by applying the stereographic projection map
+    (and its inverse) before (and after) Real NVP.
+
+
+    Parameters
+    ----------
+    inner_flow: nn.Module
+        A normalising flow which maps input vectors in R^N to output vectors in R^N.
+        Currently the only option implemented is Real NVP.
+    size_in: int
+        two times the lattice size. Only used to reshape the states.
+    """
+
     def __init__(self, inner_flow, size_in):
         super().__init__()
         self.inner_flow = inner_flow
         self.size_in = size_in
 
-    def forward(self, z_input: torch.Tensor) -> torch.Tensor:
-        polar, azimuth = z_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
+    def forward(self, x_input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the projection model.
+
+        Parameters
+        ----------
+        x_input: torch.Tensor
+            stack of simple distribution state vectors whose elements take values
+            on the unit sphere, dimensions (N_states, 2 * lattice_size)
+
+        Returns
+        -------
+        phi_out: torch.Tensor
+            stack of transformed states, which are drawn from an approximation
+            of the target distribution, same shape as input.
+        log_density: torch.Tensor
+            logarithm of the probability density of the output distribution,
+            with shape (n_states, 1)
+        """
+        polar, azimuth = x_input.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Projection
-        # -1 factor because coordinate = azimuth - pi (*-1 is faster than shift)
-        x_coords = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
+        # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
+        proj_xy = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
             (torch.cos(azimuth), torch.sin(azimuth)), dim=2
         )
-        rad_sq = x_coords.pow(2).sum(dim=2)
-        log_density_proj = (-0.5 * torch.log(rad_sq) - torch.log1p(rad_sq)).sum(
+        proj_rsq = proj_xy.pow(2).sum(dim=2)
+        log_density_proj = (-0.5 * torch.log(proj_rsq) - torch.log1p(proj_rsq)).sum(
             dim=1, keepdim=True
         )
 
         # Inner flow on real plane e.g. RealNVP
-        x_coords, log_density_inner = self.inner_flow(x_coords.view(-1, self.size_in))
-        x_1, x_2 = x_coords.view(-1, self.size_in // 2, 2).split(1, dim=2)
+        proj_xy, log_density_inner = self.inner_flow(proj_xy.view(-1, self.size_in))
+        proj_x, proj_y = proj_xy.view(-1, self.size_in // 2, 2).split(1, dim=2)
 
         # Inverse projection
-        polar = 2 * torch.atan(torch.sqrt(x_1.pow(2) + x_2.pow(2)))
-        phi_out = torch.cat((polar, torch.atan2(x_2, x_1) + pi,), dim=2)  # azimuth
+        polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
+        phi_out = torch.cat(
+            (polar, torch.atan2(proj_x, proj_y) + pi,), dim=2
+        )  # azimuth
         log_density_proj += (
             torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
         ).sum(dim=1)
