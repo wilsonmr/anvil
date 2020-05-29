@@ -62,8 +62,8 @@ def sample_batch(
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        z, base_log_density = base_dist(batch_size + 1)
-        phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
+        x, base_log_density = base_dist(batch_size + 1)
+        phi, map_log_density = loaded_model(x)  # map using trained loaded_model to phi
 
         model_log_density = base_log_density + map_log_density
 
@@ -75,6 +75,7 @@ def sample_batch(
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 
     log_ratio = model_log_density - target_dist.log_density(phi)
+
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
             "could run into nans based on minimum and maximum log of ratio of probabilities"
@@ -293,7 +294,7 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
