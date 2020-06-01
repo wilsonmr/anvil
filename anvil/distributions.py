@@ -232,8 +232,9 @@ class VonMisesDist:
         x = torch.linspace(0, 2 * pi, 10000)
         return (
             (
+                x,
                 torch.exp(self.kappa * torch.cos(x - self.mean))
-                / (2 * pi * i0(self.kappa))
+                / (2 * pi * i0(self.kappa)),
             ),
         )
 
