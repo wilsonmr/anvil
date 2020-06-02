@@ -9,10 +9,10 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import normalising_flow, convex_combination
+from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
 from anvil.layers import LAYER_OPTIONS
-from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 log = logging.getLogger(__name__)
@@ -121,28 +121,39 @@ class ConfigParser(Config):
         return beta
 
     def produce_layer_spec(self, layer):
+        """Produce iterable which we can collect over, where each element contains
+        the parameters for a single transformation."""
         return [{"layer_spec": layer[i]} for i in range(len(layer))]
 
     def parse_n_layers(self, n: int):
+        """Number of layers, where each layer is understood to be one pass of the
+        transformations defined in 'layer'."""
         return n
 
     def produce_layer_indices(self, n_layers):
+        """Produce iterable which we can collect over to create a flow by composing
+        multiple layers."""
         return [{"i_layer": i} for i in range(n_layers)]
 
     @explicit_node
     def produce_transformation_layer(self, model):
+        """Return action which defines a single transformation for a given model."""
         return LAYER_OPTIONS[model]
 
     def parse_n_mixture(self, n: int):
+        """Number of replica models which we can combine using convex combinations."""
         return n
 
     def produce_mixture_indices(self, n_mixture):
+        """Produce iterable which we can collect over to produce multiple flow replicas."""
         return [{"i_mixture": i} for i in range(n_mixture)]
     
     @explicit_node
-    def produce_flow_model(self, n_mixture=1):
+    def produce_generative_model(self, n_mixture=1):
+        """Produce the generative model which maps the base to an approximate of the 
+        target distribution."""
         if n_mixture == 1:
-            return normalising_flow
+            return normalising_flow  # function composition
         else:
             return convex_combination
 

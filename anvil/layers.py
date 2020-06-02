@@ -4,18 +4,25 @@ layers.py
 """
 import torch
 import torch.nn as nn
-
-from math import pi
 from functools import partial
-
-from reportengine import collect
 
 from anvil.core import Sequential, NeuralNetwork
 
 
 class CouplingLayer(nn.Module):
     """
-    Base class for coupling layers
+    Base class for coupling layers.
+
+    A generic coupling transformation takes the form
+
+        x_a = \phi_a
+        x_b = C( \phi_b ; {N(\phi_a)} )
+
+    where the D-dimensional \phi vector has been split into two D/2-dimensional vectors
+    \phi_a and \phi_b, and {N(\phi_a)} is a set of functions, possible neural networks,
+    which take \phi_a as parameters.
+    
+    Input and output data are flat vectors stacked in the first dimension (batch dimension).
     """
 
     def __init__(self, i_layer: int, size_half: int, even_sites: bool):
@@ -51,30 +58,33 @@ class AffineLayer(CouplingLayer):
         x_a = \phi_a
         x_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
 
-    where D-dimensional phi has been split into two D/2-dimensional pieces
-    \phi_a and \phi_b. s_i and t_i are neural networks, whose parameters are
-    torch.nn parameters of this class.
-
-    In the case of this class the partitions are expected to
-    be the first and second part of the input data, an additional transformation
-    will therefore need to be applied to the output/input of this network if
-    the desired partition is to have a different pattern, for example a
-    checkerboard transformation.
-
-    Input and output data are flat vectors stacked in the first dimension
-    (batch dimension).
-
     Parameters
     ----------
-    size_in: int
-        number of dimensions, D, of input/output data. Data should be fed to
-        affine layer in shape (N_states, size_in).
-    s_network: NeuralNetwork
-        The 's' network, see the `NeuralNetwork` class for details.
-    t_network: NeuralNetwork
-        As above, for the 't' network
-    i_affine: int
-        index of this affine layer in full set of affine transformations,
+    i_layer: int
+        layer index, used for debugging
+    size_half: int
+        Half of the configuration size, which is the size of the input vector
+        for the neural networks.
+    s_hidden_shape: list
+        list containing hidden vector sizes for s network.
+    t_hidden_shape: list
+        list containing hidden vector sizes for t network.
+    s_activation: str
+        string which is a key for an activation function for all but the final
+        layer of the s network
+    t_activation: str
+        string which is a key for an activation function for all but the final
+        layer of the t network
+    s_final_activation: str
+        string which is a key for an activation function for the final layer
+        of the s network
+    t_final_activation: str
+        string which is a key for an activation function for the final layer
+        of the t network
+    batch_normalise: bool
+        flag indicating whether or not to use batch normalising within the
+        neural networks
+    even_sites: bool
         dictates which half of the data is transformed as a and b, since
         successive affine transformations alternate which half of the data is
         passed through neural networks.
@@ -90,7 +100,7 @@ class AffineLayer(CouplingLayer):
 
     Methods
     -------
-    forward(x_input):
+    forward(x_input, log_density):
         performs the transformation of the *inverse* coupling layer, denoted
         g_i^{-1}(x). Returns the output vector along with the contribution
         to the determinant of the jacobian of the *forward* transformation.
@@ -103,10 +113,13 @@ class AffineLayer(CouplingLayer):
         i_layer: int,
         size_half: int,
         *,
-        s_hidden_shape: list = [24,],
-        t_hidden_shape: list = [24,],
-        activation: str = "leaky_relu",
-        batch_normalise: bool = False,
+        s_hidden_shape=[24,],
+        t_hidden_shape=[24,],
+        s_activation="leaky_relu",
+        t_activation="leaky_relu",
+        s_final_activation="leaky_relu",
+        t_final_activation=None,
+        batch_normalise=False,
         even_sites: bool,
     ):
         super().__init__(i_layer, size_half, even_sites)
@@ -116,8 +129,8 @@ class AffineLayer(CouplingLayer):
             size_in=size_half,
             size_out=size_half,
             hidden_shape=s_hidden_shape,
-            activation=activation,
-            final_activation=activation,
+            activation=s_activation,
+            final_activation=s_final_activation,
             batch_normalise=batch_normalise,
             label=f"({self.label}) 's' network",
         )
@@ -125,8 +138,8 @@ class AffineLayer(CouplingLayer):
             size_in=size_half,
             size_out=size_half,
             hidden_shape=t_hidden_shape,
-            activation=activation,
-            final_activation=activation,
+            activation=t_activation,
+            final_activation=t_final_activation,
             batch_normalise=batch_normalise,
             label=f"({self.label}) 't' network",
         )
@@ -153,16 +166,16 @@ class AffineLayer(CouplingLayer):
         x_input: torch.Tensor
             stack of vectors x, shape (N_states, D)
         log_density: torch.Tensor
-            current value for the logarithm of the map density
+            current value for the logarithm of the volume element for the density
+            defined by the map.
 
         Returns
         -------
-            out: torch.Tensor
-                stack of transformed vectors phi, with same shape as input
-            log_density: torch.Tensor
-                updated log density for the map, with the addition of the logarithm
-                of the jacobian determinant for the inverse of the transformation
-                applied here.
+        out: torch.Tensor
+            stack of transformed vectors phi, with same shape as input
+        log_density: torch.Tensor
+            updated log density for the map, with the addition of the logarithm of
+            the jacobian determinant for the inverse of the transformation applied here.
         """
         x_a = x_input[..., self._a_ind]
         x_b = x_input[..., self._b_ind]
@@ -176,7 +189,9 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
-def affine_transformation(i_layer, size_half, layer_spec):
+def affine_transformation(i_layer, size_half, layer_spec={}):
+    """Action which returns a callable object that performs an affine coupling
+    transformation on both even and odd lattice sites."""
     coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
     return Sequential(
         coupling_transformation(even_sites=True),

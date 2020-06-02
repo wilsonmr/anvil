@@ -16,6 +16,10 @@ ACTIVATION_LAYERS = {
 
 
 class Sequential(nn.Sequential):
+    """Modify the nn.Sequential class so that it takes an input vector *and* a
+    value for the current logarithm of the model density, returning an output
+    vector and the updated log density."""
+
     def forward(self, x_input, log_density):
         for module in self:
             x_input, log_density = module(x_input, log_density)
@@ -44,10 +48,10 @@ class NeuralNetwork(nn.Module):
     final_activation: (str, None)
         Key representing the activation function used on the final
         layer.
-    do_batch_norm: bool
+    batch_normalise: bool
         Flag dictating whether batch normalisation should be performed
         before the activation function.
-    name: str
+    label: str
         A label for the neural network, used for diagnostics.
 
     Methods
@@ -123,6 +127,30 @@ class NeuralNetwork(nn.Module):
 
 
 class ConvexCombination(nn.Module):
+    r"""
+    Class which takes a set of normalising flows and constructs a convex combination
+    of their outputs to produce a single output distribution and the logarithm of its
+    volume element, calculated using the change of variables formula.
+
+    A convex combination is a weighted sum of elements
+        
+        f(x_1, x_2, ..., x_N) = \sum_{i=1}^N \rho_i x_i
+
+    where the weights are normalised, \sum_{i=1}^N \rho_i = 1.
+
+    Parameters
+    ----------
+    flow_replica
+        A list of replica normalising flow models.
+    
+    Methods
+    -------
+    forward(x_input, log_density):
+        Returns the convex combination of probability densities output by the flow
+        replica, along with the convex combination of logarithms of probability 
+        densities.
+    """
+
     def __init__(self, flow_replica):
         super().__init__()
         self.flows = nn.ModuleList(flow_replica)
@@ -130,7 +158,23 @@ class ConvexCombination(nn.Module):
         self.norm_func = nn.Softmax(dim=0)
 
     def forward(self, x_input, log_density):
+        """Forward pass of the model.
 
+        Parameters
+        ----------
+        x_input: torch.Tensor
+            stack of input vectors drawn from the base distribution
+        log_density: torch.Tensor
+            The logarithm of the probability density of the base distribution.
+
+        Returns
+        -------
+        out: torch.Tensor
+            the convex combination of the output probability densities.
+        log_density: torch.Tensor
+            the logarithm of the probability density for the convex combination of
+            output densities.
+        """
         weights_norm = self.norm_func(self.weights)
 
         phi_out = 0
