@@ -196,7 +196,6 @@ _transformation_layers = collect(
     "transformation_layer", ("layer_indices", "layer_spec")  # must be this way round!
 )
 
-
 def normalising_flow(_transformation_layers, i_mixture=1):
     return Sequential(*_transformation_layers)
 

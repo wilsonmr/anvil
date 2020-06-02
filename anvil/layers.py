@@ -5,6 +5,7 @@ layers.py
 import torch
 import torch.nn as nn
 from functools import partial
+from math import pi
 
 from anvil.core import Sequential, NeuralNetwork
 
@@ -178,8 +179,9 @@ class AffineLayer(CouplingLayer):
         """
         x_a = x_input[..., self._a_ind]
         x_b = x_input[..., self._b_ind]
-        s_out = self.s_network(x_a)
-        t_out = self.t_network(x_a)
+        x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
+        s_out = self.s_network(x_a_stand)
+        t_out = self.t_network(x_a_stand)
         phi_b = (x_b - t_out) * torch.exp(-s_out)
 
         phi_out = self.join_func([x_a, phi_b], dim=-1)
@@ -198,4 +200,78 @@ def affine_transformation(i_layer, size_half, layer_spec={}):
     )
 
 
-LAYER_OPTIONS = {"real_nvp": affine_transformation}
+class ProjectCircle(nn.Module):
+    """Applies the stereographic projection map S1 -> R1."""
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the projection transformation."""
+        phi_out = torch.tan(0.5 * (x_input - pi))
+        log_density += (-torch.log1p(phi_out ** 2)).sum(dim=1, keepdim=True)
+        return phi_out, log_density
+
+
+class ProjectCircleInverse(nn.Module):
+    """Applies the inverse stereographic projection map R1 -> S1."""
+    def __init__(self):
+        super().__init__()
+        self.phase_shift = nn.Parameter(torch.rand(1))
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the inverse projection transformation."""
+        phi_out = 2 * torch.atan(x_input) + pi
+        log_density += (-2 * torch.log(torch.cos(0.5 * (phi_out - pi)))).sum(
+            dim=1, keepdim=True
+        )
+        return (phi_out + self.phase_shift) % (2 * pi), log_density
+
+
+def circle_flow(i_layer, size_half, layer_spec={}):
+    """Action which returns a callable object that performs an affine coupling
+    transformation on both even and odd lattice sites."""
+    coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
+    return Sequential(
+        ProjectCircle(),
+        coupling_transformation(even_sites=True),
+        coupling_transformation(even_sites=False),
+        ProjectCircleInverse(),
+    )
+
+
+class ProjectSphere(nn.Module):
+    """Applies the stereographic projection map S2 -> R2."""
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the projection transformation."""
+        polar, azimuth = x_input.split(1, dim=1)
+
+        # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
+        proj_xy = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
+            (torch.cos(azimuth), torch.sin(azimuth)), dim=1
+        )
+        proj_rsq = proj_xy.pow(2).sum(dim=1)
+        log_density += (-0.5 * torch.log(proj_rsq) - torch.log1p(proj_rsq)).sum(dim=-1)
+
+
+class ProjectSphereInverse(nn.Module):
+    """Applies the inverse stereographic projection map R2 -> S2."""
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the inverse projection transformation."""
+        proj_x, proj_y = x_input.split(1, dim=1)
+
+        polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
+        phi_out = torch.cat(
+            (polar, torch.atan2(proj_x, proj_y) + pi,), dim=1  # azimuth
+        )
+
+        log_density += (
+            torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
+        ).sum(dim=-1)
+
+        return phi_out, log_density
+
+
+LAYER_OPTIONS = {
+    "real_nvp": affine_transformation,
+    "real_nvp_circle": circle_flow,
+}
