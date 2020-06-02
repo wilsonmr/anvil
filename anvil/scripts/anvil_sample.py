@@ -11,6 +11,7 @@ from anvil.config import ConfigParser
 log = logging.getLogger(__name__)
 
 PROVIDERS = [
+    "anvil.core",
     "anvil.sample",
     "anvil.observables",
     "anvil.plot",

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 r"""
-coupling.py
+layers.py
 """
 import torch
 import torch.nn as nn
 
 from math import pi
+from functools import partial
 
 from reportengine import collect
 
@@ -17,14 +18,15 @@ class CouplingLayer(nn.Module):
     Base class for coupling layers
     """
 
-    def __init__(self, i_couple: int, size_half: int):
+    def __init__(self, i_layer: int, size_half: int, even_sites: bool):
         super().__init__()
 
-        if (i_couple % 2) == 0:  # starts at zero
+        if even_sites:
             # a is first half of input vector
             self._a_ind = slice(0, size_half)
             self._b_ind = slice(size_half, 2 * size_half)
             self.join_func = torch.cat
+            partition = "even"
         else:
             # a is second half of input vector
             self._a_ind = slice(size_half, 2 * size_half)
@@ -32,6 +34,12 @@ class CouplingLayer(nn.Module):
             self.join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
+            partition = "odd"
+
+        self.label = f"Layer: {i_layer}, partition: {partition}"
+
+    def __str__(self):
+        return f"{self.label}\n------------\n{self}"
 
 
 class AffineLayer(CouplingLayer):
@@ -92,37 +100,35 @@ class AffineLayer(CouplingLayer):
 
     def __init__(
         self,
-        i_couple: int,
+        i_layer: int,
         size_half: int,
-        hidden_shape: list = [24,],
-        activation_func: str = "leaky_relu",
-        batch_normalise: bool = False,
         *,
-        t_hidden_shape: list = None,  # optionally different from s
+        s_hidden_shape: list = [24,],
+        t_hidden_shape: list = [24,],
+        activation: str = "leaky_relu",
+        batch_normalise: bool = False,
+        even_sites: bool,
     ):
-        super().__init__(i_couple, size_half)
-
-        if t_hidden_shape is None:
-            t_hidden_shape = hidden_shape
+        super().__init__(i_layer, size_half, even_sites)
 
         # Construct networks
         self.s_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
-            hidden_shape=hidden_shape,
-            activation=activation_func,
-            final_activation=activation_func,
-            do_batch_norm=batch_normalise,
-            label="Affine layer {i_couple}: s network",
+            hidden_shape=s_hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+            label=f"({self.label}) 's' network",
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=t_hidden_shape,
-            activation=activation_func,
-            final_activation=None,
-            do_batch_norm=batch_normalise,
-            label="Affine layer {i_couple}: t network",
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+            label=f"({self.label}) 't' network",
         )
 
     def forward(self, x_input, log_density) -> torch.Tensor:
@@ -170,28 +176,13 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
-LAYER_OPTIONS = {"affine": AffineLayer}
-
-
-def coupling_layer(
-    i_block,
-    size_half,
-    layer_type,
-    hidden_shape,
-    activation,
-    batch_normalise,
-    extra_args={},
-):
-    layer_class = LAYER_OPTIONS[layer_type]
-    print("block:", i_block, hidden_shape)
-
-    red_layer = layer_class(
-        0, size_half, hidden_shape, activation, batch_normalise, **extra_args,
+def affine_transformation(i_layer, size_half, layer_spec):
+    print(layer_spec)
+    coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
+    return Sequential(
+        coupling_transformation(even_sites=True),
+        coupling_transformation(even_sites=False),
     )
-    black_layer = layer_class(
-        1, size_half, hidden_shape, activation, batch_normalise, **extra_args,
-    )
-    return Sequential(red_layer, black_layer)
 
 
-_coupling_layers = collect("coupling_layer", ("layer_block", "block_indices",))
+LAYER_OPTIONS = {"real_nvp": affine_transformation}

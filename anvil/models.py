@@ -21,9 +21,4 @@ ProjectSphere: nn.Module
     Model which wraps around Real NVP to enable learning maps between distributions
     defined on the unit sphere.
 """
-from anvil.core import Sequential
-
-def normalising_flow(coupling_layers):
-    return Sequential(*coupling_layers)
-
 

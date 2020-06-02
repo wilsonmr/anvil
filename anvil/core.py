@@ -4,6 +4,8 @@ coupling.py
 import torch
 import torch.nn as nn
 
+from reportengine import collect
+
 ACTIVATION_LAYERS = {
     "relu": nn.ReLU,
     "leaky_relu": nn.LeakyReLU,
@@ -63,7 +65,7 @@ class NeuralNetwork(nn.Module):
         hidden_shape: list,
         activation: (str, None),
         final_activation: (str, None) = None,
-        do_batch_norm: bool = False,
+        batch_normalise: bool = False,
         label: str = "network",
     ):
         super(NeuralNetwork, self).__init__()
@@ -72,7 +74,7 @@ class NeuralNetwork(nn.Module):
         self.size_out = size_out
         self.hidden_shape = hidden_shape
 
-        if do_batch_norm:
+        if batch_normalise:
             self.batch_norm = nn.BatchNorm1d
         else:
             self.batch_norm = nn.Identity
@@ -118,3 +120,21 @@ class NeuralNetwork(nn.Module):
         shape (n_batch, size_out)
         """
         return self.network(x)
+
+
+class ConvexCombination(nn.Module):
+
+    def __init__(self, flows):
+        pass
+
+
+_transformation_layers = collect("transformation_layer", ("layer_indices", "layer_spec"))
+
+def normalising_flow(_transformation_layers, n_mixture):
+    return Sequential(*_transformation_layers)
+
+#_normalising_flows = collect("normalising_flow", ("mixture_indices",))
+
+#def mixture_model(_normalising_flows):
+#    pass
+

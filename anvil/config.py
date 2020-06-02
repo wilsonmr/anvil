@@ -8,12 +8,12 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
+from anvil.core import normalising_flow
 from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.coupling import _coupling_layers, LAYER_OPTIONS
+from anvil.layers import LAYER_OPTIONS
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
-from anvil.models import normalising_flow
 
 log = logging.getLogger(__name__)
 
@@ -120,30 +120,27 @@ class ConfigParser(Config):
         """Inverse temperature."""
         return beta
 
-    def parse_n_blocks(self, n: int):
+    def produce_layer_spec(self, layer):
+        return [{"layer_spec": layer[i]} for i in range(len(layer))]
+
+    def parse_n_layers(self, n: int):
         return n
 
-    def produce_block_indices(self, n_blocks):
-        return [{"i_block": i} for i in range(n_blocks)]
+    def produce_layer_indices(self, n_layers):
+        return [{"i_layer": i} for i in range(n_layers)]
 
-    @element_of("layer_block")
-    def parse_layer(self, layer):
-        if layer["layer_type"] not in LAYER_OPTIONS:
-            raise ConfigError
-        return layer
+    @explicit_node
+    def produce_transformation_layer(self, model):
+        return LAYER_OPTIONS[model]
 
     def parse_n_mixture(self, n: int):
         return n
 
     def produce_mixture_indices(self, n_mixture):
         return [{"i_mixture": i} for i in range(n_mixture)]
-
+    
     @explicit_node
-    def produce_coupling_layers(self):
-        return _coupling_layers
-
-    @explicit_node
-    def produce_model(self):
+    def produce_flow_model(self):
         return normalising_flow
 
     def parse_n_batch(self, nb: int):
