@@ -63,9 +63,9 @@ def sample_batch(
     """
     with torch.no_grad():  # don't track gradients
         z, base_log_density = base_dist(batch_size + 1)
-        phi, map_log_density = loaded_model(z)  # map using trained loaded_model to phi
-
-        model_log_density = base_log_density + map_log_density
+        phi, model_log_density = loaded_model(
+            z, base_log_density
+        )  # map using trained loaded_model to phi
 
         if current_state is not None:
             phi[0] = current_state

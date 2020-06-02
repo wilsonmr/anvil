@@ -9,113 +9,7 @@ from math import pi
 
 from reportengine import collect
 
-ACTIVATION_LAYERS = {
-    "relu": nn.ReLU,
-    "leaky_relu": nn.LeakyReLU,
-    "sigmoid": nn.Sigmoid,
-    "tanh": nn.Tanh,
-    None: nn.Identity,
-}
-
-
-class NeuralNetwork(nn.Module):
-    """Generic class for neural networks used in coupling layers.
-
-    Networks consist of 'blocks' of
-        - Dense (linear) layer
-        - Batch normalisation layer
-        - Activation function
-
-    Parameters
-    ----------
-    size_in: int
-        Number of nodes in the input layer
-    size_out: int
-        Number of nodes in the output layer
-    hidden_shape: list
-        List specifying the number of nodes in the intermediate layers
-    activation: (str, None)
-        Key representing the activation function used for each layer
-        except the final one.
-    final_activation: (str, None)
-        Key representing the activation function used on the final
-        layer.
-    do_batch_norm: bool
-        Flag dictating whether batch normalisation should be performed
-        before the activation function.
-    name: str
-        A label for the neural network, used for diagnostics.
-
-    Methods
-    -------
-    forward:
-        The forward pass of the network, mapping a batch of input vectors
-        with 'size_in' nodes to a batch of output vectors of 'size_out'
-        nodes.
-    """
-
-    def __init__(
-        self,
-        size_in: int,
-        size_out: int,
-        hidden_shape: list,
-        activation: (str, None),
-        final_activation: (str, None) = None,
-        do_batch_norm: bool = False,
-        label: str = "network",
-    ):
-        super(NeuralNetwork, self).__init__()
-        self.label = label
-        self.size_in = size_in
-        self.size_out = size_out
-        self.hidden_shape = hidden_shape
-
-        if do_batch_norm:
-            self.batch_norm = nn.BatchNorm1d
-        else:
-            self.batch_norm = nn.Identity
-
-        self.activation_func = ACTIVATION_LAYERS[activation]
-        self.final_activation_func = ACTIVATION_LAYERS[final_activation]
-
-        # nn.Sequential object containing the network layers
-        self.network = self._construct_network()
-
-    def __str__(self):
-        return f"Network: {self.label}\n------------\n{self.network}"
-
-    def _block(self, f_in, f_out, activation_func):
-        """Constructs a single 'dense block' which maps 'f_in' inputs to
-        'f_out' output features. Returns a list with three elements:
-            - Dense (linear) layer
-            - Batch normalisation (or identity if this is switched off)
-            - Activation function
-        """
-        return [
-            nn.Linear(f_in, f_out),
-            self.batch_norm(f_out),
-            activation_func(),
-        ]
-
-    def _construct_network(self):
-        """Constructs the neural network from multiple calls to _block.
-        Returns a torch.nn.Sequential object which has the 'forward' method built in.
-        """
-        layers = self._block(self.size_in, self.hidden_shape[0], self.activation_func)
-        for f_in, f_out in zip(self.hidden_shape[:-1], self.hidden_shape[1:]):
-            layers += self._block(f_in, f_out, self.activation_func)
-        layers += self._block(
-            self.hidden_shape[-1], self.size_out, self.final_activation_func
-        )
-        return nn.Sequential(*layers)
-
-    def forward(self, x: torch.tensor):
-        """Forward pass of the network.
-        
-        Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
-        shape (n_batch, size_out)
-        """
-        return self.network(x)
+from anvil.core import Sequential, NeuralNetwork
 
 
 class CouplingLayer(nn.Module):
@@ -123,20 +17,18 @@ class CouplingLayer(nn.Module):
     Base class for coupling layers
     """
 
-    def __init__(self, i_couple: int, size_in: int):
+    def __init__(self, i_couple: int, size_half: int):
         super().__init__()
-        self.size_in = size_in
-        self.size_half = size_in // 2
 
         if (i_couple % 2) == 0:  # starts at zero
             # a is first half of input vector
-            self._a_ind = slice(0, self.size_half)
-            self._b_ind = slice(self.size_half, self.size_in)
+            self._a_ind = slice(0, size_half)
+            self._b_ind = slice(size_half, 2 * size_half)
             self.join_func = torch.cat
         else:
             # a is second half of input vector
-            self._a_ind = slice(int(self.size_half), self.size_in)
-            self._b_ind = slice(0, int(self.size_half))
+            self._a_ind = slice(size_half, 2 * size_half)
+            self._b_ind = slice(0, size_half)
             self.join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
@@ -201,22 +93,22 @@ class AffineLayer(CouplingLayer):
     def __init__(
         self,
         i_couple: int,
-        size_in: int,
+        size_half: int,
         hidden_shape: list = [24,],
         activation_func: str = "leaky_relu",
         batch_normalise: bool = False,
         *,
         t_hidden_shape: list = None,  # optionally different from s
     ):
-        super().__init__(i_couple, size_in)
+        super().__init__(i_couple, size_half)
 
         if t_hidden_shape is None:
             t_hidden_shape = hidden_shape
 
         # Construct networks
         self.s_network = NeuralNetwork(
-            size_in=self.size_half,
-            size_out=self.size_half,
+            size_in=size_half,
+            size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation_func,
             final_activation=activation_func,
@@ -224,8 +116,8 @@ class AffineLayer(CouplingLayer):
             label="Affine layer {i_couple}: s network",
         )
         self.t_network = NeuralNetwork(
-            size_in=self.size_half,
-            size_out=self.size_half,
+            size_in=size_half,
+            size_out=size_half,
             hidden_shape=t_hidden_shape,
             activation=activation_func,
             final_activation=None,
@@ -233,7 +125,7 @@ class AffineLayer(CouplingLayer):
             label="Affine layer {i_couple}: t network",
         )
 
-    def forward(self, x_input) -> torch.Tensor:
+    def forward(self, x_input, log_density) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
         g_i^{-1}(x)
 
@@ -254,41 +146,52 @@ class AffineLayer(CouplingLayer):
         ----------
         x_input: torch.Tensor
             stack of vectors x, shape (N_states, D)
+        log_density: torch.Tensor
+            current value for the logarithm of the map density
 
         Returns
         -------
             out: torch.Tensor
                 stack of transformed vectors phi, with same shape as input
-            log_det_jacobian: torch.Tensor
-                logarithm of the jacobian determinant for the inverse of the
-                transformation applied here.
+            log_density: torch.Tensor
+                updated log density for the map, with the addition of the logarithm
+                of the jacobian determinant for the inverse of the transformation
+                applied here.
         """
         x_a = x_input[..., self._a_ind]
         x_b = x_input[..., self._b_ind]
         s_out = self.s_network(x_a)
         t_out = self.t_network(x_a)
         phi_b = (x_b - t_out) * torch.exp(-s_out)
-        return (
-            self.join_func([x_a, phi_b], dim=-1),
-            s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1),
-        )
+
+        phi_out = self.join_func([x_a, phi_b], dim=-1)
+        log_density += s_out.sum(dim=tuple(range(1, len(s_out.shape)))).view(-1, 1)
+
+        return phi_out, log_density
 
 
 LAYER_OPTIONS = {"affine": AffineLayer}
 
 
 def coupling_layer(
-    config_size, layer_type, hidden_shape, activation, batch_normalise, extra_args={}
+    i_block,
+    size_half,
+    layer_type,
+    hidden_shape,
+    activation,
+    batch_normalise,
+    extra_args={},
 ):
     layer_class = LAYER_OPTIONS[layer_type]
+    print("block:", i_block, hidden_shape)
 
     red_layer = layer_class(
-        0, config_size, hidden_shape, activation, batch_normalise, **extra_args,
+        0, size_half, hidden_shape, activation, batch_normalise, **extra_args,
     )
     black_layer = layer_class(
-        1, config_size, hidden_shape, activation, batch_normalise, **extra_args,
+        1, size_half, hidden_shape, activation, batch_normalise, **extra_args,
     )
-    return [red_layer, black_layer]
+    return Sequential(red_layer, black_layer)
 
 
-coupling_layers = collect("coupling_layer", ("layer_spec",))
+_coupling_layers = collect("coupling_layer", ("layer_block", "block_indices",))
