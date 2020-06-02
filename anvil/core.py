@@ -197,7 +197,7 @@ _transformation_layers = collect(
 )
 
 
-def normalising_flow(_transformation_layers, n_mixture):
+def normalising_flow(_transformation_layers, i_mixture=1):
     return Sequential(*_transformation_layers)
 
 

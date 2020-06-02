@@ -111,8 +111,8 @@ class ConfigParser(Config):
         return lam
 
     def parse_use_arxiv_version(self, do_use: bool):
-        """If true, use the conventional phi^4 action. If false,
-        there is an additional factor of 1/2 for the kinetic part
+        """If false, use the conventional phi^4 action. If true,
+        there is an additional factor of 2 for the kinetic part
         of the phi^4 action."""
         return do_use
 
@@ -136,20 +136,25 @@ class ConfigParser(Config):
         return [{"i_layer": i} for i in range(n_layers)]
 
     @explicit_node
-    def produce_transformation_layer(self, model):
+    def produce_transformation_layer(self, flow):
         """Return action which defines a single transformation for a given model."""
-        return LAYER_OPTIONS[model]
+        try:
+            return LAYER_OPTIONS[flow]
+        except KeyError:
+            raise ConfigError(
+                f"Invalid flow {flow}", flow, LAYER_OPTIONS.keys()
+            )
 
     def parse_n_mixture(self, n: int):
         """Number of replica models which we can combine using convex combinations."""
         return n
 
-    def produce_mixture_indices(self, n_mixture):
+    def produce_mixture_indices(self, n_mixture=1):
         """Produce iterable which we can collect over to produce multiple flow replicas."""
         return [{"i_mixture": i} for i in range(n_mixture)]
     
     @explicit_node
-    def produce_generative_model(self, n_mixture=1):
+    def produce_model(self, n_mixture=1):
         """Produce the generative model which maps the base to an approximate of the 
         target distribution."""
         if n_mixture == 1:

@@ -21,7 +21,7 @@ class CouplingLayer(nn.Module):
     where the D-dimensional \phi vector has been split into two D/2-dimensional vectors
     \phi_a and \phi_b, and {N(\phi_a)} is a set of functions, possible neural networks,
     which take \phi_a as parameters.
-    
+
     Input and output data are flat vectors stacked in the first dimension (batch dimension).
     """
 
@@ -113,12 +113,8 @@ class AffineLayer(CouplingLayer):
         i_layer: int,
         size_half: int,
         *,
-        s_hidden_shape=[24,],
-        t_hidden_shape=[24,],
-        s_activation="leaky_relu",
-        t_activation="leaky_relu",
-        s_final_activation="leaky_relu",
-        t_final_activation=None,
+        hidden_shape=[24,],
+        activation="leaky_relu",
         batch_normalise=False,
         even_sites: bool,
     ):
@@ -128,21 +124,24 @@ class AffineLayer(CouplingLayer):
         self.s_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
-            hidden_shape=s_hidden_shape,
-            activation=s_activation,
-            final_activation=s_final_activation,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
             batch_normalise=batch_normalise,
             label=f"({self.label}) 's' network",
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
-            hidden_shape=t_hidden_shape,
-            activation=t_activation,
-            final_activation=t_final_activation,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=None,
             batch_normalise=batch_normalise,
             label=f"({self.label}) 't' network",
         )
+
+        # NOTE: Could potentially have non-default inputs for s and t networks
+        # by adding dictionary of overrides - e.g. s_options = {}
 
     def forward(self, x_input, log_density) -> torch.Tensor:
         r"""performs the transformation of the inverse coupling layer, denoted
