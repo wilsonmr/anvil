@@ -39,7 +39,7 @@ class CouplingLayer(nn.Module):
         self.label = f"Layer: {i_layer}, partition: {partition}"
 
     def __str__(self):
-        return f"{self.label}\n------------\n{self}"
+        return f"{self.label}\n------------------------\n{super().__str__()}"
 
 
 class AffineLayer(CouplingLayer):
@@ -177,7 +177,6 @@ class AffineLayer(CouplingLayer):
 
 
 def affine_transformation(i_layer, size_half, layer_spec):
-    print(layer_spec)
     coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
     return Sequential(
         coupling_transformation(even_sites=True),

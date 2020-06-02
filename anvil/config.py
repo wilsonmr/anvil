@@ -8,7 +8,7 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import normalising_flow
+from anvil.core import normalising_flow, convex_combination
 from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
 from anvil.layers import LAYER_OPTIONS
@@ -140,8 +140,11 @@ class ConfigParser(Config):
         return [{"i_mixture": i} for i in range(n_mixture)]
     
     @explicit_node
-    def produce_flow_model(self):
-        return normalising_flow
+    def produce_flow_model(self, n_mixture=1):
+        if n_mixture == 1:
+            return normalising_flow
+        else:
+            return convex_combination
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

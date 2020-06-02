@@ -123,18 +123,42 @@ class NeuralNetwork(nn.Module):
 
 
 class ConvexCombination(nn.Module):
+    def __init__(self, flow_replica):
+        super().__init__()
+        self.flows = nn.ModuleList(flow_replica)
+        self.weights = nn.Parameter(torch.rand(len(flow_replica)))
+        self.norm_func = nn.Softmax(dim=0)
 
-    def __init__(self, flows):
-        pass
+    def forward(self, x_input, log_density):
+
+        weights_norm = self.norm_func(self.weights)
+
+        phi_out = 0
+        for weight, flow in zip(weights_norm, self.flows):
+            input_copy = (
+                x_input.clone()
+            )  # don't want each flow to update same input tensor
+            zero_density = torch.zeros_like(
+                log_density
+            )  # don't want to add to base density
+            phi_flow, log_dens_flow = flow(input_copy, zero_density)
+            phi_out += weight * phi_flow
+            log_density += weight * log_dens_flow
+
+        return phi_out, log_density
 
 
-_transformation_layers = collect("transformation_layer", ("layer_indices", "layer_spec"))
+_transformation_layers = collect(
+    "transformation_layer", ("layer_indices", "layer_spec")  # must be this way round!
+)
+
 
 def normalising_flow(_transformation_layers, n_mixture):
     return Sequential(*_transformation_layers)
 
-#_normalising_flows = collect("normalising_flow", ("mixture_indices",))
 
-#def mixture_model(_normalising_flows):
-#    pass
+_flow_replica = collect("normalising_flow", ("mixture_indices",))
 
+
+def convex_combination(_flow_replica):
+    return ConvexCombination(_flow_replica)
