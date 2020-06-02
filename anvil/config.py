@@ -10,7 +10,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.core import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import MODEL_OPTIONS
+from anvil.coupling import LAYER_OPTIONS
 from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
@@ -119,36 +119,23 @@ class ConfigParser(Config):
         """Inverse temperature."""
         return beta
 
-    def parse_model(self, model: str):
-        """Label for normalising flow model."""
-        return model
+    def produce_i_mixture(self, n_mixture):
+        return 0
 
-    @explicit_node
-    def produce_flow_model(self, model):
-        """Return the action which instantiates the normalising flow model."""
-        try:
-            return MODEL_OPTIONS[model]
-        except KeyError:
-            raise ConfigError(
-                f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
-            )
+    def produce_layer_spec(self, layers: list, *, repeats: int):
+        return layers * repeats
 
-    def parse_standardise_inputs(self, do_stand: bool):
-        """Flag specifying whether to standardise input vectors before
-        passing them through a neural network."""
-        return do_stand
+    @element_of("layers")
+    def parse_layer(self, layer):
+        if layer["layer_type"] not in LAYER_OPTIONS:
+            raise ConfigError
+        return layer
 
-    def parse_n_affine(self, n: int):
-        """Number of affine layers."""
+    def parse_n_mixture(self, n: int):
         return n
 
-    def produce_affine_layer_index(self, n_affine):
-        """Given n_affine, the number of affine layers, produces a list
-        with n_affine elements, the ith element is {i_affine: i}
-
-        we can use affine_layer_index to collect over when producing the model
-        """
-        return [{"i_affine": i} for i in range(n_affine)]
+    def produce_mixture_indices(self, n_mixture):
+        return [{"i_mixture": i} for i in range(n_mixture)]
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""
