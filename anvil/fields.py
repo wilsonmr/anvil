@@ -65,6 +65,12 @@ class ScalarField:
         """Setter for coords which performs some basic checks (see _valid_field)."""
         self._coords = self._valid_ensemble(new)
 
+    @property
+    def first_moment_sq(self):
+        """Calculate the first moment (mean) squared of the field. Average over volume as
+        well, thanks to translation invariance."""
+        return self.coords.mean(axis=(0, -1)) ** 2  # volume and ensemble dims
+
     def _vol_avg_two_point_correlator(self, shift):
         """Helper function which calculates the volume-averaged two point correlation
         function for a single shift, given in lexicographical form as an argument.
@@ -105,16 +111,19 @@ class ScalarField:
 
     @property
     def two_point_correlator(self):
-        """Two point correlation function. Uses multiprocessing.
+        """Two point connected correlation function. Uses multiprocessing.
         numpy.ndarray, dimensions (*lattice_dimensions, *)"""
-        return self._two_point_correlator()
+        return self._two_point_correlator() - self.first_moment_sq
 
     def boot_two_point_correlator(self, bootstrap_sample_size):
-        """Two point correlation function for a bootstrap sample of ensembles
+        """Two point connected correlation function for a bootstrap sample of ensembles
         numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
-        return self._two_point_correlator(
-            bootstrap=True, bootstrap_sample_size=bootstrap_sample_size
-        )
+        return (
+            self._two_point_correlator(
+                bootstrap=True, bootstrap_sample_size=bootstrap_sample_size
+            )
+            - self.first_moment_sq
+        )  # NOTE: not bootstrapping first moment. Hopefully inconsequential
 
 
 class ClassicalSpinField(ScalarField):
@@ -162,6 +171,13 @@ class ClassicalSpinField(ScalarField):
         """Updates the spin configuration or ensemble (by updating coords), also checking
         that the spin vectors have unit norm."""
         self.coords = new  # calls coords.__set__
+
+    @property
+    def first_moment_sq(self):
+        """Calculate the first moment (mean) squared of the field. Average over volume as
+        well, thanks to translation invariance."""
+        # Average over volume and ensemble, then do dot product
+        return self.spins.mean(axis=(0, -1)).sum(axis=0)
 
     @property
     def hamiltonian(self):
