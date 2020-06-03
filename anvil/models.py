@@ -64,9 +64,12 @@ def real_nvp_sphere(size_half, real_nvp):
         layers.InverseProjectionLayer2D(size_half),
     )
 
+def ncp_circle(config_size):
+    return layers.NCPLayer(size_in=config_size)
 
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "real_nvp_circle": real_nvp_circle,
     "real_nvp_sphere": real_nvp_sphere,
+    "ncp_circle": ncp_circle,
 }

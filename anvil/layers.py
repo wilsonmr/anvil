@@ -105,7 +105,7 @@ class AffineLayer(CouplingLayer):
         Half of the configuration size, which is the size of the input vector for the
         neural networks.
     hidden_shape: list
-        list containing hidden vector sizes the neural networks.
+        list containing hidden vector sizes for the neural networks.
     activation: str
         string which is a key for an activation function for all but the final layers
         of the networks.
@@ -172,6 +172,7 @@ class AffineLayer(CouplingLayer):
         x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
+
         phi_b = (x_b - t_out) * torch.exp(-s_out)
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
@@ -179,6 +180,30 @@ class AffineLayer(CouplingLayer):
 
         return phi_out, log_density
 
+
+class NCPLayer(nn.Module):
+    def __init__(self, size_in):
+        super().__init__()
+        self.log_alpha = nn.Parameter(torch.rand(size_in).view(1, -1))
+        self.beta = nn.Parameter(torch.rand(size_in).view(1, -1))
+        self.phase_shift = nn.Parameter(torch.rand(1))
+
+    def forward(self, x_input, log_density):
+        alpha = torch.exp(self.log_alpha)  # always positive
+
+        phi_out = (
+            2 * torch.atan(alpha * torch.tan((x_input - pi) / 2) + self.beta)
+            + pi
+            + self.phase_shift
+        ) % (2 * pi)
+
+        log_density += torch.log(
+            (1 + self.beta ** 2) / alpha * torch.sin(x_input / 2) ** 2
+            + alpha * torch.cos(x_input / 2) ** 2
+            - self.beta * torch.sin(x_input)
+        ).sum(dim=1, keepdim=True)
+
+        return phi_out, log_density
 
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
