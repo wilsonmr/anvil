@@ -297,10 +297,9 @@ def sample(
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
-
 _sample_training_output = collect("sample", ("training_context",))
-
 
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""
     return _sample_training_output[0]
+

@@ -120,30 +120,13 @@ class ConfigParser(Config):
         """Inverse temperature."""
         return beta
 
-    def produce_layer_spec(self, layer):
-        """Produce iterable which we can collect over, where each element contains
-        the parameters for a single transformation."""
-        return [{"layer_spec": layer[i]} for i in range(len(layer))]
-
-    def parse_n_layers(self, n: int):
-        """Number of layers, where each layer is understood to be one pass of the
-        transformations defined in 'layer'."""
-        return n
-
-    def produce_layer_indices(self, n_layers):
-        """Produce iterable which we can collect over to create a flow by composing
-        multiple layers."""
-        return [{"i_layer": i} for i in range(n_layers)]
-
     @explicit_node
-    def produce_transformation_layer(self, flow):
-        """Return action which defines a single transformation for a given model."""
+    def produce_transformation_layer(self, layer_id: str):
+        """Given a string, return the transformation layer action indexed by that string."""
         try:
-            return LAYER_OPTIONS[flow]
+            return LAYER_OPTIONS[layer_id]
         except KeyError:
-            raise ConfigError(
-                f"Invalid flow {flow}", flow, LAYER_OPTIONS.keys()
-            )
+            raise ConfigError
 
     def parse_n_mixture(self, n: int):
         """Number of replica models which we can combine using convex combinations."""
@@ -152,7 +135,7 @@ class ConfigParser(Config):
     def produce_mixture_indices(self, n_mixture=1):
         """Produce iterable which we can collect over to produce multiple flow replicas."""
         return [{"i_mixture": i} for i in range(n_mixture)]
-    
+
     @explicit_node
     def produce_model(self, n_mixture=1):
         """Produce the generative model which maps the base to an approximate of the 

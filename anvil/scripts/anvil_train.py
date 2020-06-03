@@ -10,7 +10,9 @@ from anvil.config import ConfigParser, ConfigError
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.core"]
+# NOTE: shouldn't have layers here but not worth putting time into restructing yet,
+# since training isn't working and this branch is really just for demonstration at this stage
+PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.core", "anvil.layers"]
 
 TRAINING_ACTIONS = ["train"]
 

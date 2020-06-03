@@ -190,16 +190,6 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
-def affine_transformation(i_layer, size_half, layer_spec={}):
-    """Action which returns a callable object that performs an affine coupling
-    transformation on both even and odd lattice sites."""
-    coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
-    return Sequential(
-        coupling_transformation(even_sites=True),
-        coupling_transformation(even_sites=False),
-    )
-
-
 class ProjectCircle(nn.Module):
     """Applies the stereographic projection map S1 -> R1."""
 
@@ -212,6 +202,7 @@ class ProjectCircle(nn.Module):
 
 class ProjectCircleInverse(nn.Module):
     """Applies the inverse stereographic projection map R1 -> S1."""
+
     def __init__(self):
         super().__init__()
         self.phase_shift = nn.Parameter(torch.rand(1))
@@ -225,16 +216,34 @@ class ProjectCircleInverse(nn.Module):
         return (phi_out + self.phase_shift) % (2 * pi), log_density
 
 
-def circle_flow(i_layer, size_half, layer_spec={}):
+# TODO: add more parameters with default values specified here instead of constructor
+def affine_transformation(size_half, hidden_shape, activation):
     """Action which returns a callable object that performs an affine coupling
     transformation on both even and odd lattice sites."""
-    coupling_transformation = partial(AffineLayer, i_layer, size_half, **layer_spec)
+    coupling_transformation = partial(
+        AffineLayer, 0, size_half, hidden_shape=hidden_shape, activation=activation,
+    )
     return Sequential(
-        ProjectCircle(),
         coupling_transformation(even_sites=True),
         coupling_transformation(even_sites=False),
-        ProjectCircleInverse(),
     )
+
+
+def real_nvp(size_half, n_affine, affine_transformation):
+    """Action which returns a callable object that performs a sequence of `n_affine`
+    affine coupling transformations (each with the same parameters)."""
+    layers = [affine_transformation for lay in range(n_affine)]
+    return Sequential(*layers)
+
+
+LAYER_OPTIONS = {
+    "affine": affine_transformation,
+    "real_nvp": real_nvp,
+    "project_circle": ProjectCircle,
+    "project_circle_inverse": ProjectCircleInverse,
+}
+
+################################## Not yet implemented ######################################
 
 
 class ProjectSphere(nn.Module):
@@ -269,9 +278,3 @@ class ProjectSphereInverse(nn.Module):
         ).sum(dim=-1)
 
         return phi_out, log_density
-
-
-LAYER_OPTIONS = {
-    "real_nvp": affine_transformation,
-    "real_nvp_circle": circle_flow,
-}

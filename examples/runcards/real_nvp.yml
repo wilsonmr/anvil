@@ -1,0 +1,36 @@
+
+# Lattice
+lattice_length: 6
+lattice_dimension: 2
+
+# Target
+target: phi_four
+m_sq: -4
+lam: 5.0
+use_arxiv_version: false
+
+# Model
+base: standard_normal
+model_spec:
+    - layer_id: real_nvp
+      layer_spec:
+          n_affine: 6
+          hidden_shape: [36]
+          activation: leaky_relu
+          
+model_input:
+    namespaces_: "model_spec::layer_spec"
+
+# Training
+n_batch: 1000
+epochs: 3000
+save_interval: 1000
+
+# Optimizer
+optimizer: adam
+learning_rate: 0.001
+
+# Scheduler
+verbose_scheduler: true
+lr_reduction_factor: 0.5
+
