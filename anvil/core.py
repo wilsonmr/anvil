@@ -192,16 +192,13 @@ class ConvexCombination(nn.Module):
         return phi_out, log_density
 
 
-_transformation_layers = collect("transformation_layer", ("model_input",))
+_normalising_flow = collect("model_action", ("model_spec",))
 
 
-def normalising_flow(_transformation_layers, i_mixture=1):
-    return Sequential(*_transformation_layers)
+def normalising_flow(_normalising_flow, i_mixture=1):
+    return _normalising_flow[0]
 
 
-# NOTE: This doesn't work because we can't currently collect over a `namespaces_` object :(
-# Would need to collect over layers and do some juggling with lists to separate independent
-# flow models
 _flow_replica = collect("normalising_flow", ("mixture_indices",))
 
 

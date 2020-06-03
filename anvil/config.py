@@ -12,7 +12,7 @@ from anvil.core import normalising_flow, convex_combination
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.layers import LAYER_OPTIONS
+from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 log = logging.getLogger(__name__)
@@ -121,10 +121,10 @@ class ConfigParser(Config):
         return beta
 
     @explicit_node
-    def produce_transformation_layer(self, layer_id: str):
-        """Given a string, return the transformation layer action indexed by that string."""
+    def produce_model_action(self, model_id):
+        """Given a string, return the flow model action indexed by that string."""
         try:
-            return LAYER_OPTIONS[layer_id]
+            return MODEL_OPTIONS[model_id]
         except KeyError:
             raise ConfigError
 
@@ -141,7 +141,7 @@ class ConfigParser(Config):
         """Produce the generative model which maps the base to an approximate of the 
         target distribution."""
         if n_mixture == 1:
-            return normalising_flow  # function composition
+            return normalising_flow  # no replica flows
         else:
             return convex_combination
 

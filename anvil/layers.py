@@ -4,10 +4,9 @@ layers.py
 """
 import torch
 import torch.nn as nn
-from functools import partial
 from math import pi
 
-from anvil.core import Sequential, NeuralNetwork
+from anvil.core import NeuralNetwork
 
 
 class CouplingLayer(nn.Module):
@@ -26,7 +25,7 @@ class CouplingLayer(nn.Module):
     Input and output data are flat vectors stacked in the first dimension (batch dimension).
     """
 
-    def __init__(self, i_layer: int, size_half: int, even_sites: bool):
+    def __init__(self, size_half: int, i_layer: int, even_sites: bool):
         super().__init__()
 
         if even_sites:
@@ -111,15 +110,15 @@ class AffineLayer(CouplingLayer):
 
     def __init__(
         self,
-        i_layer: int,
         size_half: int,
         *,
-        hidden_shape=[24,],
-        activation="leaky_relu",
-        batch_normalise=False,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        i_layer: int,
         even_sites: bool,
     ):
-        super().__init__(i_layer, size_half, even_sites)
+        super().__init__(size_half, i_layer, even_sites)
 
         # Construct networks
         self.s_network = NeuralNetwork(
@@ -215,33 +214,6 @@ class ProjectCircleInverse(nn.Module):
         )
         return (phi_out + self.phase_shift) % (2 * pi), log_density
 
-
-# TODO: add more parameters with default values specified here instead of constructor
-def affine_transformation(size_half, hidden_shape, activation):
-    """Action which returns a callable object that performs an affine coupling
-    transformation on both even and odd lattice sites."""
-    coupling_transformation = partial(
-        AffineLayer, 0, size_half, hidden_shape=hidden_shape, activation=activation,
-    )
-    return Sequential(
-        coupling_transformation(even_sites=True),
-        coupling_transformation(even_sites=False),
-    )
-
-
-def real_nvp(size_half, n_affine, affine_transformation):
-    """Action which returns a callable object that performs a sequence of `n_affine`
-    affine coupling transformations (each with the same parameters)."""
-    layers = [affine_transformation for lay in range(n_affine)]
-    return Sequential(*layers)
-
-
-LAYER_OPTIONS = {
-    "affine": affine_transformation,
-    "real_nvp": real_nvp,
-    "project_circle": ProjectCircle,
-    "project_circle_inverse": ProjectCircleInverse,
-}
 
 ################################## Not yet implemented ######################################
 

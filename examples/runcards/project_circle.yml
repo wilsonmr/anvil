@@ -4,25 +4,17 @@ lattice_dimension: 2
 
 # Target
 target: von_mises
-concentration: 0.6
-mean: 1
+concentration: 0.7
+mean: 1.0
 
 # Model
 base: circular_uniform
+model_id: real_nvp_circle
 model_spec:
-    - layer_id: project_circle
-      layer_spec: {}
-    - layer_id: real_nvp
-      layer_spec:
-          n_affine: 2
-          hidden_shape: [36]
-          activation: leaky_relu
-    - layer_id: project_circle_inverse
-      layer_spec: {}
+    n_affine: 1
+    hidden_shape: [24]
+n_mixture: 4
           
-model_input:
-    namespaces_: "model_spec::layer_spec"
-
 # Training
 n_batch: 1000
 epochs: 3000
