@@ -88,7 +88,7 @@ class UniformDist:
 
         self.x_min, self.x_max = support
 
-        self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
+        self.log_density = lambda sample: torch.zeros((sample.shape[0], 1))
 
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
