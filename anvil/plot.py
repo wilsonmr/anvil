@@ -157,15 +157,17 @@ def plot_two_point_correlator(two_point_correlator):
 
 
 @figure
-def plot_two_point_correlator_series(two_point_correlator_series):
+def plot_two_point_correlator_series(two_point_correlator_series, sample_interval):
     """Plot the volumn averaged two point function for the shift (0, 1)
     """
+    chain_indices = np.arange(two_point_correlator_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
     ax.set_ylabel("$G(x; t)$")
     ax.set_xlabel("$t$")
     for i in range(two_point_correlator_series.shape[0]):
         ax.plot(
+            chain_indices,
             two_point_correlator_series[i],
             linestyle="-",
             linewidth=0.5,
@@ -177,13 +179,14 @@ def plot_two_point_correlator_series(two_point_correlator_series):
 
 @figure
 def plot_two_point_correlator_autocorr(
-    two_point_correlator_autocorr, two_point_correlator_optimal_window
+    two_point_correlator_autocorr, two_point_correlator_optimal_window, sample_interval
 ):
     """Plot autocorrelation as a function of Monte Carlo time for 4 x the optimal
     window estimated by optimal_window. Mark on the optimal window as a verticle
     line
     """
     cut = max(10, 2 * np.max(two_point_correlator_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
 
     fig, ax = plt.subplots()
     ax.set_title("Autocorrelation of volume-averaged two point function")
@@ -193,13 +196,14 @@ def plot_two_point_correlator_autocorr(
     for i in range(two_point_correlator_autocorr.shape[0]):
         color = next(ax._get_lines.prop_cycler)["color"]
         ax.plot(
+            chain_indices,
             two_point_correlator_autocorr[i, :cut],
             linestyle="--",
             linewidth=0.5,
             color=color,
         )
         ax.axvline(
-            two_point_correlator_optimal_window[i],
+            two_point_correlator_optimal_window[i] * sample_interval,
             linestyle="-",
             color=color,
             label=f"$x=$ (0, {i})",
@@ -212,7 +216,9 @@ def plot_two_point_correlator_autocorr(
 
 @figure
 def plot_two_point_correlator_integrated_autocorr(
-    two_point_correlator_integrated_autocorr, two_point_correlator_optimal_window
+    two_point_correlator_integrated_autocorr,
+    two_point_correlator_optimal_window,
+    sample_interval,
 ):
     """plot integrated_autocorr_two_point as a function of w, up until 4 x the
     optimal window estimated by optimal_window. Mark on the optimal window as a
@@ -220,6 +226,7 @@ def plot_two_point_correlator_integrated_autocorr(
 
     """
     cut = max(10, 2 * np.max(two_point_correlator_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
     tau = np.max(
         two_point_correlator_integrated_autocorr[:, two_point_correlator_optimal_window]
     )
@@ -232,18 +239,23 @@ def plot_two_point_correlator_integrated_autocorr(
     for i in range(two_point_correlator_integrated_autocorr.shape[0]):
         color = next(ax._get_lines.prop_cycler)["color"]
         ax.plot(
+            chain_indices,
             two_point_correlator_integrated_autocorr[i, :cut],
             linestyle="--",
             linewidth=0.5,
             color=color,
         )
         ax.axvline(
-            two_point_correlator_optimal_window[i],
+            two_point_correlator_optimal_window[i] * sample_interval,
             linestyle="-",
             color=color,
             label=f"$x=$ (0, {i})",
         )
-    ax.annotate(fr"$\tau_G=${tau:.2g}", xy=(0.05, 0.05), xycoords="axes fraction")
+    ax.annotate(
+        fr"$\tau_G$ / {sample_interval} = {tau:.2g}",
+        xy=(0.05, 0.05),
+        xycoords="axes fraction",
+    )
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0.5)
     ax.legend()
@@ -251,27 +263,29 @@ def plot_two_point_correlator_integrated_autocorr(
 
 
 @figure
-def plot_topological_charge_series(topological_charge_series):
+def plot_topological_charge_series(topological_charge_series, sample_interval):
     """Plot the topological charge of the ensemble as a series, ordered by the positions
     of the configurations in the Markov chain."""
+    chain_indices = np.arange(topological_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
     ax.set_title("Topological charge")
     ax.set_ylabel("$Q(t)$")
     ax.set_xlabel("$t$")
     ax.plot(
-        topological_charge_series, linestyle="-", linewidth=0.5,
+        chain_indices, topological_charge_series, linestyle="-", linewidth=0.5,
     )
     return fig
 
 
 @figure
 def plot_topological_charge_autocorr(
-    topological_charge_autocorr, topological_charge_optimal_window,
+    topological_charge_autocorr, topological_charge_optimal_window, sampling_interval
 ):
     """Plot the autocorrelation of the topological charge series. Also plot a vertical
     line to denote the location of the optimal window, which minimises the error on the
     integrated autocorrelation."""
     cut = max(10, 2 * topological_charge_optimal_window)
+    chain_indices = np.arange(cut) * sample_interval
 
     fig, ax = plt.subplots()
     ax.set_title("Autocorrelation of topological charge")
@@ -279,10 +293,10 @@ def plot_topological_charge_autocorr(
     ax.set_xlabel("$\delta t$")
 
     ax.plot(
-        topological_charge_autocorr[:cut], linestyle="--", linewidth=0.5,
+        chain_indices, topological_charge_autocorr[:cut], linestyle="--", linewidth=0.5,
     )
     ax.axvline(
-        topological_charge_optimal_window, linestyle="-", color="r",
+        topological_charge_optimal_window * sample_interval, linestyle="-", color="r",
     )
     ax.set_xlim(left=0)
     ax.set_ylim(top=1)
@@ -291,12 +305,15 @@ def plot_topological_charge_autocorr(
 
 @figure
 def plot_topological_charge_integrated_autocorr(
-    topological_charge_integrated_autocorr, topological_charge_optimal_window
+    topological_charge_integrated_autocorr,
+    topological_charge_optimal_window,
+    sample_interval,
 ):
     """Plot the integrated autocorrelation of the topological charge series. Also plot a
     vertical line to denote the location of the optimal window, which minimises the error
     on the integrated autocorrelation."""
     cut = max(10, 2 * np.max(topological_charge_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
     tau = topological_charge_integrated_autocorr[topological_charge_optimal_window]
 
     fig, ax = plt.subplots()
@@ -305,12 +322,19 @@ def plot_topological_charge_integrated_autocorr(
     ax.set_xlabel("$\delta t$")
 
     ax.plot(
-        topological_charge_integrated_autocorr[:cut], linestyle="--", linewidth=0.5,
+        chain_indices,
+        topological_charge_integrated_autocorr[:cut],
+        linestyle="--",
+        linewidth=0.5,
     )
     ax.axvline(
-        topological_charge_optimal_window, linestyle="-", color="r",
+        topological_charge_optimal_window * sample_interval, linestyle="-", color="r",
     )
-    ax.annotate(fr"$\tau_Q=${tau:.2g}", xy=(0.05, 0.05), xycoords="axes fraction")
+    ax.annotate(
+        fr"$\tau_Q$ / {sample_interval} = {tau:.2g}",
+        xy=(0.05, 0.05),
+        xycoords="axes fraction",
+    )
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0.5)
     return fig
