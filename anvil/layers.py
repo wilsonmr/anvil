@@ -189,8 +189,8 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
-class ProjectCircle(nn.Module):
-    """Applies the stereographic projection map S1 -> R1."""
+class ProjectionLayer(nn.Module):
+    """Applies the stereographic projection map S1 - {0} -> R1."""
 
     def forward(self, x_input, log_density):
         """Forward pass of the projection transformation."""
@@ -199,20 +199,21 @@ class ProjectCircle(nn.Module):
         return phi_out, log_density
 
 
-class ProjectCircleInverse(nn.Module):
-    """Applies the inverse stereographic projection map R1 -> S1."""
+class InverseProjectionLayer(nn.Module):
+    """Applies the inverse stereographic projection map R1 -> S1 - {0}."""
 
     def __init__(self):
         super().__init__()
+        # Add a learnable phase shift
         self.phase_shift = nn.Parameter(torch.rand(1))
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = 2 * torch.atan(x_input) + pi
+        phi_out = (2 * torch.atan(x_input) + pi + self.phase_shift) % (2 * pi)
         log_density += (-2 * torch.log(torch.cos(0.5 * (phi_out - pi)))).sum(
             dim=1, keepdim=True
         )
-        return (phi_out + self.phase_shift) % (2 * pi), log_density
+        return phi_out, log_density
 
 
 ################################## Not yet implemented ######################################

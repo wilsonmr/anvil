@@ -179,12 +179,11 @@ class ConvexCombination(nn.Module):
 
         phi_out = 0
         for weight, flow in zip(weights_norm, self.flows):
-            input_copy = (
-                x_input.clone()
-            )  # don't want each flow to update same input tensor
-            zero_density = torch.zeros_like(
-                log_density
-            )  # don't want to add to base density
+             # don't want each flow to update same input tensor
+            input_copy = x_input.clone()
+            # don't want to add to base density
+            zero_density = torch.zeros_like(log_density)
+            
             phi_flow, log_dens_flow = flow(input_copy, zero_density)
             phi_out += weight * phi_flow
             log_density += weight * log_dens_flow
@@ -196,6 +195,8 @@ _normalising_flow = collect("model_action", ("model_spec",))
 
 
 def normalising_flow(_normalising_flow, i_mixture=1):
+    """Return a callable model which is a normalising flow constructed via
+    function composition."""
     return _normalising_flow[0]
 
 
@@ -203,4 +204,6 @@ _flow_replica = collect("normalising_flow", ("mixture_indices",))
 
 
 def convex_combination(_flow_replica):
+    """Return a callable model which is a convex combination of multiple
+    normalising flows."""
     return ConvexCombination(_flow_replica)

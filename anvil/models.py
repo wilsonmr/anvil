@@ -22,6 +22,8 @@ def real_nvp(
     activation="leaky_relu",
     batch_normalise=False,
 ):
+    """Action that returns a callable object that performs a sequence of `n_affine`
+    affine coupling transformations on both partitions of the input vector."""
     affine_pairs = [
         coupling_pair(
             layers.AffineLayer,
@@ -37,7 +39,12 @@ def real_nvp(
 
 
 def real_nvp_circle(size_half, real_nvp):
-    return Sequential(layers.ProjectCircle(), real_nvp, layers.ProjectCircleInverse())
+    """Action that returns a callable object that projects an input vector from 
+    (0, 2\pi)->R1, performs a sequence of affine transformations, then does the
+    inverse projection back to (0, 2\pi)"""
+    return Sequential(
+        layers.ProjectionLayer(), real_nvp, layers.InverseProjectionLayer()
+    )
 
 
 MODEL_OPTIONS = {
