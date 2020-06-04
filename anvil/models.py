@@ -1,3 +1,9 @@
+"""
+models.py
+
+Module containing reportengine actions which return callable objects that execute
+normalising flows constructed from multiple layers via function composition.
+"""
 from functools import partial
 
 from anvil.core import Sequential
