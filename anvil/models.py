@@ -47,7 +47,19 @@ def real_nvp_circle(size_half, real_nvp):
     )
 
 
+def real_nvp_sphere(size_half, real_nvp):
+    """Action that returns a callable object that projects an input vector from 
+    S2 - {0} -> R2, performs a sequence of affine transformations, then does the
+    inverse projection back to S2 - {0}"""
+    return Sequential(
+        layers.ProjectionLayer2D(size_half),
+        real_nvp,
+        layers.InverseProjectionLayer2D(size_half),
+    )
+
+
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "real_nvp_circle": real_nvp_circle,
+    "real_nvp_sphere": real_nvp_sphere,
 }

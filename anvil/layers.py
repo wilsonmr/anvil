@@ -216,38 +216,48 @@ class InverseProjectionLayer(nn.Module):
         return phi_out, log_density
 
 
-################################## Not yet implemented ######################################
+class ProjectionLayer2D(nn.Module):
+    """Applies the stereographic projection map S2 - {0} -> R2."""
 
-
-class ProjectSphere(nn.Module):
-    """Applies the stereographic projection map S2 -> R2."""
+    def __init__(self, size_half: int):
+        super().__init__()
+        self.size_half = size_half
+        self.size_out = 2 * size_half
 
     def forward(self, x_input, log_density):
         """Forward pass of the projection transformation."""
-        polar, azimuth = x_input.split(1, dim=1)
+        polar, azimuth = x_input.view(-1, self.size_half, 2).split(1, dim=2)
 
         # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
-        proj_xy = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
-            (torch.cos(azimuth), torch.sin(azimuth)), dim=1
+        phi_out = -torch.tan(0.5 * polar) * torch.cat(  # radial coordinate
+            (torch.cos(azimuth), torch.sin(azimuth)), dim=2  # cos/sin polar coordinate
         )
-        proj_rsq = proj_xy.pow(2).sum(dim=1)
-        log_density += (-0.5 * torch.log(proj_rsq) - torch.log1p(proj_rsq)).sum(dim=-1)
+        proj_rsq = phi_out.pow(2).sum(dim=2)
+        log_density += (-0.5 * torch.log(proj_rsq) - torch.log1p(proj_rsq)).sum(
+            dim=1, keepdim=True
+        )
+
+        return phi_out.view(-1, self.size_out), log_density
 
 
-class ProjectSphereInverse(nn.Module):
-    """Applies the inverse stereographic projection map R2 -> S2."""
+class InverseProjectionLayer2D(nn.Module):
+    """Applies the inverse stereographic projection map R2 -> S2 - {0}."""
+
+    def __init__(self, size_half: int):
+        super().__init__()
+        self.size_half = size_half
+        self.size_out = 2 * size_half
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        proj_x, proj_y = x_input.split(1, dim=1)
+        proj_x, proj_y = x_input.view(-1, self.size_half, 2).split(1, dim=2)
 
         polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
-        phi_out = torch.cat(
-            (polar, torch.atan2(proj_x, proj_y) + pi,), dim=1  # azimuth
-        )
+        azimuth = (torch.atan2(proj_x, proj_y) + pi) % (2 * pi)
 
+        phi_out = torch.cat((polar, azimuth), dim=2,)
         log_density += (
             torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
-        ).sum(dim=-1)
+        ).sum(dim=1)
 
-        return phi_out, log_density
+        return phi_out.view(-1, self.size_out), log_density
