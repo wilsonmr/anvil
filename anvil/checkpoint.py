@@ -32,8 +32,8 @@ def train_range(loaded_checkpoint, epochs):
     return train_range
 
 
-def loaded_model(loaded_checkpoint, model):
-    new_model = deepcopy(model)  # need to copy model so we don't get weird results
+def loaded_model(loaded_checkpoint, model_to_load):
+    new_model = deepcopy(model_to_load)  # need to copy model so we don't get weird results
     if loaded_checkpoint is not None:
         new_model.load_state_dict(loaded_checkpoint["model_state_dict"])
     return new_model

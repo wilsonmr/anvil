@@ -54,14 +54,6 @@ class ConfigParser(Config):
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def parse_target(self, target: str):
-        """String specifying target distrbution."""
-        return target
-
-    def parse_base(self, base: str):
-        """String specifying base distribution."""
-        return base
-
     @explicit_node
     def produce_target_dist(self, target: str):
         """Return the function which initialises the correct action"""
@@ -121,12 +113,12 @@ class ConfigParser(Config):
         return beta
 
     @explicit_node
-    def produce_model_action(self, model_id):
+    def produce_model_action(self, model: str):
         """Given a string, return the flow model action indexed by that string."""
         try:
-            return MODEL_OPTIONS[model_id]
+            return MODEL_OPTIONS[model]
         except KeyError:
-            raise ConfigError
+            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
 
     def parse_n_mixture(self, n: int):
         """Number of replica models which we can combine using convex combinations."""
@@ -137,9 +129,9 @@ class ConfigParser(Config):
         return [{"i_mixture": i} for i in range(n_mixture)]
 
     @explicit_node
-    def produce_model(self, n_mixture=1):
-        """Produce the generative model which maps the base to an approximate of the 
-        target distribution."""
+    def produce_model_to_load(self, n_mixture=1):
+        """Produce the generative model, whose parameters are to be loaded, which maps
+        the base to an approximate of the target distribution."""
         if n_mixture == 1:
             return normalising_flow  # no replica flows
         else:

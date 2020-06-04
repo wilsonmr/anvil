@@ -8,7 +8,7 @@ beta: 3.5
 
 # Model
 base: spherical_uniform
-model_id: real_nvp_sphere
+model: real_nvp_sphere
 model_spec:
     n_affine: 2
     hidden_shape: [36]

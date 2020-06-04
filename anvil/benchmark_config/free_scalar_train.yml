@@ -10,7 +10,7 @@ use_arxiv_version: false
 
 # Model
 base: standard_normal
-model_id: real_nvp
+model: real_nvp
 model_spec:
     n_affine: 2
 
