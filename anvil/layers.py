@@ -182,6 +182,26 @@ class AffineLayer(CouplingLayer):
 
 
 class NCPLayer(nn.Module):
+    r"""A transformation layer from (0, 2\pi) -> (0, 2\pi) which uses learnable parameters
+    to perform an affine transformation x -> \alpha * x + \beta on the Euclidean vector which
+    is the stereographic projection of the input data.
+
+    Since the transformation relies on learnable parameters rather than neural networks, the
+    Jacobian is simply a diagonal matrix of gradients, which can be computed analytically for
+    the full transformation, including projection and inverse.
+
+    Denoting the map as f: \phi -> x, we compute
+
+            \phi = f^{-1}(x)
+            \log | \det J_f | , where J_f = 1 / J_{f^{-1}} = 1 / (df^{-1} / dx)
+
+    This can be thought of as a lightweight version of real_nvp_circle, with the caveat that
+    the lattice sites are decoupled.
+
+    Hence, on its own, we should expect this transformation to be effective only for weakly
+    coupled targets.
+    """
+
     def __init__(self, size_in):
         super().__init__()
         self.log_alpha = nn.Parameter(torch.rand(size_in).view(1, -1))
@@ -204,6 +224,7 @@ class NCPLayer(nn.Module):
         ).sum(dim=1, keepdim=True)
 
         return phi_out, log_density
+
 
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
