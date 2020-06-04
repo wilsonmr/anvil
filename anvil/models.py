@@ -64,8 +64,22 @@ def real_nvp_sphere(size_half, real_nvp):
         layers.InverseProjectionLayer2D(size_half),
     )
 
-def ncp_circle(config_size):
-    return layers.NCPLayer(size_in=config_size)
+
+def ncp_circle(
+    size_half, hidden_shape=[24,], activation="leaky_relu", batch_normalise=False
+):
+    """Action that returns a callable object that performs a transformation from
+    (0, 2\pi) -> (0, 2\pi) that is the composition of a stereographic projection
+    transformation, an affine transformation, and the inverse projection."""
+    return coupling_pair(
+        layers.NCPLayer,
+        size_half,
+        hidden_shape=hidden_shape,
+        activation=activation,
+        batch_normalise=batch_normalise,
+        i_layer=0,  # currently composition of these layers isn't supported (use real_nvp_circle)
+    )
+
 
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,

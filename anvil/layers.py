@@ -94,7 +94,7 @@ class AffineLayer(CouplingLayer):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
 
-    Affine transformation, x = g_i(\phi), defined as:
+    An affine transformation, x = g_i(\phi), is defined as:
 
         x_a = \phi_a
         x_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
@@ -181,47 +181,101 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
-class NCPLayer(nn.Module):
-    r"""A transformation layer from (0, 2\pi) -> (0, 2\pi) which uses learnable parameters
-    to perform an affine transformation x -> \alpha * x + \beta on the Euclidean vector which
-    is the stereographic projection of the input data.
+class NCPLayer(CouplingLayer):
+    r"""A coupling layer which performs a transformation from (0, 2\pi) -> (0, 2\pi),
+    which is an affine transformation X -> \alpha * X + \beta on the Euclidean vector
+    obtained by stereographic projection of the input data.
 
-    Since the transformation relies on learnable parameters rather than neural networks, the
-    Jacobian is simply a diagonal matrix of gradients, which can be computed analytically for
-    the full transformation, including projection and inverse.
+    The transformation x = g(\phi) is defined as
 
-    Denoting the map as f: \phi -> x, we compute
+        x_a = \phi_a
+        x_b = (
+                2 \arctan( \alpha(\phi_a) + \tan((\phi_b - \pi) / 2) + \beta(\phi_a))
+                + \pi + \theta
+              )
 
-            \phi = f^{-1}(x)
-            \log | \det J_f | , where J_f = 1 / J_{f^{-1}} = 1 / (df^{-1} / dx)
+    where \alpha and \beta are neural networks, and \theta is a learnable global phase shift.
 
-    This can be thought of as a lightweight version of real_nvp_circle, with the caveat that
-    the lattice sites are decoupled.
+    The Jacobian determinant can be computed analytically for the full transformation,
+    including projection and inverse. 
+        
+        | \det J | = \prod_n (
+            (1 + \beta ** 2) / \alpha * \sin^2(x / 2) + \beta 
+            + \alpha * \cos^2(x / 2)
+            - \beta * \sin(x_b)
+            )
 
-    Hence, on its own, we should expect this transformation to be effective only for weakly
-    coupled targets.
+    Attributes
+    ----------
+    s_network: NeuralNetwork
+        When exponentiated, this is the linear transformation \alpha.
+    t_network: NeuralNetwork
+        The shift part (\beta) of the affine transformation.
+    phase_shift: nn.Parameter
+        A learnable global phase shift.
+
+    Notes
+    -----
+    The Jacobian determinant is computed using the gradient of the inverse transformation,
+    which is the reciprocal of the gradient of the forward transformation.
+
+    This can be thought of as a lightweight version of real_nvp_circle, with just one affine
+    transformation.
     """
 
-    def __init__(self, size_in):
-        super().__init__()
-        self.log_alpha = nn.Parameter(torch.rand(size_in).view(1, -1))
-        self.beta = nn.Parameter(torch.rand(size_in).view(1, -1))
+    def __init__(
+        self,
+        size_half: int,
+        *,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        i_layer: int,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, i_layer, even_sites)
+        self.s_network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=None,
+            batch_normalise=batch_normalise,
+            label=f"({self.label}) 's' network",
+        )
+        self.t_network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=None,
+            batch_normalise=batch_normalise,
+            label=f"({self.label}) 't' network",
+        )
         self.phase_shift = nn.Parameter(torch.rand(1))
 
     def forward(self, x_input, log_density):
-        alpha = torch.exp(self.log_alpha)  # always positive
+        """Forward pass of the project-affine-inverse transformation."""
+        x_a = x_input[..., self._a_ind]
+        x_b = x_input[..., self._b_ind]
+        x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
 
-        phi_out = (
-            2 * torch.atan(alpha * torch.tan((x_input - pi) / 2) + self.beta)
+        alpha = torch.exp(self.s_network(x_a_stand))
+        beta = self.t_network(x_a_stand)
+
+        phi_b = (
+            2 * torch.atan(alpha * torch.tan((x_b - pi) / 2) + beta)
             + pi
             + self.phase_shift
         ) % (2 * pi)
 
         log_density += torch.log(
-            (1 + self.beta ** 2) / alpha * torch.sin(x_input / 2) ** 2
-            + alpha * torch.cos(x_input / 2) ** 2
-            - self.beta * torch.sin(x_input)
+            (1 + beta ** 2) / alpha * torch.sin(x_b / 2) ** 2
+            + alpha * torch.cos(x_b / 2) ** 2
+            - beta * torch.sin(x_b)
         ).sum(dim=1, keepdim=True)
+
+        phi_out = self._join_func([x_a, phi_b], dim=-1)
 
         return phi_out, log_density
 
