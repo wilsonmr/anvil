@@ -81,7 +81,6 @@ def linear_spline(
         hidden_shape=hidden_shape,
         activation=activation,
         batch_normalise=batch_normalise,
-        i_layer=0,
     )
 
 
