@@ -53,6 +53,7 @@ class NormalDist:
         return sample, self.log_density(sample)
 
     def log_density(self, sample):
+        """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
         exponent = -self.exp_coeff * torch.sum(
             (sample - self.mean).pow(2), dim=1, keepdim=True
         )
@@ -62,9 +63,11 @@ class NormalDist:
     def pdf(self):
         x = torch.linspace(-5 * self.sigma, 5 * self.sigma, 10000)
         return (
-            x,
-            torch.exp(-self.exp_coeff * (x - self.mean) ** 2)
-            / (sqrt(2 * pi) * self.sigma),
+            (
+                x,
+                torch.exp(-self.exp_coeff * (x - self.mean) ** 2)
+                / (sqrt(2 * pi) * self.sigma),
+            ),
         )
 
 
@@ -85,7 +88,7 @@ class UniformDist:
 
         self.x_min, self.x_max = support
 
-        self.log_density = lambda sample: torch.zeros((sample.size[0], 1))
+        self.log_density = lambda sample: torch.zeros((sample.shape[0], 1))
 
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
@@ -103,7 +106,7 @@ class UniformDist:
     def pdf(self):
         x = torch.linspace(self.x_min, self.x_max, 10000)
         dens = 1 / (self.x_max - self.x_min)
-        return x, torch.zeros_like(x) + dens
+        return ((x, torch.zeros_like(x) + dens),)
 
 
 class SemicircleDist:
@@ -143,7 +146,7 @@ class SemicircleDist:
         return sample, self.log_density(sample)
 
     def log_density(self, sample):
-        """Logarithm of the pdf, calculated for a given sample."""
+        """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
         return (
             torch.sum(
                 0.5 * torch.log(self.radius ** 2 - (sample - self.mean) ** 2),
@@ -157,7 +160,7 @@ class SemicircleDist:
     def pdf(self):
         x = torch.linspace(-self.radius, self.radius, 10000)
         dens = 2 / (pi * self.radius ** 2) * torch.sqrt(self.radius ** 2 - x ** 2)
-        return x + self.mean, dens
+        return ((x + self.mean, dens),)
 
 
 class VonMisesDist:
@@ -213,14 +216,12 @@ class VonMisesDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = self.generator((sample_size, self.size_out))
+        sample = self.generator((sample_size, self.size_out)) + pi  # [0, 2\pi)
         log_density = self.log_density(sample)
         return sample, log_density
 
     def log_density(self, sample):
-        """Logarithm of the normalised probability density function for the
-        von Mises distribution, given a sample.
-        """
+        """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
         return (
             self.kappa * torch.cos(sample - self.mean).sum(dim=1, keepdim=True)
             - self.log_normalisation
@@ -229,8 +230,12 @@ class VonMisesDist:
     @property
     def pdf(self):
         x = torch.linspace(0, 2 * pi, 10000)
-        return torch.exp(self.kappa * torch.cos(x - self.mean)) / (
-            2 * pi * i0(self.kappa)
+        return (
+            (
+                x,
+                torch.exp(self.kappa * torch.cos(x - self.mean))
+                / (2 * pi * i0(self.kappa)),
+            ),
         )
 
 
@@ -316,14 +321,18 @@ def normal_distribution(lattice_size, sigma=1, mean=0):
 def uniform_distribution(lattice_size, support=(-1, 1)):
     """Returns an instance of the UniformDist class.
 
-    The default interval is intentionally zero-centered,
-    anticipating use as a base distribution."""
+    The default interval is intentionally zero-centered, anticipating use
+    as a base distribution."""
     return UniformDist(lattice_size, support=support)
 
 
+def standard_uniform_distribution(lattice_size):
+    """Returns an instance of the UniformDist class with interval [0, 1)"""
+    return UniformDist(lattice_size, support=(0, 1))
+
+
 def circular_uniform_distribution(lattice_size):
-    """Returns an instance of the UniformDist class with interval
-    [0, 2 * pi)"""
+    """Returns an instance of the UniformDist class with interval [0, 2 * pi)"""
     return UniformDist(lattice_size, support=(0, 2 * pi))
 
 
@@ -546,6 +555,7 @@ BASE_OPTIONS = {
     "standard_normal": standard_normal_distribution,
     "normal": normal_distribution,
     "uniform": uniform_distribution,
+    "standard_uniform": standard_uniform_distribution,
     "circular_uniform": circular_uniform_distribution,
     "von_mises": von_mises_distribution,
     "spherical_uniform": spherical_uniform_distribution,
