@@ -46,8 +46,9 @@ def get_segment(data, knot_points):
         data.unsqueeze_(dim=-1)
         indices = torch.empty_like(data, dtype=torch.long)
         for i in range(data.shape[0]):
-            indices[i] = searchsorted(knot_points[i], data[i])
-        return indices - 1
+            indices[i] = searchsorted(knot_points[i], data[i]) - 1
+        indices[indices < 0] = 0
+        return indices
 
 class CouplingLayer(nn.Module):
     """
@@ -199,10 +200,9 @@ class LinearSplineLayer(CouplingLayer):
         hidden_shape: list,
         activation: str,
         batch_normalise: bool,
-        i_layer: int,
         even_sites: bool,
     ):
-        super().__init__(size_half, i_layer, even_sites)
+        super().__init__(size_half, even_sites)
 
         self.size_half = size_half
         self.n_segments = n_segments
@@ -216,7 +216,6 @@ class LinearSplineLayer(CouplingLayer):
             activation=activation,
             final_activation=activation,
             batch_normalise=batch_normalise,
-            label=f"{self.label}",
         )
 
         self.norm_func = nn.Softmax(dim=2)
