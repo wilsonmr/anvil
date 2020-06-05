@@ -247,11 +247,11 @@ class InverseProjectionLayer(nn.Module):
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = (2 * torch.atan(x_input) + pi + self.phase_shift) % (2 * pi)
+        phi_out = (2 * torch.atan(x_input) + pi)
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
             dim=1, keepdim=True
         )
-        return phi_out, log_density
+        return (phi_out + self.phase_shift) % (2 * pi), log_density
 
 
 class ProjectionLayer2D(nn.Module):
