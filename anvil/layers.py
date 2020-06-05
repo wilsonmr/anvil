@@ -46,8 +46,9 @@ def get_segment(data, knot_points):
         data.unsqueeze_(dim=-1)
         indices = torch.empty_like(data, dtype=torch.long)
         for i in range(data.shape[0]):
-            indices[i] = searchsorted(knot_points[i], data[i])
-        return indices - 1
+            indices[i] = searchsorted(knot_points[i], data[i]) - 1
+        indices[indices < 0] = 0
+        return indices
 
 class CouplingLayer(nn.Module):
     """
