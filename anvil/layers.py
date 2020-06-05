@@ -38,6 +38,16 @@ from math import pi
 
 from anvil.core import NeuralNetwork
 
+def get_segment(data, knot_points):
+    """Given a batch of input vectors with dimensions (n_batch, D) and knot points
+    (bin edges) with dimensions (n_batch, D, n_segments + 1) return a tensor corresponding
+    to the segments (bins) in which each data point lies, dimensions (n_batch, D, 1)."""
+    with torch.no_grad():
+        data.unsqueeze_(dim=-1)
+        indices = torch.empty_like(data, dtype=torch.long)
+        for i in range(data.shape[0]):
+            indices[i] = searchsorted(knot_points[i], data[i])
+        return indices - 1
 
 class CouplingLayer(nn.Module):
     """
@@ -182,6 +192,7 @@ class AffineLayer(CouplingLayer):
 
 
 class LinearSplineLayer(CouplingLayer):
+<<<<<<< HEAD
     r"""A coupling transformation from [0, 1] -> [0, 1] based on a piecewise linear function.
 
     The interval is divided into K equal-width (w) segments (bins), with K+1 knot points
@@ -243,14 +254,13 @@ class LinearSplineLayer(CouplingLayer):
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
-
         self.size_half = size_half
         self.n_segments = n_segments
         self.width = 1 / n_segments
 
         eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
         self.x_knot_points = torch.linspace(-eps, 1 + eps, n_segments + 1).view(1, -1)
-
+        
         self.h_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half * n_segments,

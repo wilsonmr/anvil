@@ -89,6 +89,14 @@ def linear_spline(
             batch_normalise=batch_normalise,
         ),
         layers.GlobalAffineLayer(scale=support[1] - support[0], shift=support[0]),
+    return coupling_pair(
+        layers.LinearSplineLayer,
+        size_half,
+        n_segments=n_segments,
+        hidden_shape=hidden_shape,
+        activation=activation,
+        batch_normalise=batch_normalise,
+        i_layer=0,
     )
 
 
