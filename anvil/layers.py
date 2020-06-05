@@ -33,10 +33,21 @@ and returns two torch.tensor objects:
 """
 import torch
 import torch.nn as nn
+from torchsearchsorted import searchsorted
 from math import pi
 
 from anvil.core import NeuralNetwork
 
+def get_segment(data, knot_points):
+    """Given a batch of input vectors with dimensions (n_batch, D) and knot points
+    (bin edges) with dimensions (n_batch, D, n_segments + 1) return a tensor corresponding
+    to the segments (bins) in which each data point lies, dimensions (n_batch, D, 1)."""
+    with torch.no_grad():
+        data.unsqueeze_(dim=-1)
+        indices = torch.empty_like(data, dtype=torch.long)
+        for i in range(data.shape[0]):
+            indices[i] = searchsorted(knot_points[i], data[i])
+        return indices - 1
 
 class CouplingLayer(nn.Module):
     """
@@ -176,6 +187,65 @@ class AffineLayer(CouplingLayer):
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
         log_density += s_out.sum(dim=1, keepdim=True)
+
+        return phi_out, log_density
+
+
+class LinearSplineLayer(CouplingLayer):
+    def __init__(
+        self,
+        size_half: int,
+        n_segments: int,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        i_layer: int,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, i_layer, even_sites)
+
+        self.size_half = size_half
+        self.n_segments = n_segments
+        self.width = 1 / n_segments
+        self.phi_knot_points = torch.linspace(0, 1, n_segments + 1)
+
+        self.h_network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half * n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+            label=f"{self.label}",
+        )
+
+        self.norm_func = nn.Softmax(dim=2)
+
+    def forward(self, x_input, log_density):
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+
+        net_out = self.norm_func(
+            self.h_network(x_a - 0.5).view(-1, self.size_half, self.n_segments)
+        )
+        x_knot_points = torch.cat(
+            (
+                torch.zeros(net_out.shape[0], self.size_half, 1),
+                torch.cumsum(net_out, dim=2),
+            ),
+            dim=2,
+        )
+        k_segments = get_segment(x_b, x_knot_points)
+        heights = torch.gather(net_out, 2, k_segments)
+
+        alpha = (
+            x_b.view(-1, self.size_half, 1) - torch.gather(x_knot_points, 2, k_segments)
+        ) / heights
+
+        phi_b = (self.phi_knot_points[k_segments] + alpha * self.width).squeeze()
+
+        phi_out = self._join_func([x_a, phi_b], dim=1)
+        log_density += torch.log(heights).sum(dim=1)
 
         return phi_out, log_density
 
