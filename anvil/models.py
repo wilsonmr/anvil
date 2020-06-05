@@ -26,6 +26,7 @@ def real_nvp(
     n_affine,
     hidden_shape=[24,],
     activation="leaky_relu",
+    s_final_activation="leaky_relu",
     batch_normalise=False,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
@@ -36,10 +37,10 @@ def real_nvp(
             size_half,
             hidden_shape=hidden_shape,
             activation=activation,
+            s_final_activation=s_final_activation,
             batch_normalise=batch_normalise,
-            i_layer=i,
         )
-        for i in range(n_affine)
+        for _ in range(n_affine)
     ]
     return Sequential(*affine_pairs)
 

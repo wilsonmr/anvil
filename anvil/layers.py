@@ -56,8 +56,6 @@ class CouplingLayer(nn.Module):
     size_half: int
         Half of the configuration size, which is the size of the input vector
         for the neural networks.
-    i_layer: int
-        layer index, used for debugging
     even_sites: bool
         dictates which half of the data is transformed as a and b, since
         successive affine transformations alternate which half of the data is
@@ -66,9 +64,6 @@ class CouplingLayer(nn.Module):
 
     Attributes
     ----------
-    label: str
-        A label for the coupling layer containing the index of its global position
-        in the map, and whether it acts on the even or odd partition.
     a_ind: slice (protected)
         Slice object which can be used to access the passive partition.
     b_ind: slice (protected)
@@ -78,7 +73,7 @@ class CouplingLayer(nn.Module):
         appropriate order.
     """
 
-    def __init__(self, size_half: int, i_layer: int, even_sites: bool):
+    def __init__(self, size_half: int, even_sites: bool):
         super().__init__()
 
         if even_sites:
@@ -86,7 +81,6 @@ class CouplingLayer(nn.Module):
             self._a_ind = slice(0, size_half)
             self._b_ind = slice(size_half, 2 * size_half)
             self._join_func = torch.cat
-            partition = "even"
         else:
             # a is second half of input vector
             self._a_ind = slice(size_half, 2 * size_half)
@@ -94,12 +88,6 @@ class CouplingLayer(nn.Module):
             self._join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
-            partition = "odd"
-
-        self.label = f"Layer: {i_layer}, partition: {partition}"
-
-    def __str__(self):
-        return f"{self.label}\n------------------------\n{super().__str__()}"
 
 
 class AffineLayer(CouplingLayer):
@@ -119,13 +107,14 @@ class AffineLayer(CouplingLayer):
     hidden_shape: list
         list containing hidden vector sizes the neural networks.
     activation: str
-        string which is a key for an activation function for the s network and all but
-        the final layer of the t network.
+        string which is a key for an activation function for all but the final layers
+        of the networks.
+    s_final_activation: str
+        string which is a key for an activation function, which the output of the s
+        network will be passed through.
     batch_normalise: bool
         flag indicating whether or not to use batch normalising within the neural
         networks.
-    i_layer: int
-        layer index, used for debugging.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -152,19 +141,18 @@ class AffineLayer(CouplingLayer):
         *,
         hidden_shape: list,
         activation: str,
+        s_final_activation: str,
         batch_normalise: bool,
-        i_layer: int,
         even_sites: bool,
     ):
-        super().__init__(size_half, i_layer, even_sites)
+        super().__init__(size_half, even_sites)
         self.s_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=activation,
+            final_activation=s_final_activation,
             batch_normalise=batch_normalise,
-            label=f"({self.label}) 's' network",
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
@@ -173,7 +161,6 @@ class AffineLayer(CouplingLayer):
             activation=activation,
             final_activation=None,
             batch_normalise=batch_normalise,
-            label=f"({self.label}) 't' network",
         )
         # NOTE: Could potentially have non-default inputs for s and t networks
         # by adding dictionary of overrides - e.g. s_options = {}

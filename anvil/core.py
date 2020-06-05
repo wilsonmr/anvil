@@ -51,8 +51,6 @@ class NeuralNetwork(nn.Module):
     batch_normalise: bool
         Flag dictating whether batch normalisation should be performed
         before the activation function.
-    label: str
-        A label for the neural network, used for diagnostics.
 
     Methods
     -------
@@ -70,10 +68,8 @@ class NeuralNetwork(nn.Module):
         activation: (str, None),
         final_activation: (str, None) = None,
         batch_normalise: bool = False,
-        label: str = "network",
     ):
         super(NeuralNetwork, self).__init__()
-        self.label = label
         self.size_in = size_in
         self.size_out = size_out
         self.hidden_shape = hidden_shape
@@ -88,9 +84,6 @@ class NeuralNetwork(nn.Module):
 
         # nn.Sequential object containing the network layers
         self.network = self._construct_network()
-
-    def __str__(self):
-        return f"Network: {self.label}\n------------\n{self.network}"
 
     def _block(self, f_in, f_out, activation_func):
         """Constructs a single 'dense block' which maps 'f_in' inputs to
