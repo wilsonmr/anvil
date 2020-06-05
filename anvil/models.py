@@ -66,19 +66,53 @@ def real_nvp_sphere(size_half, real_nvp):
 
 
 def ncp_circle(
-    size_half, hidden_shape=[24,], activation="leaky_relu", batch_normalise=False
+    size_half,
+    n_layers=1,  # unlikely that function composition is beneficial
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    s_final_activation=None,
+    batch_normalise=False,
 ):
-    """Action that returns a callable object that performs a transformation from
-    (0, 2\pi) -> (0, 2\pi) that is the composition of a stereographic projection
-    transformation, an affine transformation, and the inverse projection."""
-    return coupling_pair(
-        layers.NCPLayer,
-        size_half,
-        hidden_shape=hidden_shape,
-        activation=activation,
-        batch_normalise=batch_normalise,
-        i_layer=0,  # currently composition of these layers isn't supported (use real_nvp_circle)
-    )
+    """Action that returns a callable object that performs a sequence of transformations
+    from (0, 2\pi) -> (0, 2\pi), each of which are the composition of a stereographic
+    projection transformation, an affine transformation, and the inverse projection."""
+    ncp_pairs = [
+        coupling_pair(
+            layers.NCPLayer,
+            size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            s_final_activation=s_final_activation,
+            batch_normalise=batch_normalise,
+        )
+        for _ in range(n_layers)
+    ]
+    return Sequential(*ncp_pairs)
+
+
+def ncp_circle(
+    size_half,
+    n_layers=1,  # unlikely that function composition is beneficial
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    s_final_activation=None,
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a sequence of transformations
+    from (0, 2\pi) -> (0, 2\pi), each of which are the composition of a stereographic
+    projection transformation, an affine transformation, and the inverse projection."""
+    ncp_pairs = [
+        coupling_pair(
+            layers.NCPLayer,
+            size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            s_final_activation=s_final_activation,
+            batch_normalise=batch_normalise,
+        )
+        for _ in range(n_layers)
+    ]
+    return Sequential(*ncp_pairs)
 
 
 MODEL_OPTIONS = {

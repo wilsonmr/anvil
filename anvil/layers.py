@@ -229,19 +229,18 @@ class NCPLayer(CouplingLayer):
         *,
         hidden_shape: list,
         activation: str,
+        s_final_activation: str,
         batch_normalise: bool,
-        i_layer: int,
         even_sites: bool,
     ):
-        super().__init__(size_half, i_layer, even_sites)
+        super().__init__(size_half, even_sites)
         self.s_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=None,
+            final_activation=s_final_activation,
             batch_normalise=batch_normalise,
-            label=f"({self.label}) 's' network",
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
@@ -250,7 +249,6 @@ class NCPLayer(CouplingLayer):
             activation=activation,
             final_activation=None,
             batch_normalise=batch_normalise,
-            label=f"({self.label}) 't' network",
         )
         self.phase_shift = nn.Parameter(torch.rand(1))
 
@@ -334,7 +332,7 @@ class InverseProjectionLayer(nn.Module):
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = (2 * torch.atan(x_input) + pi)
+        phi_out = 2 * torch.atan(x_input) + pi
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
             dim=1, keepdim=True
         )
