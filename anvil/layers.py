@@ -278,12 +278,9 @@ class LinearSplineLayer(CouplingLayer):
             dim=2,
         )
 
-        # NOTE: This is *essential*, otherwise searchsorted gives nonsense results for
-        # all but the first row. I don't understand why!
-        x_to_sort = x_b.clone().detach()
-
         # Sort x_b into the appropriate bin
-        k_ind = searchsorted(self.x_knot_points, x_to_sort) - 1
+        # NOTE: need to make x_b contiguous, otherwise searchsorted returns nonsense
+        k_ind = searchsorted(self.x_knot_points, x_b.contiguous()) - 1
         k_ind.unsqueeze_(dim=-1)
 
         h_k = torch.gather(net_out, 2, k_ind)
