@@ -427,6 +427,134 @@ class QuadraticSplineLayer(CouplingLayer):
         return phi_out, log_density
 
 
+class QuadraticSplineLayer(CouplingLayer):
+    r"""A coupling transformation from [0, 1] -> [0, 1] based on a piecewise quadratic function.
+
+    The interval is divided into K equal-width (w) segments (bins), with K+1 knot points
+    (bin boundaries). The coupling transformation is defined piecewise by the unique
+    polynomials whose end-points are the knot points.
+
+    A neural network generates the K+1 values for the y-positions (heights) for the knot points
+    and K bin widths. The coupling transformation is then defined as the cumulative distribution
+    function associated with the piecewise-quadratic function passing through the knot points.
+
+    The inverse coupling transformation is
+
+        \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + h_{k-1}(x - x_{k-1})
+                                  + (h_k - h_{k-1}) / (2 w_k) * (x - x_{k-1})^2
+
+    Parameters
+    ----------
+    size_half: int
+        Half of the configuration size, which is the size of the input vector for the
+        neural network.
+    hidden_shape: list
+        list containing hidden vector sizes the neural network.
+    activation: str
+        string which is a key for an activation function for all but the final layers
+        of the network.
+    batch_normalise: bool
+        flag indicating whether or not to use batch normalising within the neural
+        network.
+    even_sites: bool
+        dictates which half of the data is transformed as a and b, since successive
+        affine transformations alternate which half of the data is passed through
+        neural network.
+
+    Attributes
+    ----------
+    h_network: torch.nn.Module
+        the dense layers of network h, values are intialised as per the default
+        initialisation of `nn.Linear`
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
+    def __init__(
+        self,
+        size_half: int,
+        n_segments: int,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, even_sites)
+
+        self.size_half = size_half
+        self.n_segments = n_segments
+
+        self.eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
+
+        self.network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half * (2 * n_segments + 1),
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+        )
+
+        self.w_norm_func = nn.Softmax(dim=2)
+
+    @staticmethod
+    def h_norm_func(h_raw, w_norm):
+        """Normalisation function for height values."""
+        return torch.exp(h_raw) / (
+            0.5 * w_norm * (torch.exp(h_raw[..., :-1]) + torch.exp(h_raw[..., 1:]))
+        ).sum(dim=2, keepdim=True)
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the quadratic spline layer."""
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+
+        h_raw, w_raw = (
+            self.network(x_a - 0.5)
+            .view(-1, self.size_half, 2 * self.n_segments + 1)
+            .split((self.n_segments + 1, self.n_segments), dim=2)
+        )
+        w_norm = self.w_norm_func(w_raw)
+        h_norm = self.h_norm_func(h_raw, w_norm)
+
+        x_knot_points = torch.cat(
+            (
+                torch.zeros(h_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.cumsum(w_norm, dim=2),
+            ),
+            dim=2,
+        )
+        phi_knot_points = torch.cumsum(
+            0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
+        )
+
+        with torch.no_grad():
+            x_to_sort = x_b.clone().contiguous().view(-1, 1)
+            knot_points = x_knot_points.contiguous().view(-1, self.n_segments + 1)
+            k_ind = searchsorted(knot_points, x_to_sort) - 1
+            k_ind = k_ind.reshape(-1, self.size_half, 1)
+
+        w_k = torch.gather(w_norm, 2, k_ind)
+        h_km1 = torch.gather(h_norm, 2, k_ind)
+        h_k = torch.gather(h_norm, 2, k_ind + 1)
+        x_km1 = torch.gather(x_knot_points, 2, k_ind)
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+
+        alpha = (x_b.unsqueeze(dim=-1) - x_km1) / w_k
+        quad_coeff = 0.5 * (h_k - h_km1)
+        phi_b = (
+            phi_km1 + h_km1 * alpha * w_k + quad_coeff * alpha.pow(2) * w_k
+        ).squeeze()
+
+        phi_out = self._join_func([x_a, phi_b], dim=1)
+        log_density -= torch.log(h_km1 + 2 * quad_coeff * alpha).sum(dim=1)
+
+        return phi_out, log_density
+
+
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
     input vector.
