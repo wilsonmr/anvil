@@ -38,17 +38,6 @@ from math import pi
 
 from anvil.core import NeuralNetwork
 
-def get_segment(data, knot_points):
-    """Given a batch of input vectors with dimensions (n_batch, D) and knot points
-    (bin edges) with dimensions (n_batch, D, n_segments + 1) return a tensor corresponding
-    to the segments (bins) in which each data point lies, dimensions (n_batch, D, 1)."""
-    with torch.no_grad():
-        data.unsqueeze_(dim=-1)
-        indices = torch.empty_like(data, dtype=torch.long)
-        for i in range(data.shape[0]):
-            indices[i] = searchsorted(knot_points[i], data[i]) - 1
-        indices[indices < 0] = 0
-        return indices
 
 class CouplingLayer(nn.Module):
     """
@@ -193,6 +182,57 @@ class AffineLayer(CouplingLayer):
 
 
 class LinearSplineLayer(CouplingLayer):
+    r"""A coupling transformation from [0, 1] -> [0, 1] based on a piecewise linear function.
+
+    The interval is divided into K equal-width (w) segments (bins), with K+1 knot points
+    (bin boundaries). The coupling transformation is defined piecewise by the unique
+    polynomials whose end-points are the knot points.
+
+    A neural network generates the K values for the y-positions (heights) at the knot points.
+    The coupling transformation is then defined as the cumulative distribution function
+    associated with the probability masses given by the heights.
+
+    The inverse coupling transformation is
+
+        \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + \alpha h_k
+
+    where x_{k-1} = \sum_{k'=1}^{k-1} h_{k'} is the (k-1)-th knot point, and \alpha is the
+    fractional position of x in the k-th bin, which is (x - (k-1) * w) / w.
+
+    The gradient of the forward transformation is simply
+        
+        dx / d\phi = w / h_k
+
+    Parameters
+    ----------
+    size_half: int
+        Half of the configuration size, which is the size of the input vector for the
+        neural network.
+    hidden_shape: list
+        list containing hidden vector sizes the neural network.
+    activation: str
+        string which is a key for an activation function for all but the final layers
+        of the network.
+    batch_normalise: bool
+        flag indicating whether or not to use batch normalising within the neural
+        network.
+    even_sites: bool
+        dictates which half of the data is transformed as a and b, since successive
+        affine transformations alternate which half of the data is passed through
+        neural network.
+
+    Attributes
+    ----------
+    h_network: torch.nn.Module
+        the dense layers of network h, values are intialised as per the default
+        initialisation of `nn.Linear`
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
     def __init__(
         self,
         size_half: int,
@@ -207,7 +247,9 @@ class LinearSplineLayer(CouplingLayer):
         self.size_half = size_half
         self.n_segments = n_segments
         self.width = 1 / n_segments
-        self.phi_knot_points = torch.linspace(0, 1, n_segments + 1)
+
+        eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
+        self.x_knot_points = torch.linspace(-eps, 1 + eps, n_segments + 1).view(1, -1)
 
         self.h_network = NeuralNetwork(
             size_in=size_half,
@@ -221,30 +263,36 @@ class LinearSplineLayer(CouplingLayer):
         self.norm_func = nn.Softmax(dim=2)
 
     def forward(self, x_input, log_density):
+        """Forward pass of the linear spline layer."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
 
         net_out = self.norm_func(
             self.h_network(x_a - 0.5).view(-1, self.size_half, self.n_segments)
         )
-        x_knot_points = torch.cat(
+        phi_knot_points = torch.cat(
             (
                 torch.zeros(net_out.shape[0], self.size_half, 1),
                 torch.cumsum(net_out, dim=2),
             ),
             dim=2,
         )
-        k_segments = get_segment(x_b, x_knot_points)
-        heights = torch.gather(net_out, 2, k_segments)
 
-        alpha = (
-            x_b.view(-1, self.size_half, 1) - torch.gather(x_knot_points, 2, k_segments)
-        ) / heights
+        # NOTE: This is *essential*, otherwise searchsorted gives nonsense results for
+        # all but the first row. I don't understand why!
+        x_to_sort = x_b.clone().detach()
 
-        phi_b = (self.phi_knot_points[k_segments] + alpha * self.width).squeeze()
+        # Sort x_b into the appropriate bin
+        k_ind = searchsorted(self.x_knot_points, x_to_sort) - 1
+        k_ind.unsqueeze_(dim=-1)
+
+        h_k = torch.gather(net_out, 2, k_ind)
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+        alpha = (x_b.unsqueeze(dim=-1) - k_ind * self.width) / self.width
+        phi_b = (phi_km1 + alpha * h_k).squeeze()
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
-        log_density += torch.log(heights).sum(dim=1)
+        log_density -= torch.log(h_k).sum(dim=1)
 
         return phi_out, log_density
 
@@ -303,7 +351,7 @@ class InverseProjectionLayer(nn.Module):
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = (2 * torch.atan(x_input) + pi)
+        phi_out = 2 * torch.atan(x_input) + pi
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
             dim=1, keepdim=True
         )
