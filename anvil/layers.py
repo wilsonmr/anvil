@@ -396,11 +396,13 @@ class QuadraticSplineLayer(CouplingLayer):
             0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
         )
 
-        with torch.no_grad():
-            x_to_sort = x_b.clone().contiguous().view(-1, 1)
-            knot_points = x_knot_points.contiguous().view(-1, self.n_segments + 1)
-            k_ind = searchsorted(knot_points, x_to_sort) - 1
-            k_ind = k_ind.reshape(-1, self.size_half, 1)
+        k_ind = (
+            searchsorted(
+                x_knot_points.contiguous().view(-1, self.n_segments + 1),
+                x_b.contiguous().view(-1, 1),
+            )
+            - 1
+        ).view(-1, self.size_half, 1)
 
         w_k = torch.gather(w_norm, 2, k_ind)
         h_km1 = torch.gather(h_norm, 2, k_ind)
