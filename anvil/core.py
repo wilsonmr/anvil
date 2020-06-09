@@ -150,14 +150,14 @@ class ConvexCombination(nn.Module):
         self.weights = nn.Parameter(torch.rand(len(flow_replica)))
         self.norm_func = nn.Softmax(dim=0)
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density_base):
         """Forward pass of the model.
 
         Parameters
         ----------
         x_input: torch.Tensor
             stack of input vectors drawn from the base distribution
-        log_density: torch.Tensor
+        log_density_base: torch.Tensor
             The logarithm of the probability density of the base distribution.
 
         Returns
@@ -166,22 +166,22 @@ class ConvexCombination(nn.Module):
             the convex combination of the output probability densities.
         log_density: torch.Tensor
             the logarithm of the probability density for the convex combination of
-            output densities.
+            output densities, added to the base log density.
         """
         weights_norm = self.norm_func(self.weights)
 
-        phi_out = 0
+        phi_out, density = 0, 0
         for weight, flow in zip(weights_norm, self.flows):
-             # don't want each flow to update same input tensor
+            # don't want each flow to update same input tensor
             input_copy = x_input.clone()
             # don't want to add to base density
-            zero_density = torch.zeros_like(log_density)
-            
+            zero_density = torch.zeros_like(log_density_base)
+
             phi_flow, log_dens_flow = flow(input_copy, zero_density)
             phi_out += weight * phi_flow
-            log_density += weight * log_dens_flow
+            density += weight * torch.exp(log_dens_flow)# / (2 * pi)  # needs to be log of normalised pdf!
 
-        return phi_out, log_density
+        return phi_out, log_density_base + torch.log(density)
 
 
 _normalising_flow = collect("model_action", ("model_spec",))
