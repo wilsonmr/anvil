@@ -10,10 +10,12 @@ from anvil.core import Sequential
 
 import anvil.layers as layers
 
+
 def support(target_dist):
     """Return the support of the target distribution."""
     # NOTE: may need to rethink this for multivariate distributions
     return target_dist.support
+
 
 def coupling_pair(coupling_layer, size_half, **layer_spec):
     """Helper function which returns a callable object that performs a coupling
@@ -89,13 +91,6 @@ def linear_spline(
             batch_normalise=batch_normalise,
         ),
         layers.GlobalAffineLayer(scale=support[1] - support[0], shift=support[0]),
-    return coupling_pair(
-        layers.LinearSplineLayer,
-        size_half,
-        n_segments=n_segments,
-        hidden_shape=hidden_shape,
-        activation=activation,
-        batch_normalise=batch_normalise,
     )
 
 
