@@ -82,10 +82,6 @@ class ConfigParser(Config):
         """Standard deviation of normal distribution."""
         return sigma
 
-    def parse_support(self, supp: list):
-        """Support of uniform distrbution."""
-        return supp
-
     def parse_concentration(self, conc: float):
         """Concentration parameter of von Mises distribution."""
         return conc
