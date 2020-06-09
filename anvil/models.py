@@ -93,8 +93,10 @@ def linear_spline(
         layers.GlobalAffineLayer(scale=support[1] - support[0], shift=support[0]),
     )
 
+
 def quadratic_spline(
     size_half,
+    support=(0, 1),
     n_segments=4,
     hidden_shape=[24,],
     activation="leaky_relu",
@@ -102,13 +104,16 @@ def quadratic_spline(
 ):
     """Action that returns a callable object that performs a pair of linear spline
     transformations, one on each half of the input vector."""
-    return coupling_pair(
-        layers.QuadraticSplineLayer,
-        size_half,
-        n_segments=n_segments,
-        hidden_shape=hidden_shape,
-        activation=activation,
-        batch_normalise=batch_normalise,
+    return Sequential(
+        coupling_pair(
+            layers.QuadraticSplineLayer,
+            size_half,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            batch_normalise=batch_normalise,
+        ),
+        layers.GlobalAffineLayer(scale=support[1] - support[0], shift=support[0]),
     )
 
 
