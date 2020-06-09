@@ -447,3 +447,32 @@ class InverseProjectionLayer2D(nn.Module):
         ).sum(dim=1)
 
         return phi_out.view(-1, self.size_out), log_density
+
+
+class GlobalAffineLayer(nn.Module):
+    r"""Applies an affine transformation to every data point using a given scale and shift,
+    which are *not* learnable. Useful to shift the domain of a learned distribution. This is
+    done at the cost of a constant term in the logarithm of the Jacobian determinant, which
+    is ignored.
+
+    Parameters
+    ----------
+    scale: (int, float)
+        Every data point will be multiplied by this factor.
+    shift: (int, float)
+        Every scaled data point will be shifted by this factor.
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
+    def __init__(self, scale, shift):
+        super().__init__()
+        self.scale = scale
+        self.shift = shift
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the global affine transformation."""
+        return self.scale * x_input + self.shift, log_density
