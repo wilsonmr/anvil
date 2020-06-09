@@ -394,8 +394,14 @@ class QuadraticSplineLayer(CouplingLayer):
             ),
             dim=2,
         )
-        phi_knot_points = torch.cumsum(
-            0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
+        phi_knot_points = torch.cat(
+            (
+                torch.zeros(h_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.cumsum(
+                    0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
+                ),
+            ),
+            dim=2,
         )
 
         k_ind = (
@@ -413,13 +419,12 @@ class QuadraticSplineLayer(CouplingLayer):
         phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
 
         alpha = (x_b.unsqueeze(dim=-1) - x_km1) / w_k
-        quad_coeff = 0.5 * (h_k - h_km1)
         phi_b = (
-            phi_km1 + h_km1 * alpha * w_k + quad_coeff * alpha.pow(2) * w_k
+            phi_km1 + alpha * h_km1 * w_k + 0.5 * alpha.pow(2) * (h_k - h_km1) * w_k
         ).squeeze()
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
-        log_density -= torch.log(h_km1 + 2 * quad_coeff * alpha).sum(dim=1)
+        log_density -= torch.log(h_km1 + alpha * (h_k - h_km1)).sum(dim=1)
 
         return phi_out, log_density
 
