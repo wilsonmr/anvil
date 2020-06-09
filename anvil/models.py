@@ -10,6 +10,10 @@ from anvil.core import Sequential
 
 import anvil.layers as layers
 
+def support(target_dist):
+    """Return the support of the target distribution."""
+    # NOTE: may need to rethink this for multivariate distributions
+    return target_dist.support
 
 def coupling_pair(coupling_layer, size_half, **layer_spec):
     """Helper function which returns a callable object that performs a coupling
@@ -67,6 +71,7 @@ def real_nvp_sphere(size_half, real_nvp):
 
 def linear_spline(
     size_half,
+    support=(0, 1),
     n_segments=4,
     hidden_shape=[24,],
     activation="leaky_relu",
@@ -74,13 +79,16 @@ def linear_spline(
 ):
     """Action that returns a callable object that performs a pair of linear spline
     transformations, one on each half of the input vector."""
-    return coupling_pair(
-        layers.LinearSplineLayer,
-        size_half,
-        n_segments=n_segments,
-        hidden_shape=hidden_shape,
-        activation=activation,
-        batch_normalise=batch_normalise,
+    return Sequential(
+        coupling_pair(
+            layers.LinearSplineLayer,
+            size_half,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            batch_normalise=batch_normalise,
+        ),
+        layers.GlobalAffineLayer(scale=support[1] - support[0], shift=support[0]),
     )
 
 
