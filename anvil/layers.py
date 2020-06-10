@@ -293,6 +293,102 @@ class LinearSplineLayer(CouplingLayer):
         return phi_out, log_density
 
 
+class CircularSplineLayer(CouplingLayer):
+    def __init__(
+        self,
+        size_half: int,
+        n_segments: int,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, even_sites)
+        self.size_half = size_half
+        self.n_segments = n_segments
+
+        self.eps = 1e-6
+
+        self.network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half * (3 * n_segments),
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+        )
+
+        self.norm_func = nn.Softmax(dim=2)
+        self.softplus = nn.Softplus()
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the rational quadratic spline layer."""
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+
+        h_raw, w_raw, d_raw = (
+            self.network((x_a - pi) / pi)
+            .view(-1, self.size_half, 3 * self.n_segments)
+            .split((self.n_segments, self.n_segments, self.n_segments), dim=2)
+        )
+        h_norm = self.norm_func(h_raw) * 2 * pi
+        w_norm = self.norm_func(w_raw) * 2 * pi
+        d_norm = self.softplus(d_raw)
+
+        x_knot_points = torch.cat(
+            (
+                torch.zeros(w_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.cumsum(w_norm, dim=2), # + self.eps
+            ),
+            dim=2,
+        )
+        phi_knot_points = torch.cat(
+            (
+                torch.zeros(h_norm.shape[0], self.size_half, 1),
+                torch.cumsum(h_norm, dim=2),
+            ),
+            dim=2,
+        )
+
+        k_ind = (
+            searchsorted(
+                x_knot_points.contiguous().view(-1, self.n_segments + 1),
+                x_b.contiguous().view(-1, 1),
+            )
+            - 1
+        ).view(-1, self.size_half, 1)
+
+        w_k = torch.gather(w_norm, 2, k_ind)
+        h_k = torch.gather(h_norm, 2, k_ind)
+        s_k = h_k / w_k
+        d_k = torch.gather(d_norm, 2, k_ind)
+        d_km1 = torch.gather(d_norm, 2, (k_ind - 1) % self.n_segments)
+        x_km1 = torch.gather(x_knot_points, 2, k_ind)
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+
+        alpha = (x_b.unsqueeze(dim=-1) - x_km1) / w_k
+
+        phi_b = (
+            phi_km1
+            + (h_k * (s_k * alpha.pow(2) + d_k * alpha * (1 - alpha)))
+            / (s_k + (d_k + d_km1 - 2 * s_k) * alpha * (1 - alpha))
+        ).squeeze()
+
+        grad = (
+            s_k.pow(2)
+            * (
+                d_k * alpha.pow(2)
+                + 2 * s_k * alpha * (1 - alpha)
+                + d_km1 * (1 - alpha.pow(2))
+            )
+        ) / (s_k + (d_k + d_km1 - 2 * s_k) * alpha * (1 - alpha)).pow(2)
+
+        phi_out = self._join_func([x_a, phi_b], dim=1)
+        log_density -= torch.log(grad).sum(dim=1)
+
+        return phi_out, log_density
+
+
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
     input vector.

@@ -10,10 +10,14 @@ from anvil.core import Sequential
 
 import anvil.layers as layers
 
+from math import pi
+
+
 def support(target_dist):
     """Return the support of the target distribution."""
     # NOTE: may need to rethink this for multivariate distributions
     return target_dist.support
+
 
 def coupling_pair(coupling_layer, size_half, **layer_spec):
     """Helper function which returns a callable object that performs a coupling
@@ -92,9 +96,30 @@ def linear_spline(
     )
 
 
+def rational_quadratic_spline(
+    size_half,
+    support=(1, 1),
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of linear spline
+    transformations, one on each half of the input vector."""
+    return coupling_pair(
+            layers.CircularSplineLayer,
+            size_half,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            batch_normalise=batch_normalise,
+        )
+
+
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "real_nvp_circle": real_nvp_circle,
     "real_nvp_sphere": real_nvp_sphere,
     "linear_spline": linear_spline,
+    "rational_quadratic_spline": rational_quadratic_spline,
 }
