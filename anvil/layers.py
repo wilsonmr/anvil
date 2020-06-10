@@ -430,18 +430,23 @@ class QuadraticSplineLayer(CouplingLayer):
 class QuadraticSplineLayer(CouplingLayer):
     r"""A coupling transformation from [0, 1] -> [0, 1] based on a piecewise quadratic function.
 
-    The interval is divided into K equal-width (w) segments (bins), with K+1 knot points
-    (bin boundaries). The coupling transformation is defined piecewise by the unique
-    polynomials whose end-points are the knot points.
+    The interval is divided into K segments (bins), with K+1 knot points (bin boundaries).
+    The coupling transformation is defined piecewise by the unique polynomials whose
+    end-points are the knot points.
 
-    A neural network generates the K+1 values for the y-positions (heights) for the knot points
-    and K bin widths. The coupling transformation is then defined as the cumulative distribution
-    function associated with the piecewise-quadratic function passing through the knot points.
+    A neural network generates K+1 values for the y-positions (heights) at the x knot points,
+    and K bin widths. The inverse coupling transformation is then defined as the cumulative
+    distribution function associated with the piecewise linear probability density function
+    obtained by interpolating between the heights.
 
-    The inverse coupling transformation is
+    The result is a quadratic function defined piecewise by 
 
-        \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + h_{k-1}(x - x_{k-1})
-                                  + (h_k - h_{k-1}) / (2 w_k) * (x - x_{k-1})^2
+        \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + \alpha(x) h_k w_k
+                                  + \alpha(x)^2 / 2 * (h_{k+1} - h_k) w_k
+
+    where \alpha(x) is the fractional position within a bin,
+
+        \alpha(x) = (x - x_{k-1}) / w_k
 
     Parameters
     ----------
@@ -483,11 +488,8 @@ class QuadraticSplineLayer(CouplingLayer):
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
-
         self.size_half = size_half
         self.n_segments = n_segments
-
-        self.eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
 
         self.network = NeuralNetwork(
             size_in=size_half,
@@ -497,8 +499,9 @@ class QuadraticSplineLayer(CouplingLayer):
             final_activation=activation,
             batch_normalise=batch_normalise,
         )
-
         self.w_norm_func = nn.Softmax(dim=2)
+
+        self.eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
 
     @staticmethod
     def h_norm_func(h_raw, w_norm):
@@ -529,7 +532,7 @@ class QuadraticSplineLayer(CouplingLayer):
         )
         phi_knot_points = torch.cat(
             (
-                torch.zeros(h_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.zeros(h_norm.shape[0], self.size_half, 1),
                 torch.cumsum(
                     0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
                 ),
@@ -537,6 +540,8 @@ class QuadraticSplineLayer(CouplingLayer):
             dim=2,
         )
 
+        # Temporarily mix batch and lattice dimensions so that the bisection search
+        # can be done in a single operation
         k_ind = (
             searchsorted(
                 x_knot_points.contiguous().view(-1, self.n_segments + 1),
@@ -546,18 +551,19 @@ class QuadraticSplineLayer(CouplingLayer):
         ).view(-1, self.size_half, 1)
 
         w_k = torch.gather(w_norm, 2, k_ind)
-        h_km1 = torch.gather(h_norm, 2, k_ind)
-        h_k = torch.gather(h_norm, 2, k_ind + 1)
+        h_k = torch.gather(h_norm, 2, k_ind)
+        h_kp1 = torch.gather(h_norm, 2, k_ind + 1)
+
         x_km1 = torch.gather(x_knot_points, 2, k_ind)
         phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
 
         alpha = (x_b.unsqueeze(dim=-1) - x_km1) / w_k
         phi_b = (
-            phi_km1 + alpha * h_km1 * w_k + 0.5 * alpha.pow(2) * (h_k - h_km1) * w_k
+            phi_km1 + alpha * h_k * w_k + 0.5 * alpha.pow(2) * (h_kp1 - h_k) * w_k
         ).squeeze()
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
-        log_density -= torch.log(h_km1 + alpha * (h_k - h_km1)).sum(dim=1)
+        log_density -= torch.log(h_k + alpha * (h_kp1 - h_k)).sum(dim=1)
 
         return phi_out, log_density
 
