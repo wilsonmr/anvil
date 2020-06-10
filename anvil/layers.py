@@ -287,7 +287,7 @@ class LinearSplineLayer(CouplingLayer):
         
         phi_b = (phi_km1 + alpha * p_k).squeeze()
         phi_out = self._join_func([x_a, phi_b], dim=1)
-        log_density -= torch.log(h_k).sum(dim=1)
+        log_density -= torch.log(p_k).sum(dim=1)
 
         return phi_out, log_density
 
