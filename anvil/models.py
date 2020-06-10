@@ -10,6 +10,10 @@ from anvil.core import Sequential
 
 import anvil.layers as layers
 
+def support(target_dist):
+    """Return the support of the target distribution."""
+    # NOTE: may need to rethink this for multivariate distributions
+    return target_dist.support
 
 def support(target_dist):
     """Return the support of the target distribution."""
