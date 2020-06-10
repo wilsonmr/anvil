@@ -88,7 +88,10 @@ class UniformDist:
 
         self.x_min, self.x_max = support
 
-        self.log_density = lambda sample: torch.zeros((sample.shape[0], 1))
+        self._log_density = -log((self.x_max - self.x_min) * lattice_size)  # normalised
+        self.log_density = (
+            lambda sample: torch.ones((sample.shape[0], 1)) * self._log_density
+        )
 
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
@@ -100,13 +103,12 @@ class UniformDist:
         sample = torch.empty(sample_size, self.size_out).uniform_(
             self.x_min, self.x_max
         )
-        return sample, torch.zeros((sample_size, 1))
+        return sample, self.log_density(sample)
 
     @property
     def pdf(self):
         x = torch.linspace(self.x_min, self.x_max, 10000)
-        dens = 1 / (self.x_max - self.x_min)
-        return ((x, torch.zeros_like(x) + dens),)
+        return ((x, torch.zeros_like(x) + 1 / (self.x_max - self.x_min)),)
 
 
 class SemicircleDist:

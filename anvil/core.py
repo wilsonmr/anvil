@@ -142,6 +142,12 @@ class ConvexCombination(nn.Module):
         Returns the convex combination of probability densities output by the flow
         replica, along with the convex combination of logarithms of probability 
         densities.
+
+    Notes
+    -----
+    It is assumed that the log_density input to the forward method is the logarithm
+    of a *normalised* probability density - i.e. the base log density is normalised and
+    we don't neglect additive constants to the log density during the flow.
     """
 
     def __init__(self, flow_replica):
@@ -179,7 +185,7 @@ class ConvexCombination(nn.Module):
 
             phi_flow, log_dens_flow = flow(input_copy, zero_density)
             phi_out += weight * phi_flow
-            density += weight * torch.exp(log_dens_flow)# / (2 * pi)  # needs to be log of normalised pdf!
+            density += weight * torch.exp(log_dens_flow)
 
         return phi_out, log_density_base + torch.log(density)
 
