@@ -88,9 +88,9 @@ class UniformDist:
 
         self.x_min, self.x_max = support
 
-        self._log_density = -log((self.x_max - self.x_min) * lattice_size)  # normalised
+        self.log_normalisation = log(self.x_max - self.x_min)
         self.log_density = (
-            lambda sample: torch.ones((sample.shape[0], 1)) * self._log_density
+            lambda sample: torch.zeros((sample.shape[0], 1)) - self.log_normalisation
         )
 
     def __call__(self, sample_size):
