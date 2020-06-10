@@ -194,14 +194,14 @@ class LinearSplineLayer(CouplingLayer):
 
     The inverse coupling transformation is
 
-        \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + \alpha h_k
+        \phi = C^{-1}(x, {p_k}) = \phi_{k-1} + \alpha p_k
 
-    where x_{k-1} = \sum_{k'=1}^{k-1} h_{k'} is the (k-1)-th knot point, and \alpha is the
+    where \phi_{k-1} = \sum_{k'=1}^{k-1} p_{k'} is the (k-1)-th knot point, and \alpha is the
     fractional position of x in the k-th bin, which is (x - (k-1) * w) / w.
 
     The gradient of the forward transformation is simply
         
-        dx / d\phi = w / h_k
+        dx / d\phi = w / p_k
 
     Parameters
     ----------
@@ -250,7 +250,7 @@ class LinearSplineLayer(CouplingLayer):
         eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
         self.x_knot_points = torch.linspace(-eps, 1 + eps, n_segments + 1).view(1, -1)
 
-        self.h_network = NeuralNetwork(
+        self.network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half * n_segments,
             hidden_shape=hidden_shape,
@@ -258,7 +258,6 @@ class LinearSplineLayer(CouplingLayer):
             final_activation=activation,
             batch_normalise=batch_normalise,
         )
-
         self.norm_func = nn.Softmax(dim=2)
 
     def forward(self, x_input, log_density):
@@ -267,7 +266,7 @@ class LinearSplineLayer(CouplingLayer):
         x_b = x_input[:, self._b_ind]
 
         net_out = self.norm_func(
-            self.h_network(x_a - 0.5).view(-1, self.size_half, self.n_segments)
+            self.network(x_a - 0.5).view(-1, self.size_half, self.n_segments)
         )
         phi_knot_points = torch.cat(
             (
@@ -282,11 +281,11 @@ class LinearSplineLayer(CouplingLayer):
         k_ind = searchsorted(self.x_knot_points, x_b.contiguous()) - 1
         k_ind.unsqueeze_(dim=-1)
 
-        h_k = torch.gather(net_out, 2, k_ind)
-        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+        p_k = torch.gather(net_out, 2, k_ind)
         alpha = (x_b.unsqueeze(dim=-1) - k_ind * self.width) / self.width
-        phi_b = (phi_km1 + alpha * h_k).squeeze()
-
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+        
+        phi_b = (phi_km1 + alpha * p_k).squeeze()
         phi_out = self._join_func([x_a, phi_b], dim=1)
         log_density -= torch.log(h_k).sum(dim=1)
 
