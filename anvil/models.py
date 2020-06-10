@@ -10,8 +10,6 @@ from anvil.core import Sequential
 
 import anvil.layers as layers
 
-from math import pi
-
 
 def support(target_dist):
     """Return the support of the target distribution."""
@@ -106,13 +104,13 @@ def circular_spline(
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
     return coupling_pair(
-            layers.CircularSplineLayer,
-            size_half,
-            n_segments=n_segments,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            batch_normalise=batch_normalise,
-        )
+        layers.CircularSplineLayer,
+        size_half,
+        n_segments=n_segments,
+        hidden_shape=hidden_shape,
+        activation=activation,
+        batch_normalise=batch_normalise,
+    )
 
 
 MODEL_OPTIONS = {
