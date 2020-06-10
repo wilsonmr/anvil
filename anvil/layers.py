@@ -258,6 +258,7 @@ class LinearSplineLayer(CouplingLayer):
             final_activation=activation,
             batch_normalise=batch_normalise,
         )
+
         self.norm_func = nn.Softmax(dim=2)
 
     def forward(self, x_input, log_density):
