@@ -258,10 +258,6 @@ class LinearSplineLayer(CouplingLayer):
             final_activation=activation,
             batch_normalise=batch_normalise,
         )
-<<<<<<< HEAD
-=======
-
->>>>>>> b410f114699103bf09ba65e74864d0e8f34a482d
         self.norm_func = nn.Softmax(dim=2)
 
     def forward(self, x_input, log_density):
@@ -288,7 +284,7 @@ class LinearSplineLayer(CouplingLayer):
         p_k = torch.gather(net_out, 2, k_ind)
         alpha = (x_b.unsqueeze(dim=-1) - k_ind * self.width) / self.width
         phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
-        
+
         phi_b = (phi_km1 + alpha * p_k).squeeze()
         phi_out = self._join_func([x_a, phi_b], dim=1)
         log_density -= torch.log(p_k).sum(dim=1)
