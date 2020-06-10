@@ -197,6 +197,7 @@ class VonMisesDist:
     the log density calculation. There's no good reason for this other
     than it's nice to see the calculation written out.
     """
+    support = (0, 2 * pi)
 
     def __init__(self, lattice_size, *, concentration, mean):
         self.size_out = lattice_size
@@ -349,6 +350,65 @@ def spherical_uniform_distribution(lattice_size):
 def semicircle_distribution(lattice_size, radius=pi, mean=0):
     """Returns an instance of the SemicircleDist class."""
     return SemicircleDist(lattice_size, radius=radius, mean=mean)
+
+
+class MixtureDist:
+    """Class for creating mixture distributions (convex combinations of distributions),
+    useful for training flows against more challenging multi-model distributions.
+
+    The mixture weights and distribution parameters are chosen ar random, using a
+    seed to ensure reproducibility.
+
+    Parameters
+    ----------
+    lattice_size: int
+        Number of sites on the lattice.
+    dist_class: class
+        The distribution class, of which a number of separate instances will be created.
+    dist_kwargs: list
+        Parameters for the individual distributions. Each entry should be a list of
+        the same length, which is the number of independent distributions to combine.
+
+    Notes
+    -----
+    The distribution class must have a method called log_density which returns the
+    logarithm of the *normalised* pdf for a given input.
+    """
+
+    def __init__(self, lattice_size, dist_class, **dist_kwargs):
+        n_dists = len(list(dist_kwargs.values())[0])
+
+        # Create list of dictionaries for distribution parameters
+        kwargs_list = [{} for _ in range(n_dists)]
+        for key, val_list in dist_kwargs.items():
+            for i in range(n_dists):
+                kwargs_list[i][key] = val_list[i]
+
+        # Normalised weights
+        torch.manual_seed(0)
+        self.weights = torch.softmax(torch.empty(n_dists).uniform_(0, 1), dim=0)
+
+        # Instantiate distributions
+        self.dists = [dist_class(lattice_size, **kwargs) for kwargs in kwargs_list]
+
+        self.support = dist_class.support
+
+    def log_density(self, sample):
+        """Return the logarithm of the probability density function for the mixture
+        of distributions."""
+        pdf = 0
+        for weight, dist in zip(self.weights, self.dists):
+            pdf += weight * torch.exp(dist.log_density(sample))
+        # NOTE: this step is numerically unstable for small / zero densities
+        return torch.log(pdf)
+
+    @property
+    def pdf(self):
+        x, _ = self.dists[0].pdf[0]
+        result = 0
+        for weight, dist in zip(self.weights, self.dists):
+            result += weight * dist.pdf[0][1]
+        return ((x, result),)
 
 
 class PhiFourAction:
@@ -536,6 +596,16 @@ class O3Action:
         return log_volume_element - action
 
 
+def von_mises_mixture(lattice_size, n_dists=2, concentration=4.0):
+    """Returns mixture of von Mises distributions."""
+    torch.manual_seed(0)  # so we get the same output for training and sampling
+    concentrations = torch.ones(n_dists) * concentration
+    means = torch.empty(n_dists).uniform_(0.5, 2 * pi - 0.5)
+    return MixtureDist(
+        lattice_size, VonMisesDist, concentration=concentrations, mean=means
+    )
+
+
 def phi_four_action(m_sq, lam, geometry, use_arxiv_version):
     """returns instance of PhiFourAction"""
     return PhiFourAction(
@@ -562,5 +632,11 @@ BASE_OPTIONS = {
     "semicircle": semicircle_distribution,
 }
 TARGET_OPTIONS = dict(
-    {"phi_four": phi_four_action, "o2": o2_action, "o3": o3_action,}, **BASE_OPTIONS
+    {
+        "von_mises_mixture": von_mises_mixture,
+        "phi_four": phi_four_action,
+        "o2": o2_action,
+        "o3": o3_action,
+    },
+    **BASE_OPTIONS
 )
