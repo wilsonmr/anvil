@@ -15,6 +15,13 @@ conda install -c conda-forge tqdm
 conda install scipy
 ```
 
+To use `spline' flows, the third-party package *torchsearchsorted* must be installed.
+Download the source from the [github repo](https://github.com/aliutkus/torchsearchsorted) and, with the conda environment activated, run
+```bash
+pip install .
+```
+in the root folder.
+
 These are the minimal requirements for running the code, however if you plan
 on developing the code or doing small external tests, then I highly recommend also
 installing the following packages
