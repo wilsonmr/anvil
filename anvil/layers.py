@@ -433,6 +433,159 @@ class QuadraticSplineLayer(CouplingLayer):
         return phi_out, log_density
 
 
+class CircularSplineLayer(CouplingLayer):
+    r"""A coupling transformation from S^1 -> S^1 based on a piecewise rational quadratic
+    spline function.
+
+    The interval is divided into K segments (bins) with widths w_k and heights h_k. The
+    'knot points' (\phi_k, x_k) are the cumulative sum of (h_k, w_k), starting at (0, 0)
+    and ending at (2\pi, 2\pi).
+
+    In addition to the w_k and h_k, the derivatives d_k at the knot points are generated
+    by a neural network. d_0 is set equal to d_K.
+
+    Defing the slopes s_k = h_k / w_k and fractional position within a bin
+        
+            alpha(x) = (x - x_{k-1}) / w_k
+
+    the coupling transformation is defined piecewise by
+
+            \phi = C^{-1}(x, {h_k, s_k, d_k})
+                 = \phi_{k-1}
+                 + ( h_k(s_k * \alpha^2 + d_k * \alpha * (1 - \alpha)) )
+                 / ( s_k + (d_{k+1} + d_k - 2s_k) * \alpha * (1 - \alpha) )
+
+    Parameters
+    ----------
+    size_half: int
+        Half of the configuration size, which is the size of the input vector for the
+        neural network.
+    hidden_shape: list
+        list containing hidden vector sizes the neural network.
+    activation: str
+        string which is a key for an activation function for all but the final layers
+        of the network.
+    batch_normalise: bool
+        flag indicating whether or not to use batch normalising within the neural
+        network.
+    even_sites: bool
+        dictates which half of the data is transformed as a and b, since successive
+        affine transformations alternate which half of the data is passed through
+        neural network.
+
+    Attributes
+    ----------
+    network: torch.nn.Module
+        the dense layers of the network, values are intialised as per the default
+        initialisation of `nn.Linear`
+    phase_shift: torch.nn.Parameter
+        a learnable phase shift which incurs no Jacobian penalty, the purpose being 
+        that 0 and 2\pi are no longer fixed points of the transformation.
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
+    def __init__(
+        self,
+        size_half: int,
+        n_segments: int,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, even_sites)
+        self.size_half = size_half
+        self.n_segments = n_segments
+
+        self.network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half * 3 * n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+        )
+        self.phase_shift = nn.Parameter(torch.rand(1))
+
+        self.norm_func = nn.Softmax(dim=2)
+        self.softplus = nn.Softplus()
+
+        self.eps = 1e-6
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the rational quadratic spline layer."""
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+
+        h_raw, w_raw, d_raw = (
+            self.network((x_a - pi) / pi)
+            .view(-1, self.size_half, 3 * self.n_segments)
+            .split((self.n_segments, self.n_segments, self.n_segments), dim=2)
+        )
+        h_norm = self.norm_func(h_raw) * 2 * pi
+        w_norm = self.norm_func(w_raw) * 2 * pi
+        d_norm = self.softplus(d_raw)
+
+        x_knot_points = torch.cat(
+            (
+                torch.zeros(w_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.cumsum(w_norm, dim=2),
+            ),
+            dim=2,
+        )
+        phi_knot_points = torch.cat(
+            (
+                torch.zeros(h_norm.shape[0], self.size_half, 1),
+                torch.cumsum(h_norm, dim=2),
+            ),
+            dim=2,
+        )
+
+        k_ind = (
+            searchsorted(
+                x_knot_points.contiguous().view(-1, self.n_segments + 1),
+                x_b.contiguous().view(-1, 1),
+            )
+            - 1
+        ).view(-1, self.size_half, 1)
+
+        w_k = torch.gather(w_norm, 2, k_ind)
+        h_k = torch.gather(h_norm, 2, k_ind)
+        s_k = h_k / w_k
+        d_k = torch.gather(d_norm, 2, k_ind)
+        d_kp1 = torch.gather(d_norm, 2, (k_ind + 1) % self.n_segments)
+
+        x_km1 = torch.gather(x_knot_points, 2, k_ind)
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+
+        alpha = (x_b.unsqueeze(dim=-1) - x_km1) / w_k
+
+        phi_b = (
+            phi_km1
+            + (h_k * (s_k * alpha.pow(2) + d_k * alpha * (1 - alpha)))
+            / (s_k + (d_kp1 + d_k - 2 * s_k) * alpha * (1 - alpha))
+        ).squeeze()
+        phi_b = (phi_b + self.phase_shift) % (2 * pi)
+
+        grad = (
+            s_k.pow(2)
+            * (
+                d_kp1 * alpha.pow(2)
+                + 2 * s_k * alpha * (1 - alpha)
+                + d_k * (1 - alpha).pow(2)
+            )
+        ) / (s_k + (d_kp1 + d_k - 2 * s_k) * alpha * (1 - alpha)).pow(2)
+
+        phi_out = self._join_func([x_a, phi_b], dim=1)
+        log_density -= torch.log(grad).sum(dim=1)
+
+        return phi_out, log_density
+
+
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
     input vector.

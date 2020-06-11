@@ -121,10 +121,30 @@ def quadratic_spline(
     )
 
 
+def circular_spline(
+    size_half,
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of circular spline
+    transformations, one on each half of the input vector."""
+    return coupling_pair(
+        layers.CircularSplineLayer,
+        size_half,
+        n_segments=n_segments,
+        hidden_shape=hidden_shape,
+        activation=activation,
+        batch_normalise=batch_normalise,
+    )
+
+
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "real_nvp_circle": real_nvp_circle,
     "real_nvp_sphere": real_nvp_sphere,
     "linear_spline": linear_spline,
     "quadratic_spline": quadratic_spline,
+    "circular_spline": circular_spline,
 }
