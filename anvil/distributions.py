@@ -85,7 +85,7 @@ class UniformDist:
 
     def __init__(self, lattice_size, *, support):
         self.size_out = lattice_size
-
+        self.support = support
         self.x_min, self.x_max = support
 
         self.log_normalisation = log(self.x_max - self.x_min)
@@ -129,6 +129,7 @@ class SemicircleDist:
         self.size_out = lattice_size
         self.radius = radius
         self.mean = mean
+        self.support = (mean - radius, mean + radius)
 
         self.log_normalisation = self.size_out * log((pi * self.radius ** 2) / 2)
 
@@ -199,6 +200,7 @@ class VonMisesDist:
     the log density calculation. There's no good reason for this other
     than it's nice to see the calculation written out.
     """
+    support = (0, 2 * pi)
 
     def __init__(self, lattice_size, *, concentration, mean):
         self.size_out = lattice_size
@@ -447,6 +449,7 @@ class O2Action:
     beta: float
         the inverse temperature (coupling strength).
     """
+    support = (0, 2 * pi)
 
     def __init__(self, beta, geometry):
         super().__init__()

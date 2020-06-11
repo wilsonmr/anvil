@@ -33,6 +33,7 @@ and returns two torch.tensor objects:
 """
 import torch
 import torch.nn as nn
+from torchsearchsorted import searchsorted
 from math import pi
 
 from anvil.core import NeuralNetwork
@@ -180,6 +181,117 @@ class AffineLayer(CouplingLayer):
         return phi_out, log_density
 
 
+class LinearSplineLayer(CouplingLayer):
+    r"""A coupling transformation from [0, 1] -> [0, 1] based on a piecewise linear function.
+
+    The interval is divided into K equal-width (w) segments (bins), with K+1 knot points
+    (bin boundaries). The coupling transformation is defined piecewise by the unique
+    polynomials whose end-points are the knot points.
+
+    A neural network generates the K values for the y-positions (heights) at the knot points.
+    The coupling transformation is then defined as the cumulative distribution function
+    associated with the probability masses given by the heights.
+
+    The inverse coupling transformation is
+
+        \phi = C^{-1}(x, {p_k}) = \phi_{k-1} + \alpha p_k
+
+    where \phi_{k-1} = \sum_{k'=1}^{k-1} p_{k'} is the (k-1)-th knot point, and \alpha is the
+    fractional position of x in the k-th bin, which is (x - (k-1) * w) / w.
+
+    The gradient of the forward transformation is simply
+        
+        dx / d\phi = w / p_k
+
+    Parameters
+    ----------
+    size_half: int
+        Half of the configuration size, which is the size of the input vector for the
+        neural network.
+    hidden_shape: list
+        list containing hidden vector sizes the neural network.
+    activation: str
+        string which is a key for an activation function for all but the final layers
+        of the network.
+    batch_normalise: bool
+        flag indicating whether or not to use batch normalising within the neural
+        network.
+    even_sites: bool
+        dictates which half of the data is transformed as a and b, since successive
+        affine transformations alternate which half of the data is passed through
+        neural network.
+
+    Attributes
+    ----------
+    network: torch.nn.Module
+        the dense layers of network h, values are intialised as per the default
+        initialisation of `nn.Linear`
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
+    def __init__(
+        self,
+        size_half: int,
+        n_segments: int,
+        hidden_shape: list,
+        activation: str,
+        batch_normalise: bool,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, even_sites)
+        self.size_half = size_half
+        self.n_segments = n_segments
+        self.width = 1 / n_segments
+
+        eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
+        self.x_knot_points = torch.linspace(-eps, 1 + eps, n_segments + 1).view(1, -1)
+
+        self.network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half * n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=activation,
+            batch_normalise=batch_normalise,
+        )
+        self.norm_func = nn.Softmax(dim=2)
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the linear spline layer."""
+        x_a = x_input[:, self._a_ind]
+        x_b = x_input[:, self._b_ind]
+
+        net_out = self.norm_func(
+            self.network(x_a - 0.5).view(-1, self.size_half, self.n_segments)
+        )
+        phi_knot_points = torch.cat(
+            (
+                torch.zeros(net_out.shape[0], self.size_half, 1),
+                torch.cumsum(net_out, dim=2),
+            ),
+            dim=2,
+        )
+
+        # Sort x_b into the appropriate bin
+        # NOTE: need to make x_b contiguous, otherwise searchsorted returns nonsense
+        k_ind = searchsorted(self.x_knot_points, x_b.contiguous()) - 1
+        k_ind.unsqueeze_(dim=-1)
+
+        p_k = torch.gather(net_out, 2, k_ind)
+        alpha = (x_b.unsqueeze(dim=-1) - k_ind * self.width) / self.width
+        phi_km1 = torch.gather(phi_knot_points, 2, k_ind)
+
+        phi_b = (phi_km1 + alpha * p_k).squeeze()
+        phi_out = self._join_func([x_a, phi_b], dim=1)
+        log_density -= torch.log(p_k).sum(dim=1)
+
+        return phi_out, log_density
+
+
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
     input vector.
@@ -234,7 +346,7 @@ class InverseProjectionLayer(nn.Module):
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = (2 * torch.atan(x_input) + pi)
+        phi_out = 2 * torch.atan(x_input) + pi
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
             dim=1, keepdim=True
         )
@@ -333,3 +445,32 @@ class InverseProjectionLayer2D(nn.Module):
         ).sum(dim=1)
 
         return phi_out.view(-1, self.size_out), log_density
+
+
+class GlobalAffineLayer(nn.Module):
+    r"""Applies an affine transformation to every data point using a given scale and shift,
+    which are *not* learnable. Useful to shift the domain of a learned distribution. This is
+    done at the cost of a constant term in the logarithm of the Jacobian determinant, which
+    is ignored.
+
+    Parameters
+    ----------
+    scale: (int, float)
+        Every data point will be multiplied by this factor.
+    shift: (int, float)
+        Every scaled data point will be shifted by this factor.
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers
+    """
+
+    def __init__(self, scale, shift):
+        super().__init__()
+        self.scale = scale
+        self.shift = shift
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the global affine transformation."""
+        return self.scale * x_input + self.shift, log_density
