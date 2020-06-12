@@ -53,8 +53,32 @@ def real_nvp_sphere(real_nvp):
     )
 
 
+def ncp_circle(
+    n_lattice,
+    n_pairs=1,  # unlikely that function composition is beneficial
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    s_final_activation=None,
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a sequence of transformations
+    from (0, 2\pi) -> (0, 2\pi), each of which are the composition of a stereographic
+    projection transformation, an affine transformation, and the inverse projection."""
+    return RedBlackLayers(
+        layers.NCPLayer,
+        n_pairs,
+        n_lattice,
+        n_components=1,
+        hidden_shape=hidden_shape,
+        activation=activation,
+        s_final_activation=s_final_activation,
+        batch_normalise=batch_normalise,
+    )
+
+
 MODEL_OPTIONS = {
     "real_nvp": real_nvp,
     "real_nvp_circle": real_nvp_circle,
     "real_nvp_sphere": real_nvp_sphere,
+    "ncp_circle": ncp_circle,
 }
