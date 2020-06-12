@@ -9,6 +9,7 @@ from reportengine import collect
 ACTIVATION_LAYERS = {
     "relu": nn.ReLU,
     "leaky_relu": nn.LeakyReLU,
+    "celu": nn.CELU,
     "sigmoid": nn.Sigmoid,
     "tanh": nn.Tanh,
     None: nn.Identity,
@@ -129,14 +130,14 @@ class RedBlackLayers(nn.Module):
     ----------
     coupling_layer: nn.Module
         A nn.Module from anvil.layers which implements a single coupling transformation.
-    n_pairs: int
-        Number of pairs of coupling transformations, which is the number of times each
-        data point is transformed.
     n_lattice: int
         Number of sites on the lattice.
     n_components: int
         Number of components at each lattice site, which is the size of the input tensor
         at dimension 1.
+    n_pairs: int
+        Number of pairs of coupling transformations, which is the number of times each
+        data point is transformed.
     layer_spec: dict
         A dictionary containing keyword arguments for `coupling_layer`.
     
@@ -158,12 +159,12 @@ class RedBlackLayers(nn.Module):
     """
 
     def __init__(
-        self, coupling_layer, n_pairs, n_lattice, n_components, **layer_spec,
+        self, coupling_layer, n_lattice, *, n_components=1, n_pairs=1, **layer_spec,
     ):
         super().__init__()
-        self.n_components = n_components
         self.lattice_half = n_lattice // 2
-        self.size_half = self.lattice_half * n_components
+        self.n_components = n_components
+        self.size_half = self.lattice_half * self.n_components
 
         self.red_layers = nn.ModuleList(
             [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pairs)]

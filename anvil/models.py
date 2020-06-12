@@ -12,10 +12,16 @@ from anvil.core import Sequential, RedBlackLayers
 import anvil.layers as layers
 
 
+def target_support(target_dist):
+    """Return the support of the target distribution."""
+    # NOTE: may need to rethink this for multivariate distributions
+    return target_dist.support
+
+
 def real_nvp(
-    n_affine,
     n_lattice,
     n_components,
+    n_affine,
     hidden_shape=[24,],
     activation="leaky_relu",
     s_final_activation="leaky_relu",
@@ -25,9 +31,9 @@ def real_nvp(
     affine coupling transformations on both partitions of the input vector."""
     return RedBlackLayers(
         layers.AffineLayer,
-        n_affine,
-        n_lattice,
-        n_components,
+        n_lattice=n_lattice,
+        n_components=n_components,
+        n_pairs=n_affine,
         hidden_shape=hidden_shape,
         activation=activation,
         s_final_activation=s_final_activation,
@@ -58,7 +64,6 @@ def ncp_circle(
     n_pairs=1,  # unlikely that function composition is beneficial
     hidden_shape=[24,],
     activation="leaky_relu",
-    s_final_activation=None,
     batch_normalise=False,
 ):
     """Action that returns a callable object that performs a sequence of transformations
@@ -66,12 +71,79 @@ def ncp_circle(
     projection transformation, an affine transformation, and the inverse projection."""
     return RedBlackLayers(
         layers.NCPLayer,
-        n_pairs,
-        n_lattice,
-        n_components=1,
+        n_lattice=n_lattice,
+        n_pairs=n_pairs,
         hidden_shape=hidden_shape,
         activation=activation,
-        s_final_activation=s_final_activation,
+        batch_normalise=batch_normalise,
+    )
+
+
+def linear_spline(
+    n_lattice,
+    target_support,
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of linear spline
+    transformations, one on each half of the input vector."""
+    return Sequential(
+        RedBlackLayers(
+            layers.LinearSplineLayer,
+            n_lattice,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            batch_normalise=batch_normalise,
+        ),
+        layers.GlobalAffineLayer(
+            scale=target_support[1] - target_support[0], shift=target_support[0]
+        ),
+    )
+
+
+def quadratic_spline(
+    n_lattice,
+    target_support,
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of quadratic spline
+    transformations, one on each half of the input vector."""
+    return Sequential(
+        RedBlackLayers(
+            layers.QuadraticSplineLayer,
+            n_lattice,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            batch_normalise=batch_normalise,
+        ),
+        layers.GlobalAffineLayer(
+            scale=target_support[1] - target_support[0], shift=target_support[0]
+        ),
+    )
+
+
+def circular_spline(
+    n_lattice,
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of quadratic spline
+    transformations, one on each half of the input vector."""
+    return RedBlackLayers(
+        layers.CircularSplineLayer,
+        n_lattice,
+        n_segments=n_segments,
+        hidden_shape=hidden_shape,
+        activation=activation,
         batch_normalise=batch_normalise,
     )
 
@@ -81,4 +153,7 @@ MODEL_OPTIONS = {
     "real_nvp_circle": real_nvp_circle,
     "real_nvp_sphere": real_nvp_sphere,
     "ncp_circle": ncp_circle,
+    "linear_spline": linear_spline,
+    "quadratic_spline": quadratic_spline,
+    "circular_spline": circular_spline,
 }
