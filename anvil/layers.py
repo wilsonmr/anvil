@@ -38,59 +38,7 @@ from math import pi
 from anvil.core import NeuralNetwork
 
 
-class CouplingLayer(nn.Module):
-    """
-    Base class for coupling layers.
-
-    A generic coupling transformation takes the form
-
-        x_a = \phi_a
-        x_b = C( \phi_b ; {N(\phi_a)} )
-
-    where the D-dimensional \phi vector has been split into two D/2-dimensional vectors
-    \phi_a and \phi_b, and {N(\phi_a)} is a set of functions, possible neural networks,
-    which take \phi_a as parameters.
-
-    Parameters
-    ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector
-        for the neural networks.
-    even_sites: bool
-        dictates which half of the data is transformed as a and b, since
-        successive affine transformations alternate which half of the data is
-        passed through neural networks.
-
-
-    Attributes
-    ----------
-    a_ind: slice (protected)
-        Slice object which can be used to access the passive partition.
-    b_ind: slice (protected)
-        Slice object which can be used to access the partition that gets transformed.
-    join_func: function (protected)
-        Function which returns the concatenation of the two partitions in the
-        appropriate order.
-    """
-
-    def __init__(self, size_half: int, even_sites: bool):
-        super().__init__()
-
-        if even_sites:
-            # a is first half of input vector
-            self._a_ind = slice(0, size_half)
-            self._b_ind = slice(size_half, 2 * size_half)
-            self._join_func = torch.cat
-        else:
-            # a is second half of input vector
-            self._a_ind = slice(size_half, 2 * size_half)
-            self._b_ind = slice(0, size_half)
-            self._join_func = lambda a, *args, **kwargs: torch.cat(
-                (a[1], a[0]), *args, **kwargs
-            )
-
-
-class AffineLayer(CouplingLayer):
+class AffineLayer(nn.Module):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
 
@@ -101,9 +49,9 @@ class AffineLayer(CouplingLayer):
 
     Parameters
     ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector for the
-        neural networks.
+    size_in: int
+        Size of the input tensor at dimension 1, which is the size of the input vector
+        for the neural networks.
     hidden_shape: list
         list containing hidden vector sizes the neural networks.
     activation: str
@@ -115,10 +63,6 @@ class AffineLayer(CouplingLayer):
     batch_normalise: bool
         flag indicating whether or not to use batch normalising within the neural
         networks.
-    even_sites: bool
-        dictates which half of the data is transformed as a and b, since successive
-        affine transformations alternate which half of the data is passed through
-        neural networks.
 
     Attributes
     ----------
@@ -131,50 +75,45 @@ class AffineLayer(CouplingLayer):
 
     Methods
     -------
-    forward(x_input, log_density)
-        see docstring for anvil.layers
+    forward(x_in, x_passive, log_density)
     """
 
     def __init__(
         self,
-        size_half: int,
+        size_in: int,
         *,
         hidden_shape: list,
         activation: str,
         s_final_activation: str,
         batch_normalise: bool,
-        even_sites: bool,
     ):
-        super().__init__(size_half, even_sites)
+        super().__init__()
         self.s_network = NeuralNetwork(
-            size_in=size_half,
-            size_out=size_half,
+            size_in=size_in,
+            size_out=size_in,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=s_final_activation,
             batch_normalise=batch_normalise,
         )
         self.t_network = NeuralNetwork(
-            size_in=size_half,
-            size_out=size_half,
+            size_in=size_in,
+            size_out=size_in,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=None,
             batch_normalise=batch_normalise,
         )
-        # NOTE: Could potentially have non-default inputs for s and t networks
-        # by adding dictionary of overrides - e.g. s_options = {}
 
-    def forward(self, x_input, log_density) -> torch.Tensor:
-        r"""Forward pass of affine transformation."""
-        x_a = x_input[:, self._a_ind]
-        x_b = x_input[:, self._b_ind]
-        x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
-        s_out = self.s_network(x_a_stand)
-        t_out = self.t_network(x_a_stand)
-        phi_b = (x_b - t_out) * torch.exp(-s_out)
+    def forward(self, x_in, x_passive, log_density):
+        """Forward pass of affine transformation."""
+        # standardise to reduce numerical instability
+        x_for_net = (x_passive - x_passive.mean()) / x_passive.std()
 
-        phi_out = self._join_func([x_a, phi_b], dim=1)
+        s_out = self.s_network(x_for_net)
+        t_out = self.t_network(x_for_net)
+
+        phi_out = (x_in - t_out) * torch.exp(-s_out)
         log_density += s_out.sum(dim=1, keepdim=True)
 
         return phi_out, log_density
@@ -201,7 +140,7 @@ class ProjectionLayer(nn.Module):
     def forward(self, x_input, log_density):
         """Forward pass of the projection transformation."""
         phi_out = torch.tan(0.5 * (x_input - pi))
-        log_density -= torch.log1p(phi_out ** 2).sum(dim=1, keepdim=True)
+        log_density -= torch.log1p(phi_out ** 2).sum(dim=2)
         return phi_out, log_density
 
 
@@ -234,10 +173,8 @@ class InverseProjectionLayer(nn.Module):
 
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = (2 * torch.atan(x_input) + pi)
-        log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
-            dim=1, keepdim=True
-        )
+        phi_out = 2 * torch.atan(x_input) + pi
+        log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(dim=2)
         return (phi_out + self.phase_shift) % (2 * pi), log_density
 
 
@@ -259,33 +196,22 @@ class ProjectionLayer2D(nn.Module):
 
     where R is the radial coordinate defined above.
 
-    Parameters
-    ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector
-        for the neural networks.
-
     Methods
     -------
     forward(x_input, log_density)
         see docstring for anvil.layers
     """
 
-    def __init__(self, size_half: int):
-        super().__init__()
-        self.size_half = size_half
-        self.size_out = 2 * size_half
-
     def forward(self, x_input, log_density):
         """Forward pass of the projection transformation."""
-        polar, azimuth = x_input.view(-1, self.size_half, 2).split(1, dim=2)
+        polar, azimuth = x_input.split(1, dim=1)
         rad = torch.tan(0.5 * polar)  # radial coordinate
 
         # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
-        phi_out = -rad * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=2)
-        log_density -= torch.log(rad + rad.pow(3)).sum(dim=1)
+        phi_out = -rad * torch.cat((torch.cos(azimuth), torch.sin(azimuth)), dim=1)
+        log_density -= torch.log(rad + rad.pow(3)).sum(dim=2)
 
-        return phi_out.view(-1, self.size_out), log_density
+        return phi_out, log_density
 
 
 class InverseProjectionLayer2D(nn.Module):
@@ -302,12 +228,6 @@ class InverseProjectionLayer2D(nn.Module):
     The Jacobian determinant of the projection map is
 
         | \det J | = 1/2 \sec^2(\phi_1 / 2) \tan(\phi_1 / 2)
-    
-    Parameters
-    ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector
-        for the neural networks.
 
     Methods
     -------
@@ -315,21 +235,16 @@ class InverseProjectionLayer2D(nn.Module):
         see docstring for anvil.layers
     """
 
-    def __init__(self, size_half: int):
-        super().__init__()
-        self.size_half = size_half
-        self.size_out = 2 * size_half
-
     def forward(self, x_input, log_density):
         """Forward pass of the inverse projection transformation."""
-        proj_x, proj_y = x_input.view(-1, self.size_half, 2).split(1, dim=2)
+        proj_x, proj_y = x_input.split(1, dim=1)
 
         polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
         azimuth = torch.atan2(proj_x, proj_y) + pi
 
-        phi_out = torch.cat((polar, azimuth), dim=2)
+        phi_out = torch.cat((polar, azimuth), dim=1)
         log_density += (
             torch.log(torch.sin(0.5 * polar)) - 3 * torch.log(torch.cos(0.5 * polar))
-        ).sum(dim=1)
+        ).sum(dim=2)
 
-        return phi_out.view(-1, self.size_out), log_density
+        return phi_out, log_density

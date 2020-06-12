@@ -43,10 +43,10 @@ class NormalDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the normal distribution.
         
-        Return shape: (sample_size, lattice_size) for the sample,
+        Return shape: (sample_size, 1, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.empty(sample_size, self.size_out).normal_(
+        sample = torch.empty(sample_size, 1, self.size_out).normal_(
             mean=self.mean, std=self.sigma
         )
 
@@ -54,9 +54,7 @@ class NormalDist:
 
     def log_density(self, sample):
         """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
-        exponent = -self.exp_coeff * torch.sum(
-            (sample - self.mean).pow(2), dim=1, keepdim=True
-        )
+        exponent = -self.exp_coeff * (sample - self.mean).pow(2).sum(dim=2)
         return exponent - self.log_normalisation
 
     @property
@@ -97,10 +95,10 @@ class UniformDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from a uniform distribution.
         
-        Return shape: (sample_size, lattice_size) for the sample,
+        Return shape: (sample_size, 1, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.empty(sample_size, self.size_out).uniform_(
+        sample = torch.empty(sample_size, 1, self.size_out).uniform_(
             self.x_min, self.x_max
         )
         return sample, self.log_density(sample)
@@ -136,13 +134,13 @@ class SemicircleDist:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the semicircle distribution.
         
-        Return shape: (sample_size, lattice_size) for the sample,
+        Return shape: (sample_size, 1, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
         sample = (
             self.radius
-            * torch.sqrt(torch.empty(sample_size, self.size_out).uniform_())
-            * torch.cos(torch.empty(sample_size, self.size_out).uniform_(0, pi))
+            * torch.sqrt(torch.empty(sample_size, 1, self.size_out).uniform_())
+            * torch.cos(torch.empty(sample_size, 1, self.size_out).uniform_(0, pi))
             + self.mean
         )
         return sample, self.log_density(sample)
@@ -151,9 +149,7 @@ class SemicircleDist:
         """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
         return (
             torch.sum(
-                0.5 * torch.log(self.radius ** 2 - (sample - self.mean) ** 2),
-                dim=1,
-                keepdim=True,
+                0.5 * torch.log(self.radius ** 2 - (sample - self.mean) ** 2), dim=2,
             )
             - self.log_normalisation
         )
@@ -218,14 +214,14 @@ class VonMisesDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = self.generator((sample_size, self.size_out)) + pi  # [0, 2\pi)
+        sample = self.generator((sample_size, 1, self.size_out)) + pi  # [0, 2\pi)
         log_density = self.log_density(sample)
         return sample, log_density
 
     def log_density(self, sample):
         """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
         return (
-            self.kappa * torch.cos(sample - self.mean).sum(dim=1, keepdim=True)
+            self.kappa * torch.cos(sample - self.mean).sum(dim=2)
             - self.log_normalisation
         )
 
@@ -253,16 +249,15 @@ class SphericalUniformDist:
     """
 
     def __init__(self, lattice_size):
-        # Two components for each lattice site
         self.lattice_size = lattice_size
-        self.size_out = lattice_size * 2
+        self.size_out = lattice_size * 2  # two angles for each lattice site
 
     def __call__(self, sample_size):
         r"""Return tensor of values drawn from uniform distribution
         on a unit 2-dimensional sphere, along with the corresponding
         log probability density.
         
-        Return shape: (sample_size, lattice_size) for the sample,
+        Return shape: (sample_size, 2, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         
         Notes
@@ -273,34 +268,28 @@ class SphericalUniformDist:
 
                         \theta = \arccos( 1 - 2 x )
         """
-        polar = torch.acos(1 - 2 * torch.rand(sample_size, self.lattice_size))
-        azimuth = torch.rand(sample_size, self.lattice_size) * 2 * pi
+        polar = torch.acos(1 - 2 * torch.rand(sample_size, 1, self.lattice_size))
+        azimuth = torch.rand(sample_size, 1, self.lattice_size) * 2 * pi
 
         # Quicker to do this than call log_density method
-        log_density = torch.log(torch.sin(polar)).sum(dim=1, keepdim=True)
+        log_density = torch.log(torch.sin(polar)).sum(dim=2)
 
-        sample = torch.stack((polar, azimuth), dim=-1).view(-1, self.size_out)
+        sample = torch.cat((polar, azimuth), dim=1)
 
         return sample, log_density
 
     def log_density(self, sample):
-        r"""Takes a sample of shape (sample_size, lattice_size) and
+        r"""Takes a sample of shape (sample_size, lattice_size, 2) and
         computes the logarithm of the probability density function for
         the spherical uniform distribution.
 
-        It is assumed that the tensor follows the __call__ method above
-        in that, when a view of shape (sample_size, lattice_size / 2, 2)
-        is taken, the 0th element in the 2nd dimension is the polar angle.
-        In other words, every second element of the input tensor, starting
-        at the 0th element, is a polar angle.
-        
         The density function is equal to the surface area element
         for the 2-sphere expressed in spherical coordinates, which,
         for lattice site 'n' containing polar angle '\theta_n', is
 
                     | \det J_n | = \sin \theta_n 
         """
-        return torch.log(torch.sin(sample[:, ::2])).sum(dim=1, keepdim=True)
+        return torch.log(torch.sin(sample[:, 0, :])).sum(dim=1, keepdim=True)
 
     @property
     def pdf(self):
@@ -419,11 +408,12 @@ class PhiFourAction:
             + self.lam * phi_state ** 4  # phi^4 term
             - self.version_factor
             * torch.sum(
-                phi_state[:, self.shift] * phi_state.view(-1, 1, self.lattice_size),
-                dim=1,
+                phi_state[..., self.shift]
+                * phi_state.view(-1, 1, 1, self.lattice_size),
+                dim=2,
             )  # derivative
         ).sum(
-            dim=1, keepdim=True  # sum across sites
+            dim=2,  # sum across sites
         )
         return -action
 
@@ -457,14 +447,14 @@ class O2Action:
     def log_density(self, state: torch.Tensor) -> torch.Tensor:
         """
         Compute action from a stack of angles (not Euclidean field components)
-        with shape (sample_size, lattice_size).
+        with shape (sample_size, 1, lattice_size).
         """
         action = -self.beta * torch.cos(
-            state[:, self.shift] - state.view(-1, 1, self.lattice_size)
+            state[..., self.shift] - state.view(-1, 1, 1, self.lattice_size)
         ).sum(
-            dim=1,
+            dim=2,
         ).sum(  # sum over two shift directions (+ve nearest neighbours)
-            dim=1, keepdim=True
+            dim=2,
         )  # sum over lattice sites
         return -action
 
@@ -517,23 +507,22 @@ class O3Action:
         two elements in the final dimension represent, respectively, the polar and
         azimuthal angles for the same lattice site.
         """
-        polar = state[:, ::2]
-        azimuth = state[:, 1::2]
+        polar, azimuth = state.split(1, dim=1)
         cos_polar = torch.cos(polar)
         sin_polar = torch.sin(polar)
 
         action = -self.beta * (
-            cos_polar[:, self.shift] * cos_polar.view(-1, 1, self.lattice_size)
-            + sin_polar[:, self.shift]
-            * sin_polar.view(-1, 1, self.lattice_size)
-            * torch.cos(azimuth[:, self.shift] - azimuth.view(-1, 1, self.lattice_size))
+            cos_polar[..., self.shift] * cos_polar.unsqueeze(dim=2)
+            + sin_polar[..., self.shift]
+            * sin_polar.unsqueeze(dim=2)
+            * torch.cos(azimuth[..., self.shift] - azimuth.unsqueeze(dim=2))
         ).sum(
-            dim=1,
+            dim=2,
         ).sum(  # sum over two shift directions (+ve nearest neighbours)
-            dim=1, keepdim=True
+            dim=2,
         )  # sum over lattice sites
 
-        log_volume_element = torch.log(sin_polar).sum(dim=1, keepdim=True)
+        log_volume_element = torch.log(sin_polar).sum(dim=2)
 
         return log_volume_element - action
 

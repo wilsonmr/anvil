@@ -34,22 +34,22 @@ class ConfigParser(Config):
 
     def produce_lattice_size(self, lattice_length, lattice_dimension):
         """returns the total number of nodes on lattice"""
-        return pow(lattice_length, lattice_dimension)
-
-    def produce_config_size(self, lattice_size, target):
-        """number of nodes in a single field configuration"""
-        if target == "o3":
-            return 2 * lattice_size
+        lattice_size = pow(lattice_length, lattice_dimension)
+        if (lattice_size % 2) != 0:
+            raise ConfigError("Lattice size is expected to be an even number")
         return lattice_size
 
-    def produce_size_half(self, config_size):
-        """Given the number of nodes in a field configuration, return an integer
-        of config_size/2 which is the size of the input vector for each coupling layer.
-        """
-        # NOTE: we may want to make this more flexible
-        if (config_size % 2) != 0:
-            raise ConfigError("Config size is expected to be an even number")
-        return int(config_size / 2)
+    def produce_n_components(self, target: str):
+        if target == "o3":  # NOTE: may want more flexibility in future
+            return 2
+        return 1
+
+    def produce_config_shape(self, lattice_size, target: str):
+        """Given the number of sites on the lattice, return an integer
+        which is the number of units in a field configuration."""
+        if target == "o3":  # NOTE: may want more flexibility in future
+            return (lattice_size, 2)
+        return (lattice_size,)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)

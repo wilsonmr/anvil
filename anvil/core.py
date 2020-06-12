@@ -119,6 +119,40 @@ class NeuralNetwork(nn.Module):
         return self.network(x)
 
 
+class RedBlackCoupling(nn.Module):
+    def __init__(
+        self, coupling_layer, n_pass, n_components, lattice_size, **layer_spec,
+    ):
+        super().__init__()
+        self.lattice_half = lattice_size // 2
+        self.size_half = self.lattice_half * n_components
+        self.n_components = n_components
+
+        self.red_layers = nn.ModuleList(
+            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pass)]
+        )
+        self.black_layers = nn.ModuleList(
+            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pass)]
+        )
+
+    def forward(self, x_input, log_density):
+        x_r, x_b = x_input.split(self.lattice_half, dim=2)
+
+        # view if n_components = 1, copy otherwise
+        x_r = x_r.reshape(-1, self.size_half)
+        x_b = x_b.reshape(-1, self.size_half)
+
+        for red_layer, black_layer in zip(self.red_layers, self.black_layers):
+            x_r, log_density = red_layer(x_r, x_b, log_density)
+            x_b, log_density = black_layer(x_b, x_r, log_density)
+
+        x_r = x_r.view(-1, self.n_components, self.lattice_half)
+        x_b = x_b.view(-1, self.n_components, self.lattice_half)
+
+        phi_out = torch.cat((x_r, x_b), dim=2)
+        return phi_out, log_density
+
+
 class ConvexCombination(nn.Module):
     r"""
     Class which takes a set of normalising flows and constructs a convex combination

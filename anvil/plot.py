@@ -37,9 +37,9 @@ def field_components(loaded_model, base_dist, target_dist, lattice_size):
         x_base, base_log_density = base_dist(sample_size)
         phi_model, model_log_density = loaded_model(x_base, base_log_density)
 
-    # Convert to shape (n_coords, sample_size * lattice_size)
-    x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
-    phi_model = phi_model.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+    # Convert to shape (n_components, sample_size * lattice_size)
+    x_base = x_base.transpose(0, 1).reshape(-1, sample_size * lattice_size)
+    phi_model = phi_model.transpose(0, 1).reshape(-1, sample_size * lattice_size)
 
     # Include target density if known
     if hasattr(target_dist, "pdf"):
