@@ -20,10 +20,10 @@ class Sequential(nn.Sequential):
     value for the current logarithm of the model density, returning an output
     vector and the updated log density."""
 
-    def forward(self, x_input, log_density):
+    def forward(self, x, log_dens):
         for module in self:
-            x_input, log_density = module(x_input, log_density)
-        return x_input, log_density
+            x, log_dens = module(x, log_dens)
+        return x, log_dens
 
 
 class NeuralNetwork(nn.Module):
@@ -62,6 +62,7 @@ class NeuralNetwork(nn.Module):
 
     def __init__(
         self,
+        *,
         size_in: int,
         size_out: int,
         hidden_shape: list,
@@ -111,32 +112,69 @@ class NeuralNetwork(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: torch.tensor):
-        """Forward pass of the network.
-        
-        Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
-        shape (n_batch, size_out)
-        """
+        """Forward pass of the network."""
         return self.network(x)
 
 
-class RedBlackCoupling(nn.Module):
+class RedBlackLayers(nn.Module):
+    """Generic class for sequences of coupling transformations which couple different
+    lattice sites.
+
+    Lattice sites are partitioned into two groups: 'red' and 'black', as per a
+    checkerboard pattern. A coupling layer transforms either the red or the black sites,
+    using the passive partition as input for a (set of) neural networks which
+    parameterise the transformation.
+
+    Parameters
+    ----------
+    coupling_layer: nn.Module
+        A nn.Module from anvil.layers which implements a single coupling transformation.
+    n_pairs: int
+        Number of pairs of coupling transformations, which is the number of times each
+        data point is transformed.
+    n_lattice: int
+        Number of sites on the lattice.
+    n_components: int
+        Number of components at each lattice site, which is the size of the input tensor
+        at dimension 1.
+    layer_spec: dict
+        A dictionary containing keyword arguments for `coupling_layer`.
+    
+    Attributes
+    ----------
+    red_layers: nn.ModuleList
+        A list of `n_pairs` instances of `coupling_layer`, which will transform the red
+        partition whilst taking the black partition as parameters.
+    black_layers: nn.ModuleList
+        As above for the black partition.
+
+    Methods
+    -------
+    forward(x_in, log_density)
+        Takes a tensor of input data with dimensions (n_batch, n_components, n_lattice),
+        and a tensor of the current logarithm of the probability density function, with
+        dimensions (n_batch, 1). Returns a tensor of transformed data and an updated
+        log density.
+    """
+
     def __init__(
-        self, coupling_layer, n_pass, n_components, lattice_size, **layer_spec,
+        self, coupling_layer, n_pairs, n_lattice, n_components, **layer_spec,
     ):
         super().__init__()
-        self.lattice_half = lattice_size // 2
-        self.size_half = self.lattice_half * n_components
         self.n_components = n_components
+        self.lattice_half = n_lattice // 2
+        self.size_half = self.lattice_half * n_components
 
         self.red_layers = nn.ModuleList(
-            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pass)]
+            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pairs)]
         )
         self.black_layers = nn.ModuleList(
-            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pass)]
+            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pairs)]
         )
 
-    def forward(self, x_input, log_density):
-        x_r, x_b = x_input.split(self.lattice_half, dim=2)
+    def forward(self, x_in, log_density):
+        """Forward pass of the sequence of coupling transformations."""
+        x_r, x_b = x_in.split(self.lattice_half, dim=2)
 
         # view if n_components = 1, copy otherwise
         x_r = x_r.reshape(-1, self.size_half)

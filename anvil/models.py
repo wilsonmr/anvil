@@ -8,14 +8,14 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from anvil.core import Sequential, RedBlackCoupling
+from anvil.core import Sequential, RedBlackLayers
 import anvil.layers as layers
 
 
 def real_nvp(
     n_affine,
+    n_lattice,
     n_components,
-    lattice_size,
     hidden_shape=[24,],
     activation="leaky_relu",
     s_final_activation="leaky_relu",
@@ -23,11 +23,11 @@ def real_nvp(
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
-    return RedBlackCoupling(
+    return RedBlackLayers(
         layers.AffineLayer,
         n_affine,
+        n_lattice,
         n_components,
-        lattice_size,
         hidden_shape=hidden_shape,
         activation=activation,
         s_final_activation=s_final_activation,

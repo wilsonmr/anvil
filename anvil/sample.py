@@ -239,7 +239,7 @@ def sample(
     Returns
     -------
     decorrelated_chain: torch.Tensor
-        a sample of states from loaded_model, size = (target_length, base_dist.size_out)
+        a sample of states from loaded_model, size = (target_length, target_dist.dimensions)
     """
 
     # Thermalise
@@ -258,7 +258,7 @@ def sample(
     actual_length = dec_samp_per_batch * n_batches
 
     decorrelated_chain = torch.empty(
-        (actual_length, base_dist.size_out), dtype=torch.float32
+        (actual_length, *target_dist.dimensions), dtype=torch.float32
     )
     accepted = 0
 

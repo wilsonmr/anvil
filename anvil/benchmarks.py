@@ -40,7 +40,7 @@ def fourier_transform(sample_training_output, training_geometry):
     ------
     sample_training_output: torch.tensor
         A (hopefully decorrelated) sample of field configurations in the
-        split representation. Shape: (sample_size, lattice_size)
+        split representation. Shape: (sample_size, n_lattice)
     training_geometry: geometry object
 
     Returns

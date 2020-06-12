@@ -27,7 +27,7 @@ def field_component(i, x_base, phi_model, phi_target=None):
     return fig
 
 
-def field_components(loaded_model, base_dist, target_dist, lattice_size):
+def field_components(loaded_model, base_dist, target_dist, n_lattice):
     """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
     if known, plot the pdf of the target distribution."""
     sample_size = 100000
@@ -37,9 +37,9 @@ def field_components(loaded_model, base_dist, target_dist, lattice_size):
         x_base, base_log_density = base_dist(sample_size)
         phi_model, model_log_density = loaded_model(x_base, base_log_density)
 
-    # Convert to shape (n_components, sample_size * lattice_size)
-    x_base = x_base.transpose(0, 1).reshape(-1, sample_size * lattice_size)
-    phi_model = phi_model.transpose(0, 1).reshape(-1, sample_size * lattice_size)
+    # Convert to shape (n_components, sample_size * n_lattice)
+    x_base = x_base.transpose(0, 1).reshape(-1, sample_size * n_lattice)
+    phi_model = phi_model.transpose(0, 1).reshape(-1, sample_size * n_lattice)
 
     # Include target density if known
     if hasattr(target_dist, "pdf"):

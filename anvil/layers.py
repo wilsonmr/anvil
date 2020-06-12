@@ -13,29 +13,38 @@ A normalising flow, f, can be constructed from multiple layers using function co
 
 which is implemented using the architecture provided by torch.nn
 
+Layers can be divided into two classes.
 
-All layers in this module contain a `forward` method which takes two torch.tensor objects
-as inputs:
+1. Coupling layers: (x_in, x_passive, log_density) -> (phi_out, log_density)
 
-    - a batch of input vectors x, dimensions (N_batch, D) where D is the total number of
-      units being transformed (i.e. number of lattice sites multiplied by field dimension).
+    Takes two tensors `x_in`, `x_passive` of dimensions (n_batch, D) and one tensor `log_density`
+    of dimensions (n_batch, 1).
 
-    - a batch of scalar values for the logarithm of the 'current' probability density, at
-      this stage in the normalising flow.
+    The `x_in` is transformed by a bijective function whose parameters are neural networks
+    which themselves take `x_passive` as an input vector.
 
-and returns two torch.tensor objects:
+    The current value of the logarithm of the probability density is updated by adding the
+    Jacobian determinant of the *inverse* of the coupling transformation.
 
-    - a batch of vectors \phi which have been transformed according to the *inverse*
-    transformation g_i^{-1}, with the same dimensions as the input.
+2. Full layers: (x_in, log_density) -> (phi_out, log_density)
 
-    - the updated logarithm of the probability density, including the contribution from
-      this transformation, | \det \partial g_i / \partial \phi |.
+    Takes a single input tensor and transforms the entire tensor, with no coupling occuring
+    between lattice sites.
+
+    These layers may be 'cascaded' using anvil.core.Sequential provided `x_in` is the full
+    dataset.
 """
 import torch
 import torch.nn as nn
 from math import pi
 
 from anvil.core import NeuralNetwork
+
+# ----------------------------------------------------------------------------------------- #
+#                                                                                           #
+#                                   Coupling layers                                         #
+#                                                                                           #
+# ----------------------------------------------------------------------------------------- #
 
 
 class AffineLayer(nn.Module):
@@ -76,6 +85,9 @@ class AffineLayer(nn.Module):
     Methods
     -------
     forward(x_in, x_passive, log_density)
+        Performs an affine transformation of the `x_in` tensor, using the `x_passive`
+        tensor as parameters for the neural networks. Returns the transformed tensor
+        along with the updated log density.
     """
 
     def __init__(
@@ -119,6 +131,13 @@ class AffineLayer(nn.Module):
         return phi_out, log_density
 
 
+# ----------------------------------------------------------------------------------------- #
+#                                                                                           #
+#                                       Full layers                                         #
+#                                                                                           #
+# ----------------------------------------------------------------------------------------- #
+
+
 class ProjectionLayer(nn.Module):
     r"""Applies the stereographic projection map S1 - {0} -> R1 to the entire
     input vector.
@@ -133,13 +152,12 @@ class ProjectionLayer(nn.Module):
 
     Methods
     -------
-    forward(x_input, log_density)
-        see docstring for anvil.layers
+    forward(x_in, log_density)
     """
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_in, log_density):
         """Forward pass of the projection transformation."""
-        phi_out = torch.tan(0.5 * (x_input - pi))
+        phi_out = torch.tan(0.5 * (x_in - pi))
         log_density -= torch.log1p(phi_out ** 2).sum(dim=2)
         return phi_out, log_density
 
@@ -163,7 +181,7 @@ class InverseProjectionLayer(nn.Module):
 
     Methods
     -------
-    forward(x_input, log_density)
+    forward(x_in, log_density)
         see docstring for anvil.layers
     """
 
@@ -171,9 +189,9 @@ class InverseProjectionLayer(nn.Module):
         super().__init__()
         self.phase_shift = nn.Parameter(torch.rand(1))
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_in, log_density):
         """Forward pass of the inverse projection transformation."""
-        phi_out = 2 * torch.atan(x_input) + pi
+        phi_out = 2 * torch.atan(x_in) + pi
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(dim=2)
         return (phi_out + self.phase_shift) % (2 * pi), log_density
 
@@ -198,13 +216,13 @@ class ProjectionLayer2D(nn.Module):
 
     Methods
     -------
-    forward(x_input, log_density)
+    forward(x_in, log_density)
         see docstring for anvil.layers
     """
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_in, log_density):
         """Forward pass of the projection transformation."""
-        polar, azimuth = x_input.split(1, dim=1)
+        polar, azimuth = x_in.split(1, dim=1)
         rad = torch.tan(0.5 * polar)  # radial coordinate
 
         # -1 factor because actually want azimuth - pi, but -1 is faster than shift by pi
@@ -231,13 +249,13 @@ class InverseProjectionLayer2D(nn.Module):
 
     Methods
     -------
-    forward(x_input, log_density)
+    forward(x_in, log_density)
         see docstring for anvil.layers
     """
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_in, log_density):
         """Forward pass of the inverse projection transformation."""
-        proj_x, proj_y = x_input.split(1, dim=1)
+        proj_x, proj_y = x_in.split(1, dim=1)
 
         polar = 2 * torch.atan(torch.sqrt(proj_x.pow(2) + proj_y.pow(2)))
         azimuth = torch.atan2(proj_x, proj_y) + pi

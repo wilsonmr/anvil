@@ -32,24 +32,18 @@ class ConfigParser(Config):
             raise ConfigError("Currently only 2 dimensions is supported")
         return dim
 
-    def produce_lattice_size(self, lattice_length, lattice_dimension):
+    def produce_n_lattice(self, lattice_length, lattice_dimension):
         """returns the total number of nodes on lattice"""
-        lattice_size = pow(lattice_length, lattice_dimension)
-        if (lattice_size % 2) != 0:
+        n = pow(lattice_length, lattice_dimension)
+        if (n % 2) != 0:
             raise ConfigError("Lattice size is expected to be an even number")
-        return lattice_size
+        return n
 
     def produce_n_components(self, target: str):
+        """returns the number of field components at a single lattice site."""
         if target == "o3":  # NOTE: may want more flexibility in future
             return 2
         return 1
-
-    def produce_config_shape(self, lattice_size, target: str):
-        """Given the number of sites on the lattice, return an integer
-        which is the number of units in a field configuration."""
-        if target == "o3":  # NOTE: may want more flexibility in future
-            return (lattice_size, 2)
-        return (lattice_size,)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)

@@ -21,7 +21,7 @@ class NormalDist:
 
     Inputs:
     -------
-    lattice_size: int
+    n_lattice: int
         Number of nodes on the lattice.
     sigma: float
         Standard deviation for the distribution.
@@ -29,24 +29,24 @@ class NormalDist:
         Mean for the distribution.
     """
 
-    def __init__(self, lattice_size, *, sigma, mean):
-        self.size_out = lattice_size
+    def __init__(self, n_lattice, *, sigma, mean):
+        self.dimensions = (1, n_lattice)
         self.sigma = sigma
         self.mean = mean
 
         self.exp_coeff = 1 / (2 * self.sigma ** 2)
 
         # Pre-calculate normalisation for log density
-        self.log_normalisation = self.size_out * log(sqrt(2 * pi) * self.sigma)
+        self.log_normalisation = n_lattice * log(sqrt(2 * pi) * self.sigma)
 
     def __call__(self, sample_size) -> tuple:
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the normal distribution.
-        
-        Return shape: (sample_size, 1, lattice_size) for the sample,
+
+        Return shape: (sample_size, 1, n_lattice) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.empty(sample_size, 1, self.size_out).normal_(
+        sample = torch.empty(sample_size, *self.dimensions).normal_(
             mean=self.mean, std=self.sigma
         )
 
@@ -75,14 +75,14 @@ class UniformDist:
 
     Inputs:
     -------
-    lattice_size: int
+    n_lattice: int
         Number of nodes on the lattice.
     support: tuple
         Low and high limits for the interval.
     """
 
-    def __init__(self, lattice_size, *, support):
-        self.size_out = lattice_size
+    def __init__(self, n_lattice, *, support):
+        self.dimensions = (1, n_lattice)
 
         self.x_min, self.x_max = support
 
@@ -94,11 +94,11 @@ class UniformDist:
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from a uniform distribution.
-        
-        Return shape: (sample_size, 1, lattice_size) for the sample,
+
+        Return shape: (sample_size, 1, n_lattice) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = torch.empty(sample_size, 1, self.size_out).uniform_(
+        sample = torch.empty(sample_size, *self.dimensions).uniform_(
             self.x_min, self.x_max
         )
         return sample, self.log_density(sample)
@@ -115,7 +115,7 @@ class SemicircleDist:
 
     Inputs:
     -------
-    lattice_size: int
+    n_lattice: int
         Number of nodes on the lattice.
     radius: (int, float)
         radius of semicircle
@@ -123,24 +123,24 @@ class SemicircleDist:
         location of center of distribution. Not really useful.
     """
 
-    def __init__(self, lattice_size, *, radius, mean):
-        self.size_out = lattice_size
+    def __init__(self, n_lattice, *, radius, mean):
+        self.dimensions = (1, n_lattice)
         self.radius = radius
         self.mean = mean
 
-        self.log_normalisation = self.size_out * log((pi * self.radius ** 2) / 2)
+        self.log_normalisation = n_lattice * log((pi * self.radius ** 2) / 2)
 
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the semicircle distribution.
-        
-        Return shape: (sample_size, 1, lattice_size) for the sample,
+
+        Return shape: (sample_size, 1, n_lattice) for the sample,
         (sample_size, 1) for the log density.
         """
         sample = (
             self.radius
-            * torch.sqrt(torch.empty(sample_size, 1, self.size_out).uniform_())
-            * torch.cos(torch.empty(sample_size, 1, self.size_out).uniform_(0, pi))
+            * torch.sqrt(torch.empty(sample_size, *self.dimensions).uniform_())
+            * torch.cos(torch.empty(sample_size, *self.dimensions).uniform_(0, pi))
             + self.mean
         )
         return sample, self.log_density(sample)
@@ -180,7 +180,7 @@ class VonMisesDist:
 
     Inputs:
     -------
-    lattice_size: int
+    n_lattice: int
         number of nodes on the lattice.
     concentration: float
         parameter dictating sharpness of the peak.
@@ -196,12 +196,12 @@ class VonMisesDist:
     than it's nice to see the calculation written out.
     """
 
-    def __init__(self, lattice_size, *, concentration, mean):
-        self.size_out = lattice_size
+    def __init__(self, n_lattice, *, concentration, mean):
+        self.dimensions = (1, n_lattice)
         self.kappa = concentration
         self.mean = mean
 
-        self.log_normalisation = self.size_out * log(2 * pi * i0(self.kappa))
+        self.log_normalisation = n_lattice * log(2 * pi * i0(self.kappa))
 
         self.generator = torch.distributions.von_mises.VonMises(
             loc=self.mean, concentration=self.kappa
@@ -210,11 +210,11 @@ class VonMisesDist:
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
         states drawn from the von Mises distribution.
-        
-        Return shape: (sample_size, lattice_size) for the sample,
+
+        Return shape: (sample_size, n_lattice) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = self.generator((sample_size, 1, self.size_out)) + pi  # [0, 2\pi)
+        sample = self.generator((sample_size, *self.dimensions)) + pi  # [0, 2\pi)
         log_density = self.log_density(sample)
         return sample, log_density
 
@@ -244,32 +244,32 @@ class SphericalUniformDist:
 
     Inputs:
     -------
-    lattice_size: int
+    n_lattice: int
         number of nodes on the lattice
     """
 
-    def __init__(self, lattice_size):
-        self.lattice_size = lattice_size
-        self.size_out = lattice_size * 2  # two angles for each lattice site
+    def __init__(self, n_lattice):
+        self.dimensions = (2, n_lattice)
+        self.n_lattice = n_lattice
 
     def __call__(self, sample_size):
         r"""Return tensor of values drawn from uniform distribution
         on a unit 2-dimensional sphere, along with the corresponding
         log probability density.
-        
-        Return shape: (sample_size, 2, lattice_size) for the sample,
+
+        Return shape: (sample_size, 2, n_lattice) for the sample,
         (sample_size, 1) for the log density.
-        
+
         Notes
         -----
-        Uses inversion sampling to map random variables x ~ [0, 1] to the 
+        Uses inversion sampling to map random variables x ~ [0, 1] to the
         polar angle \theta which has the marginalised density \sin\theta,
         via the inverse of its cumulative distribution.
 
                         \theta = \arccos( 1 - 2 x )
         """
-        polar = torch.acos(1 - 2 * torch.rand(sample_size, 1, self.lattice_size))
-        azimuth = torch.rand(sample_size, 1, self.lattice_size) * 2 * pi
+        polar = torch.acos(1 - 2 * torch.rand(sample_size, 1, self.n_lattice))
+        azimuth = torch.rand(sample_size, 1, self.n_lattice) * 2 * pi
 
         # Quicker to do this than call log_density method
         log_density = torch.log(torch.sin(polar)).sum(dim=2)
@@ -279,7 +279,7 @@ class SphericalUniformDist:
         return sample, log_density
 
     def log_density(self, sample):
-        r"""Takes a sample of shape (sample_size, lattice_size, 2) and
+        r"""Takes a sample of shape (sample_size, n_lattice, 2) and
         computes the logarithm of the probability density function for
         the spherical uniform distribution.
 
@@ -287,7 +287,7 @@ class SphericalUniformDist:
         for the 2-sphere expressed in spherical coordinates, which,
         for lattice site 'n' containing polar angle '\theta_n', is
 
-                    | \det J_n | = \sin \theta_n 
+                    | \det J_n | = \sin \theta_n
         """
         return torch.log(torch.sin(sample[:, 0, :])).sum(dim=1, keepdim=True)
 
@@ -298,48 +298,48 @@ class SphericalUniformDist:
         return (pol, torch.sin(pol)), (az, torch.zeros_like(az) + 1 / (2 * pi))
 
 
-def standard_normal_distribution(lattice_size):
+def standard_normal_distribution(n_lattice):
     """returns an instance of the NormalDist class with mean 0 and
     variance 1"""
-    return NormalDist(lattice_size, sigma=1, mean=0)
+    return NormalDist(n_lattice, sigma=1, mean=0)
 
 
-def normal_distribution(lattice_size, sigma=1, mean=0):
+def normal_distribution(n_lattice, sigma=1, mean=0):
     """Returns an instance of the NormalDist class"""
-    return NormalDist(lattice_size, sigma=sigma, mean=mean)
+    return NormalDist(n_lattice, sigma=sigma, mean=mean)
 
 
-def uniform_distribution(lattice_size, support=(-1, 1)):
+def uniform_distribution(n_lattice, support=(-1, 1)):
     """Returns an instance of the UniformDist class.
 
     The default interval is intentionally zero-centered, anticipating use
     as a base distribution."""
-    return UniformDist(lattice_size, support=support)
+    return UniformDist(n_lattice, support=support)
 
 
-def standard_uniform_distribution(lattice_size):
+def standard_uniform_distribution(n_lattice):
     """Returns an instance of the UniformDist class with interval [0, 1)"""
-    return UniformDist(lattice_size, support=(0, 1))
+    return UniformDist(n_lattice, support=(0, 1))
 
 
-def circular_uniform_distribution(lattice_size):
+def circular_uniform_distribution(n_lattice):
     """Returns an instance of the UniformDist class with interval [0, 2 * pi)"""
-    return UniformDist(lattice_size, support=(0, 2 * pi))
+    return UniformDist(n_lattice, support=(0, 2 * pi))
 
 
-def von_mises_distribution(lattice_size, concentration=1, mean=0):
+def von_mises_distribution(n_lattice, concentration=1, mean=0):
     """Returns and instance of the VonMisesDist class."""
-    return VonMisesDist(lattice_size, concentration=concentration, mean=mean)
+    return VonMisesDist(n_lattice, concentration=concentration, mean=mean)
 
 
-def spherical_uniform_distribution(lattice_size):
+def spherical_uniform_distribution(n_lattice):
     """Returns an instance of the SphericalUniformDist class"""
-    return SphericalUniformDist(lattice_size)
+    return SphericalUniformDist(n_lattice)
 
 
-def semicircle_distribution(lattice_size, radius=pi, mean=0):
+def semicircle_distribution(n_lattice, radius=pi, mean=0):
     """Returns an instance of the SemicircleDist class."""
-    return SemicircleDist(lattice_size, radius=radius, mean=mean)
+    return SemicircleDist(n_lattice, radius=radius, mean=mean)
 
 
 class PhiFourAction:
@@ -386,15 +386,16 @@ class PhiFourAction:
     """
 
     def __init__(self, m_sq, lam, geometry, use_arxiv_version=False):
-        super(PhiFourAction, self).__init__()
-        self.shift = geometry.get_shift()
+        super().__init__()
+        self.dimensions = (1, geometry.length ** 2)
         self.lam = lam
         self.m_sq = m_sq
-        self.lattice_size = geometry.length ** 2
         if use_arxiv_version:
             self.version_factor = 2
         else:
             self.version_factor = 1
+
+        self.shift = geometry.get_shift()
 
     def log_density(self, phi_state: torch.Tensor) -> torch.Tensor:
         """Perform forward pass, returning -action for stack of states. Note
@@ -404,16 +405,14 @@ class PhiFourAction:
         see class Notes for details on definition of action.
         """
         action = (
-            self.version_factor * (2 + 0.5 * self.m_sq) * phi_state ** 2  # phi^2 terms
-            + self.lam * phi_state ** 4  # phi^4 term
+            self.version_factor * (2 + 0.5 * self.m_sq) * phi_state.pow(2)
+            + self.lam * phi_state.pow(4)
             - self.version_factor
             * torch.sum(
-                phi_state[..., self.shift]
-                * phi_state.view(-1, 1, 1, self.lattice_size),
-                dim=2,
-            )  # derivative
+                phi_state[..., self.shift] * phi_state.unsqueeze(dim=2), dim=2
+            )  # sum over shift directions (+ve nearest neighbours)
         ).sum(
-            dim=2,  # sum across sites
+            dim=2,  # sum over lattice sites
         )
         return -action
 
@@ -421,8 +420,8 @@ class PhiFourAction:
 class O2Action:
     r"""
     The (shifted) action for the O(2) non-linear sigma model, calculated
-    from a stack of polar angles with shape (sample_size, lattice_size).
-    
+    from a stack of polar angles with shape (sample_size, n_lattice).
+
     The action is shifted by -2 * V * \beta, making it equivalent to \beta
     times the Hamiltonian for the classical XY spin model.
 
@@ -441,16 +440,17 @@ class O2Action:
     def __init__(self, beta, geometry):
         super().__init__()
         self.beta = beta
-        self.lattice_size = geometry.length ** 2
+        self.dimensions = (1, geometry.length ** 2)
+
         self.shift = geometry.get_shift()
 
     def log_density(self, state: torch.Tensor) -> torch.Tensor:
         """
         Compute action from a stack of angles (not Euclidean field components)
-        with shape (sample_size, 1, lattice_size).
+        with shape (sample_size, 1, n_lattice).
         """
         action = -self.beta * torch.cos(
-            state[..., self.shift] - state.view(-1, 1, 1, self.lattice_size)
+            state[..., self.shift] - state.unsqueeze(dim=2)
         ).sum(
             dim=2,
         ).sum(  # sum over two shift directions (+ve nearest neighbours)
@@ -463,7 +463,7 @@ class O3Action:
     r"""
     The (shifted) action for the O(3) non-linear sigma model, calculated from
     a stack of polar and azimuthal angles with shape
-    (sample_size, 2 * lattice_size).
+    (sample_size, 2 * n_lattice).
 
     The action is shifted by -2 * V * \beta, making it equivalent to \beta
     times the Hamiltonian for the classical Heisenberg spin model.
@@ -483,8 +483,9 @@ class O3Action:
 
     def __init__(self, beta, geometry):
         super().__init__()
+        self.dimensions = (2, geometry.length ** 2)
         self.beta = beta
-        self.lattice_size = geometry.length ** 2
+
         self.shift = geometry.get_shift()
 
     def log_density(self, state: torch.Tensor) -> torch.Tensor:
@@ -494,16 +495,16 @@ class O3Action:
 
         Also computes the logarithm of the 'volume element' for the probability
         distribution due to parameterisating the spin vectors using polar coordinates.
-        
+
         The volume element for a configuration is a product over all lattice sites
-        
+
             \prod_{n=1}^V sin(\theta_n)
 
         where \theta_n is the polar angle for the spin at site n.
-        
+
         Notes
         -----
-        Assumes that state.view(-1, lattice_size, 2) yields a tensor for which the
+        Assumes that state.view(-1, n_lattice, 2) yields a tensor for which the
         two elements in the final dimension represent, respectively, the polar and
         azimuthal angles for the same lattice site.
         """
