@@ -3,8 +3,11 @@ coupling.py
 """
 import torch
 import torch.nn as nn
+from itertools import cycle
 
 from reportengine import collect
+
+from math import pi
 
 ACTIVATION_LAYERS = {
     "relu": nn.ReLU,
@@ -117,7 +120,7 @@ class NeuralNetwork(nn.Module):
         return self.network(x)
 
 
-class RedBlackLayers(nn.Module):
+class CoupleRedBlack(nn.Module):
     """Generic class for sequences of coupling transformations which couple different
     lattice sites.
 
@@ -132,9 +135,6 @@ class RedBlackLayers(nn.Module):
         A nn.Module from anvil.layers which implements a single coupling transformation.
     n_lattice: int
         Number of sites on the lattice.
-    n_components: int
-        Number of components at each lattice site, which is the size of the input tensor
-        at dimension 1.
     n_pairs: int
         Number of pairs of coupling transformations, which is the number of times each
         data point is transformed.
@@ -159,37 +159,83 @@ class RedBlackLayers(nn.Module):
     """
 
     def __init__(
-        self, coupling_layer, n_lattice, *, n_components=1, n_pairs=1, **layer_spec,
+        self, coupling_layer, n_lattice: int, layer_spec: dict, *, n_couple=1,
     ):
         super().__init__()
         self.lattice_half = n_lattice // 2
-        self.n_components = n_components
-        self.size_half = self.lattice_half * self.n_components
 
         self.red_layers = nn.ModuleList(
-            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pairs)]
+            [
+                coupling_layer(self.lattice_half, self.lattice_half, **layer_spec)
+                for _ in range(n_couple)
+            ]
         )
         self.black_layers = nn.ModuleList(
-            [coupling_layer(self.size_half, **layer_spec) for _ in range(n_pairs)]
+            [
+                coupling_layer(self.lattice_half, self.lattice_half, **layer_spec)
+                for _ in range(n_couple)
+            ]
         )
 
     def forward(self, x_in, log_density):
         """Forward pass of the sequence of coupling transformations."""
-        x_r, x_b = x_in.split(self.lattice_half, dim=2)
-
-        # view if n_components = 1, copy otherwise
-        x_r = x_r.reshape(-1, self.size_half)
-        x_b = x_b.reshape(-1, self.size_half)
+        x_r, x_b = x_in.squeeze(dim=1).split(self.lattice_half, dim=1)
 
         for red_layer, black_layer in zip(self.red_layers, self.black_layers):
             x_r, log_density = red_layer(x_r, x_b, log_density)
             x_b, log_density = black_layer(x_b, x_r, log_density)
 
-        x_r = x_r.view(-1, self.n_components, self.lattice_half)
-        x_b = x_b.view(-1, self.n_components, self.lattice_half)
-
-        phi_out = torch.cat((x_r, x_b), dim=2)
+        phi_out = torch.cat((x_r, x_b), dim=1).unsqueeze(dim=1)
         return phi_out, log_density
+
+
+class CoupleRedBlackNd(nn.Module):
+    def __init__(
+        self, coupling_layers: list, n_lattice: int, layer_spec: dict, *, n_couple=1
+    ):
+        super().__init__()
+
+        self.component_layers = nn.ModuleList(
+            [
+                CoupleRedBlack(coupling_layer, n_lattice, layer_spec, n_couple=n_couple)
+                for coupling_layer in coupling_layers
+            ]
+        )
+
+    def forward(self, x_in, log_density):
+        x_components = x_in.split(1, dim=1)
+
+        phi_out = []
+        for x_i, layer in zip(x_components, self.component_layers):
+            phi_i, log_density = layer(x_i, log_density)
+            phi_out.append(phi_i)
+
+        return torch.cat(phi_out, dim=1), log_density
+
+
+class CoupleComponents(nn.Module):
+    def __init__(self, coupling_layers: list, n_lattice: int, layer_spec: dict):
+        super().__init__()
+        self.n_components = len(coupling_layers)
+
+        self.component_layers = nn.ModuleList(
+            [
+                coupling_layer(n_lattice, n_lattice, **layer_spec)
+                for coupling_layer in coupling_layers
+            ]
+        )
+
+    def forward(self, x_in, log_density):
+        x_components = x_in.split(1, dim=1)
+
+        phi_out = []
+        for i, layer in enumerate(self.component_layers):
+            phi_i, log_density = layer(
+                x_components[(i + 1) % self.n_components], x_components[i], log_density
+            )
+            phi_out.append(phi_i)
+
+        return torch.cat(phi_out, dim=1), log_density
 
 
 class ConvexCombination(nn.Module):

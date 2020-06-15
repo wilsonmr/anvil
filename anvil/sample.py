@@ -293,7 +293,7 @@ def sample(
     rejected = n_batches * batch_size - accepted
     fraction = accepted / (accepted + rejected)
 
-    log.debug(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
+    log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 

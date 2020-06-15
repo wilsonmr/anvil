@@ -60,8 +60,11 @@ class AffineLayer(nn.Module):
     Parameters
     ----------
     size_in: int
-        Size of the input tensor at dimension 1, which is the size of the input vector
-        for the neural networks.
+        Size of the passive partition at dimension 1, which is also the size of the input
+        vector for the neural networks.
+    size_out: int
+        Size of the active partition, being transformed by the spline layer, at dimension 1,
+        which is also the number of rows in the matrix output by the neural networks.
     hidden_shape: list
         list containing hidden vector sizes for the neural networks.
     activation: str
@@ -94,6 +97,7 @@ class AffineLayer(nn.Module):
     def __init__(
         self,
         size_in: int,
+        size_out: int,
         *,
         hidden_shape: list,
         activation: str,
@@ -103,7 +107,7 @@ class AffineLayer(nn.Module):
         super().__init__()
         self.s_network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in,
+            size_out=size_out,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=s_final_activation,
@@ -111,7 +115,7 @@ class AffineLayer(nn.Module):
         )
         self.t_network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in,
+            size_out=size_out,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=None,
@@ -159,16 +163,16 @@ class NCPLayer(nn.Module):
     Parameters
     ----------
     size_in: int
-        Size of the input tensor at dimension 1, which is the size of the input vector
-        for the neural networks.
+        Size of the passive partition at dimension 1, which is also the size of the input
+        vector for the neural networks.
+    size_out: int
+        Size of the active partition, being transformed by the spline layer, at dimension 1,
+        which is also the number of rows in the matrix output by the neural networks.
     hidden_shape: list
         list containing hidden vector sizes for the neural networks.
     activation: str
         string which is a key for an activation function for all but the final layers
         of the networks.
-    s_final_activation: str
-        string which is a key for an activation function, which the output of the s
-        network will be passed through.
     batch_normalise: bool
         flag indicating whether or not to use batch normalising within the neural
         networks.
@@ -181,12 +185,16 @@ class NCPLayer(nn.Module):
         The shift part (\beta) of the affine transformation.
     phase_shift: nn.Parameter
         A learnable global phase shift.
+    
+    Methods
+    -------
+    forward(x_in, x_passive, log_density)
+        Performs an affine transformation of the `x_in` tensor, using the `x_passive`
+        tensor as parameters for the neural networks. Returns the transformed tensor
+        along with the updated log density.
 
     Notes
     -----
-    The Jacobian determinant is computed using the gradient of the inverse transformation,
-    which is the reciprocal of the gradient of the forward transformation.
-
     This can be thought of as a lightweight version of real_nvp_circle, with just one affine
     transformation.
     """
@@ -194,24 +202,24 @@ class NCPLayer(nn.Module):
     def __init__(
         self,
         size_in: int,
+        size_out: int,
         *,
         hidden_shape: list,
         activation: str,
-        s_final_activation: str,
         batch_normalise: bool,
     ):
         super().__init__()
         self.s_network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in,
+            size_out=size_out,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=s_final_activation,
+            final_activation=None,
             batch_normalise=batch_normalise,
         )
         self.t_network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in,
+            size_out=size_out,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=None,
@@ -267,8 +275,11 @@ class LinearSplineLayer(nn.Module):
     Parameters
     ----------
     size_in: int
-        Size of the input tensor at dimension 1, which is the size of the input vector
-        for the neural networks.
+        Size of the passive partition at dimension 1, which is also the size of the input
+        vector for the neural networks.
+    size_out: int
+        Size of the active partition, being transformed by the spline layer, at dimension 1,
+        which is also the number of rows in the matrix output by the neural networks.
     n_segments: int
         Number of segments (bins).
     hidden_shape: list
@@ -285,16 +296,19 @@ class LinearSplineLayer(nn.Module):
     network: torch.nn.Module
         the dense layers of network h, values are intialised as per the default
         initialisation of `nn.Linear`
-
+    
     Methods
     -------
-    forward(x_in, log_density)
-        see docstring for anvil.layers
+    forward(x_in, x_passive, log_density)
+        Performs an affine transformation of the `x_in` tensor, using the `x_passive`
+        tensor as parameters for the neural networks. Returns the transformed tensor
+        along with the updated log density.
     """
 
     def __init__(
         self,
         size_in: int,
+        size_out: int,
         *,
         n_segments: int,
         hidden_shape: list,
@@ -302,7 +316,7 @@ class LinearSplineLayer(nn.Module):
         batch_normalise: bool,
     ):
         super().__init__()
-        self.size_in = size_in
+        self.size_out = size_out
         self.n_segments = n_segments
         self.width = 1 / n_segments
 
@@ -311,7 +325,7 @@ class LinearSplineLayer(nn.Module):
 
         self.network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in * n_segments,
+            size_out=size_out * n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
@@ -319,14 +333,19 @@ class LinearSplineLayer(nn.Module):
         )
         self.norm_func = nn.Softmax(dim=2)
 
+        self.scale = pi  # TODO: improve
+
     def forward(self, x_in, x_passive, log_density):
         """Forward pass of the linear spline layer."""
+        x_in /= self.scale
+        x_for_net = (x_passive - x_passive.mean()) / x_passive.std()
+
         net_out = self.norm_func(
-            self.network(x_passive - 0.5).view(-1, self.size_in, self.n_segments)
+            self.network(x_for_net).view(-1, self.size_out, self.n_segments)
         )
         phi_knot_points = torch.cat(
             (
-                torch.zeros(net_out.shape[0], self.size_in, 1),
+                torch.zeros(net_out.shape[0], self.size_out, 1),
                 torch.cumsum(net_out, dim=2),
             ),
             dim=2,
@@ -371,8 +390,11 @@ class QuadraticSplineLayer(nn.Module):
     Parameters
     ----------
     size_in: int
-        Size of the input tensor at dimension 1, which is the size of the input vector
-        for the neural networks.
+        Size of the passive partition at dimension 1, which is also the size of the input
+        vector for the neural networks.
+    size_out: int
+        Size of the active partition, being transformed by the spline layer, at dimension 1,
+        which is also the number of rows in the matrix output by the neural networks.
     n_segments: int
         Number of segments (bins).
     hidden_shape: list
@@ -392,13 +414,16 @@ class QuadraticSplineLayer(nn.Module):
 
     Methods
     -------
-    forward(x_in, log_density)
-        see docstring for anvil.layers
+    forward(x_in, x_passive, log_density)
+        Performs an affine transformation of the `x_in` tensor, using the `x_passive`
+        tensor as parameters for the neural networks. Returns the transformed tensor
+        along with the updated log density.
     """
 
     def __init__(
         self,
         size_in: int,
+        size_out: int,
         *,
         n_segments: int,
         hidden_shape: list,
@@ -406,12 +431,12 @@ class QuadraticSplineLayer(nn.Module):
         batch_normalise: bool,
     ):
         super().__init__()
-        self.size_in = size_in
+        self.size_out = size_out
         self.n_segments = n_segments
 
         self.network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in * (2 * n_segments + 1),
+            size_out=size_out * (2 * n_segments + 1),
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
@@ -420,6 +445,8 @@ class QuadraticSplineLayer(nn.Module):
         self.w_norm_func = nn.Softmax(dim=2)
 
         self.eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
+
+        self.scale = pi  # TODO: improve
 
     @staticmethod
     def h_norm_func(h_raw, w_norm):
@@ -430,9 +457,12 @@ class QuadraticSplineLayer(nn.Module):
 
     def forward(self, x_in, x_passive, log_density):
         """Forward pass of the quadratic spline layer."""
+        x_in /= self.scale
+        x_for_net = (x_passive - x_passive.mean()) / x_passive.std()
+
         h_raw, w_raw = (
-            self.network(x_passive - 0.5)
-            .view(-1, self.size_in, 2 * self.n_segments + 1)
+            self.network(x_for_net)
+            .view(-1, self.size_out, 2 * self.n_segments + 1)
             .split((self.n_segments + 1, self.n_segments), dim=2)
         )
         w_norm = self.w_norm_func(w_raw)
@@ -440,14 +470,14 @@ class QuadraticSplineLayer(nn.Module):
 
         x_knot_points = torch.cat(
             (
-                torch.zeros(h_norm.shape[0], self.size_in, 1) - self.eps,
+                torch.zeros(h_norm.shape[0], self.size_out, 1) - self.eps,
                 torch.cumsum(w_norm, dim=2),
             ),
             dim=2,
         )
         phi_knot_points = torch.cat(
             (
-                torch.zeros(h_norm.shape[0], self.size_in, 1),
+                torch.zeros(h_norm.shape[0], self.size_out, 1),
                 torch.cumsum(
                     0.5 * w_norm * (h_norm[..., :-1] + h_norm[..., 1:]), dim=2,
                 ),
@@ -463,7 +493,7 @@ class QuadraticSplineLayer(nn.Module):
                 x_in.contiguous().view(-1, 1),
             )
             - 1
-        ).view(-1, self.size_in, 1)
+        ).view(-1, self.size_out, 1)
 
         w_k = torch.gather(w_norm, 2, k_ind)
         h_k = torch.gather(h_norm, 2, k_ind)
@@ -506,8 +536,11 @@ class CircularSplineLayer(nn.Module):
     Parameters
     ----------
     size_in: int
-        Size of the input tensor at dimension 1, which is the size of the input vector
-        for the neural networks.
+        Size of the passive partition at dimension 1, which is also the size of the input
+        vector for the neural networks.
+    size_out: int
+        Size of the active partition, being transformed by the spline layer, at dimension 1,
+        which is also the number of rows in the matrix output by the neural networks.
     n_segments: int
         Number of segments (bins).
     hidden_shape: list
@@ -530,13 +563,16 @@ class CircularSplineLayer(nn.Module):
 
     Methods
     -------
-    forward(x_in, log_density)
-        see docstring for anvil.layers
+    forward(x_in, x_passive, log_density)
+        Performs an affine transformation of the `x_in` tensor, using the `x_passive`
+        tensor as parameters for the neural networks. Returns the transformed tensor
+        along with the updated log density.
     """
 
     def __init__(
         self,
         size_in: int,
+        size_out: int,
         *,
         n_segments: int,
         hidden_shape: list,
@@ -544,12 +580,12 @@ class CircularSplineLayer(nn.Module):
         batch_normalise: bool,
     ):
         super().__init__()
-        self.size_in = size_in
+        self.size_out = size_out
         self.n_segments = n_segments
 
         self.network = NeuralNetwork(
             size_in=size_in,
-            size_out=size_in * 3 * n_segments,
+            size_out=size_out * 3 * n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
@@ -564,9 +600,11 @@ class CircularSplineLayer(nn.Module):
 
     def forward(self, x_in, x_passive, log_density):
         """Forward pass of the rational quadratic spline layer."""
+        x_for_net = (x_passive - x_passive.mean()) / x_passive.std()
+
         h_raw, w_raw, d_raw = (
-            self.network((x_passive - pi) / pi)
-            .view(-1, self.size_in, 3 * self.n_segments)
+            self.network(x_for_net)
+            .view(-1, self.size_out, 3 * self.n_segments)
             .split((self.n_segments, self.n_segments, self.n_segments), dim=2)
         )
         h_norm = self.norm_func(h_raw) * 2 * pi
@@ -575,14 +613,14 @@ class CircularSplineLayer(nn.Module):
 
         x_knot_points = torch.cat(
             (
-                torch.zeros(w_norm.shape[0], self.size_in, 1) - self.eps,
+                torch.zeros(w_norm.shape[0], self.size_out, 1) - self.eps,
                 torch.cumsum(w_norm, dim=2),
             ),
             dim=2,
         )
         phi_knot_points = torch.cat(
             (
-                torch.zeros(h_norm.shape[0], self.size_in, 1),
+                torch.zeros(h_norm.shape[0], self.size_out, 1),
                 torch.cumsum(h_norm, dim=2),
             ),
             dim=2,
@@ -594,7 +632,9 @@ class CircularSplineLayer(nn.Module):
                 x_in.contiguous().view(-1, 1),
             )
             - 1
-        ).view(-1, self.size_in, 1)
+        ).view(-1, self.size_out, 1)
+
+        k_ind = torch.clamp(k_ind, 0, self.n_segments - 1)
 
         w_k = torch.gather(w_norm, 2, k_ind)
         h_k = torch.gather(h_norm, 2, k_ind)
