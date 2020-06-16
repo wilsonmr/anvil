@@ -4,15 +4,15 @@ lattice_dimension: 2
 
 # Target
 target: phi_four
-m_sq: 4
-lam: 0
+m_sq: -4
+lam: 6.975
 use_arxiv_version: False
 
 # Base
-model: real_nvp
 base: standard_normal
 
 # Model
+model: real_nvp
 n_affine: 4
 
 # Networks

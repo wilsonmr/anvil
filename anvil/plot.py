@@ -60,15 +60,15 @@ def plot_field_components(_plot_field_components):
 
 
 @figure
-def plot_zero_momentum_two_point(zero_momentum_two_point, training_geometry):
+def plot_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
     sample and errorbars are standard deviations across boostrap samples
     """
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(training_geometry.length),
-        y=zero_momentum_two_point.mean(dim=-1),
-        yerr=zero_momentum_two_point.std(dim=-1),
+        y=zero_momentum_correlator.mean(axis=-1),
+        yerr=zero_momentum_correlator.std(axis=-1),
         fmt="-r",
         label=f"L = {training_geometry.length}",
     )
@@ -88,27 +88,49 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     fig, ax = plt.subplots()
     ax.errorbar(
         x=range(1, training_geometry.length - 1),
-        y=effective_pole_mass.mean(dim=-1),
-        yerr=effective_pole_mass.std(dim=-1),
+        y=effective_pole_mass.mean(axis=-1),
+        yerr=effective_pole_mass.std(axis=-1),
         fmt="-b",
         label=f"L = {training_geometry.length}",
     )
-    ax.set_ylabel("$m_p^{eff}$")
+    ax.set_ylabel("$m_p$")
     ax.set_xlabel("$t$")
     ax.set_title("Effective pole mass")
     return fig
 
 
 @figure
-def plot_two_point_function(two_point_function):
+def plot_exponential_correlation_length(
+    training_geometry, exponential_correlation_length
+):
+    """Plot exponential correlation length as a function of t. The points are means
+    across bootstrap samples and the errorbars are standard deviation across
+    bootstrap.
+    """
+    fig, ax = plt.subplots()
+    ax.errorbar(
+        x=range(1, training_geometry.length - 1),
+        y=exponential_correlation_length.mean(axis=-1),
+        yerr=exponential_correlation_length.std(axis=-1),
+        fmt="-b",
+        label=f"L = {training_geometry.length}",
+    )
+    ax.set_ylabel("$m_p^{-2}$")
+    ax.set_xlabel("$t$")
+    ax.set_title("Exponential correlation length")
+    return fig
+
+
+@figure
+def plot_two_point_correlator(two_point_correlator):
     """Represent the two point function and it's error in x and t as heatmaps
     of the respective matrices. Returns a figure with two plots, the left plot
     is the mean two point function across bootstrap and the right plot is the
     standard deviation divide by the mean (fractional error)
 
     """
-    corr = two_point_function.mean(dim=-1)
-    std = two_point_function.std(dim=-1)
+    corr = two_point_correlator.mean(axis=-1)
+    std = two_point_correlator.std(axis=-1)
 
     fractional_std = std / abs(corr)
 
@@ -135,94 +157,192 @@ def plot_two_point_function(two_point_function):
 
 
 @figure
-def plot_volume_averaged_two_point(volume_avg_two_point_function):
-    """Plot the volumn averaged two point function for the shift (0, 0)
+def plot_two_point_correlator_series(two_point_correlator_series, sample_interval):
+    """Plot the volumn averaged two point function for the shift (0, 1)
     """
-    # TODO: do we want to plot this for all shifts?
+    chain_indices = np.arange(two_point_correlator_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
     ax.set_title("Volume-averaged two point function")
-    ax.set_ylabel("$G_k(0,0)$")
+    ax.set_ylabel("$G(x; t)$")
     ax.set_xlabel("$t$")
-    ax.plot(volume_avg_two_point_function[:, 0, 0], "-")
-    return fig
-
-
-@figure
-def plot_autocorr_two_point(autocorr_two_point, optimal_window):
-    """Plot autocorrelation as a function of Monte Carlo time for 4 x the optimal
-    window estimated by optimal_window. Mark on the optimal window as a verticle
-    line
-    """
-    fig, ax = plt.subplots()
-    ax.set_title("Autocorrelation of volume-averaged two point function")
-    ax.set_ylabel(r"$\Gamma_{G(s)}(t)$")
-    ax.set_xlabel("$t$")
-    ax.plot(autocorr_two_point[: 4 * optimal_window])
-    ax.axvline(optimal_window + 1, linestyle="-", color="r", label="Optimal window")
+    for i in range(two_point_correlator_series.shape[0]):
+        ax.plot(
+            chain_indices,
+            two_point_correlator_series[i],
+            linestyle="-",
+            linewidth=0.5,
+            label=f"$x=$ (0, {i})",
+        )
     ax.legend()
     return fig
 
 
 @figure
-def plot_integrated_autocorr_two_point(integrated_autocorr_two_point, optimal_window):
+def plot_two_point_correlator_autocorr(
+    two_point_correlator_autocorr, two_point_correlator_optimal_window, sample_interval
+):
+    """Plot autocorrelation as a function of Monte Carlo time for 4 x the optimal
+    window estimated by optimal_window. Mark on the optimal window as a verticle
+    line
+    """
+    cut = max(10, 2 * np.max(two_point_correlator_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
+
+    fig, ax = plt.subplots()
+    ax.set_title("Autocorrelation of volume-averaged two point function")
+    ax.set_ylabel(r"$\Gamma_G(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    for i in range(two_point_correlator_autocorr.shape[0]):
+        color = next(ax._get_lines.prop_cycler)["color"]
+        ax.plot(
+            chain_indices,
+            two_point_correlator_autocorr[i, :cut],
+            linestyle="--",
+            linewidth=0.5,
+            color=color,
+        )
+        ax.axvline(
+            two_point_correlator_optimal_window[i] * sample_interval,
+            linestyle="-",
+            color=color,
+            label=f"$x=$ (0, {i})",
+        )
+    ax.set_xlim(left=0)
+    ax.set_ylim(top=1)
+    ax.legend()
+    return fig
+
+
+@figure
+def plot_two_point_correlator_integrated_autocorr(
+    two_point_correlator_integrated_autocorr,
+    two_point_correlator_optimal_window,
+    sample_interval,
+):
     """plot integrated_autocorr_two_point as a function of w, up until 4 x the
     optimal window estimated by optimal_window. Mark on the optimal window as a
     verticle line
 
     """
-    tau_int = integrated_autocorr_two_point[: 4 * optimal_window]
-    windows = np.arange(1, tau_int.size + 1)
+    cut = max(10, 2 * np.max(two_point_correlator_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
+    tau = np.max(
+        two_point_correlator_integrated_autocorr[:, two_point_correlator_optimal_window]
+    )
+
     fig, ax = plt.subplots()
-    # Integrated autocorrelation time
-    ax.set_title("Integrated autocorrelation time")
-    ax.set_ylabel(r"$\tau_{int}(W)$")
-    ax.plot(windows, tau_int)
-    ax.axvline(optimal_window, linestyle="-", color="r", label="Optimal window")
+    ax.set_title("Integrated autocorrelation of volume-averaged two point function")
+    ax.set_ylabel(r"$\sum \Gamma_G(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    for i in range(two_point_correlator_integrated_autocorr.shape[0]):
+        color = next(ax._get_lines.prop_cycler)["color"]
+        ax.plot(
+            chain_indices,
+            two_point_correlator_integrated_autocorr[i, :cut],
+            linestyle="--",
+            linewidth=0.5,
+            color=color,
+        )
+        ax.axvline(
+            two_point_correlator_optimal_window[i] * sample_interval,
+            linestyle="-",
+            color=color,
+            label=f"$x=$ (0, {i})",
+        )
+    ax.annotate(
+        fr"$\tau_G$ / {sample_interval} = {tau:.2g}",
+        xy=(0.05, 0.05),
+        xycoords="axes fraction",
+    )
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0.5)
     ax.legend()
     return fig
 
 
 @figure
-def plot_exp_autocorr_two_point(exp_autocorr_two_point, optimal_window):
-    """plot exp_autocorr_two_point as a function of w, up until 4 x the
-    optimal window estimated by optimal_window. Mark on the optimal window as a
-    verticle line
-
-    """
+def plot_topological_charge_series(topological_charge_series, sample_interval):
+    """Plot the topological charge of the ensemble as a series, ordered by the positions
+    of the configurations in the Markov chain."""
+    chain_indices = np.arange(topological_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
-    tau_exp = exp_autocorr_two_point[: 4 * optimal_window]
-    windows = np.arange(1, tau_exp.size + 1)
-    ax.set_title("Exponential autocorrelation time")
-    ax.set_ylabel(r"$\tau_{exp}(W)$")
-    ax.plot(windows, tau_exp)
-    ax.axvline(optimal_window, linestyle="-", color="r", label="Optimal window")
-    ax.legend()
+    ax.set_title("Topological charge")
+    ax.set_ylabel("$Q(t)$")
+    ax.set_xlabel("$t$")
+    ax.plot(
+        chain_indices, topological_charge_series, linestyle="-", linewidth=0.5,
+    )
     return fig
 
 
 @figure
-def plot_automatic_windowing_function(automatic_windowing_function, optimal_window):
-    """plot automatic_windowing_function as a function of w, up until 4 x the
-    optimal window estimated by optimal_window. Mark on the optimal window as a
-    verticle line
+def plot_topological_charge_autocorr(
+    topological_charge_autocorr, topological_charge_optimal_window, sample_interval
+):
+    """Plot the autocorrelation of the topological charge series. Also plot a vertical
+    line to denote the location of the optimal window, which minimises the error on the
+    integrated autocorrelation."""
+    cut = max(10, 2 * topological_charge_optimal_window)
+    chain_indices = np.arange(cut) * sample_interval
 
-    """
     fig, ax = plt.subplots()
-    g_func = automatic_windowing_function[: 4 * optimal_window]
-    windows = np.arange(1, g_func.size + 1)
-    ax.set_title("g")
-    ax.set_ylabel("$g$")
-    ax.set_xlabel("$W$")
-    ax.plot(windows, g_func)
-    ax.axvline(optimal_window, linestyle="-", color="r", label="Optimal window")
-    ax.legend()
+    ax.set_title("Autocorrelation of topological charge")
+    ax.set_ylabel(r"$\Gamma_Q(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    ax.plot(
+        chain_indices, topological_charge_autocorr[:cut], linestyle="--", linewidth=0.5,
+    )
+    ax.axvline(
+        topological_charge_optimal_window * sample_interval, linestyle="-", color="r",
+    )
+    ax.set_xlim(left=0)
+    ax.set_ylim(top=1)
+    return fig
+
+
+@figure
+def plot_topological_charge_integrated_autocorr(
+    topological_charge_integrated_autocorr,
+    topological_charge_optimal_window,
+    sample_interval,
+):
+    """Plot the integrated autocorrelation of the topological charge series. Also plot a
+    vertical line to denote the location of the optimal window, which minimises the error
+    on the integrated autocorrelation."""
+    cut = max(10, 2 * np.max(topological_charge_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
+    tau = topological_charge_integrated_autocorr[topological_charge_optimal_window]
+
+    fig, ax = plt.subplots()
+    ax.set_title("Integrated autocorrelation of topological charge")
+    ax.set_ylabel(r"$\sum \Gamma_Q(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    ax.plot(
+        chain_indices,
+        topological_charge_integrated_autocorr[:cut],
+        linestyle="--",
+        linewidth=0.5,
+    )
+    ax.axvline(
+        topological_charge_optimal_window * sample_interval, linestyle="-", color="r",
+    )
+    ax.annotate(
+        fr"$\tau_Q$ / {sample_interval} = {tau:.2g}",
+        xy=(0.05, 0.05),
+        xycoords="axes fraction",
+    )
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0.5)
     return fig
 
 
 def plot_bootstrap_single_number(observable, label):
     """Given a 1 dimensional tensor of observables, plot a histogram of the
     distribution
-
     """
     fig, ax = plt.subplots()
     ax.hist(
@@ -248,10 +368,10 @@ def plot_bootstrap_multiple_numbers(observable, labels):
 
 
 @figure
-def plot_bootstrap_two_point(two_point_function):
+def plot_bootstrap_two_point(two_point_correlator):
     """Plot the distribution of G(0, 0)"""
     x = t = 0
-    data_to_plot = two_point_function(x, t)
+    data_to_plot = two_point_correlator(x, t)
     return plot_bootstrap_single_number(data_to_plot, rf"$G$({x},{t})")
 
 
@@ -268,15 +388,15 @@ def plot_bootstrap_ising_energy(ising_energy):
 
 
 @figuregen
-def plot_bootstrap_zero_momentum_2pf(zero_momentum_two_point):
+def plot_bootstrap_zero_momentum_2pf(zero_momentum_correlator):
     """For each value of t, plot a boostrap distribution of
-    zero_momentum_two_point[t]
+    zero_momentum_correlator[t]
 
     """
     labels = [
-        r"$\tilde{G}$" + f"$(0,{t})$" for t in range(zero_momentum_two_point.shape[0])
+        r"$\tilde{G}$" + f"$(0,{t})$" for t in range(zero_momentum_correlator.shape[0])
     ]
-    yield from plot_bootstrap_multiple_numbers(zero_momentum_two_point, labels)
+    yield from plot_bootstrap_multiple_numbers(zero_momentum_correlator, labels)
 
 
 @figuregen
