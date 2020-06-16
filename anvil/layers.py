@@ -363,6 +363,8 @@ class LinearSplineLayer(nn.Module):
         phi_out = (phi_km1 + alpha * p_k).squeeze()
         log_density -= torch.log(p_k).sum(dim=1)
 
+        phi_out *= self.scale
+
         return phi_out, log_density
 
 
@@ -507,6 +509,8 @@ class QuadraticSplineLayer(nn.Module):
             phi_km1 + alpha * h_k * w_k + 0.5 * alpha.pow(2) * (h_kp1 - h_k) * w_k
         ).squeeze()
         log_density -= torch.log(h_k + alpha * (h_kp1 - h_k)).sum(dim=1)
+
+        phi_out *= self.scale
 
         return phi_out, log_density
 
