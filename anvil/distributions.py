@@ -107,8 +107,8 @@ class UniformDist:
 
     @property
     def pdf(self):
-        x = torch.linspace(self.x_min, self.x_max, 10000)
-        return ((x, torch.zeros_like(x) + 1 / (self.x_max - self.x_min)),)
+        dens = 1 / (self.x_max - self.x_min)
+        return (([self.x_min, self.x_max], [dens, dens]),)
 
 
 class SemicircleDist:

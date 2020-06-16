@@ -14,12 +14,14 @@ PROVIDERS = [
     "anvil.core",
     "anvil.models",
     "anvil.sample",
+    "anvil.models",
     "anvil.observables",
     "anvil.plot",
     "anvil.table",
     "anvil.checkpoint",
     "reportengine.report",
     "anvil.benchmarks",
+    "anvil.fields",
 ]
 
 
