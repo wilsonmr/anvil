@@ -279,7 +279,7 @@ def plot_topological_charge_series(topological_charge_series, sample_interval):
 
 @figure
 def plot_topological_charge_autocorr(
-    topological_charge_autocorr, topological_charge_optimal_window, sampling_interval
+    topological_charge_autocorr, topological_charge_optimal_window, sample_interval
 ):
     """Plot the autocorrelation of the topological charge series. Also plot a vertical
     line to denote the location of the optimal window, which minimises the error on the
