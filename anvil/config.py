@@ -14,6 +14,7 @@ from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
+from anvil.fields import FIELD_OPTIONS
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class ConfigParser(Config):
         return pow(lattice_length, lattice_dimension)
 
     def produce_config_size(self, lattice_size, target):
-        """number of nodes in a single field configuration"""
+        """Size of a single configuration or input vector for neural network."""
         if target == "o3":
             return 2 * lattice_size
         return lattice_size
@@ -55,7 +56,7 @@ class ConfigParser(Config):
         return Geometry2D(lattice_length)
 
     @explicit_node
-    def produce_target_dist(self, target: str):
+    def produce_target_dist(self, target):
         """Return the function which initialises the correct action"""
         try:
             return TARGET_OPTIONS[target]
@@ -63,6 +64,18 @@ class ConfigParser(Config):
             raise ConfigError(
                 f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
             )
+
+    @explicit_node
+    def produce_field(self, target):
+        """Return the function which instantiates the field object, for
+        calculating observables."""
+        try:
+            return FIELD_OPTIONS[target]
+        except KeyError:
+            log.warning(
+                f"Target {target} does not match an implemented field theory. Using generic field class."
+            )
+            return FIELD_OPTIONS[None]
 
     @explicit_node
     def produce_base_dist(self, base: str):
@@ -101,6 +114,10 @@ class ConfigParser(Config):
     def parse_lam(self, lam: (float, int)):
         """Coefficient of quartic interaction in phi^4 theory."""
         return lam
+    
+    def parse_beta(self, beta: (float, int)):
+        """Inverse temperature."""
+        return beta
 
     def parse_use_arxiv_version(self, do_use: bool):
         """If false, use the conventional phi^4 action. If true,
