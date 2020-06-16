@@ -95,7 +95,7 @@ class AffineLayer(CouplingLayer):
     r"""Extension to `nn.Module` for an affine transformation layer as described
     in https://arxiv.org/abs/1904.12072.
 
-    Affine transformation, x = g_i(\phi), defined as:
+    An affine transformation, x = g_i(\phi), is defined as:
 
         x_a = \phi_a
         x_b = \phi_b * exp(s_i(\phi_a)) + t_i(\phi_a)
@@ -106,7 +106,7 @@ class AffineLayer(CouplingLayer):
         Half of the configuration size, which is the size of the input vector for the
         neural networks.
     hidden_shape: list
-        list containing hidden vector sizes the neural networks.
+        list containing hidden vector sizes for the neural networks.
     activation: str
         string which is a key for an activation function for all but the final layers
         of the networks.
@@ -173,10 +173,109 @@ class AffineLayer(CouplingLayer):
         x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
+
         phi_b = (x_b - t_out) * torch.exp(-s_out)
 
         phi_out = self._join_func([x_a, phi_b], dim=1)
         log_density += s_out.sum(dim=1, keepdim=True)
+
+        return phi_out, log_density
+
+
+class NCPLayer(CouplingLayer):
+    r"""A coupling layer which performs a transformation from (0, 2\pi) -> (0, 2\pi),
+    which is an affine transformation X -> \alpha * X + \beta on the Euclidean vector
+    obtained by stereographic projection of the input data.
+
+    The transformation x = g(\phi) is defined as
+
+        x_a = \phi_a
+        x_b = (
+                2 \arctan( \alpha(\phi_a) + \tan((\phi_b - \pi) / 2) + \beta(\phi_a))
+                + \pi + \theta
+              )
+
+    where \alpha and \beta are neural networks, and \theta is a learnable global phase shift.
+
+    The Jacobian determinant can be computed analytically for the full transformation,
+    including projection and inverse.
+
+        | \det J | = \prod_n (
+            (1 + \beta ** 2) / \alpha * \sin^2(x / 2) + \beta
+            + \alpha * \cos^2(x / 2)
+            - \beta * \sin(x_b)
+            )
+
+    Attributes
+    ----------
+    s_network: NeuralNetwork
+        When exponentiated, this is the linear transformation \alpha.
+    t_network: NeuralNetwork
+        The shift part (\beta) of the affine transformation.
+    phase_shift: nn.Parameter
+        A learnable global phase shift.
+
+    Notes
+    -----
+    The Jacobian determinant is computed using the gradient of the inverse transformation,
+    which is the reciprocal of the gradient of the forward transformation.
+
+    This can be thought of as a lightweight version of real_nvp_circle, with just one affine
+    transformation.
+    """
+
+    def __init__(
+        self,
+        size_half: int,
+        *,
+        hidden_shape: list,
+        activation: str,
+        s_final_activation: str,
+        batch_normalise: bool,
+        even_sites: bool,
+    ):
+        super().__init__(size_half, even_sites)
+
+        self.s_network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=s_final_activation,
+            batch_normalise=batch_normalise,
+        )
+        self.t_network = NeuralNetwork(
+            size_in=size_half,
+            size_out=size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=None,
+            batch_normalise=batch_normalise,
+        )
+        self.phase_shift = nn.Parameter(torch.rand(1))
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the project-affine-inverse transformation."""
+        x_a = x_input[..., self._a_ind]
+        x_b = x_input[..., self._b_ind]
+        x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
+
+        alpha = torch.exp(self.s_network(x_a_stand))
+        beta = self.t_network(x_a_stand)
+
+        phi_b = (
+            2 * torch.atan(alpha * torch.tan((x_b - pi) / 2) + beta)
+            + pi
+            + self.phase_shift
+        ) % (2 * pi)
+
+        log_density += torch.log(
+            (1 + beta ** 2) / alpha * torch.sin(x_b / 2) ** 2
+            + alpha * torch.cos(x_b / 2) ** 2
+            - beta * torch.sin(x_b)
+        ).sum(dim=1, keepdim=True)
+
+        phi_out = self._join_func([x_a, phi_b], dim=-1)
 
         return phi_out, log_density
 
@@ -200,7 +299,7 @@ class LinearSplineLayer(CouplingLayer):
     fractional position of x in the k-th bin, which is (x - (k-1) * w) / w.
 
     The gradient of the forward transformation is simply
-        
+
         dx / d\phi = w / p_k
 
     Parameters
@@ -236,6 +335,7 @@ class LinearSplineLayer(CouplingLayer):
     def __init__(
         self,
         size_half: int,
+        *,
         n_segments: int,
         hidden_shape: list,
         activation: str,
@@ -304,7 +404,7 @@ class QuadraticSplineLayer(CouplingLayer):
     distribution function associated with the piecewise linear probability density function
     obtained by interpolating between the heights.
 
-    The result is a quadratic function defined piecewise by 
+    The result is a quadratic function defined piecewise by
 
         \phi = C^{-1}(x, {h_k}) = \phi_{k-1} + \alpha(x) h_k w_k
                                   + \alpha(x)^2 / 2 * (h_{k+1} - h_k) w_k
@@ -445,7 +545,7 @@ class CircularSplineLayer(CouplingLayer):
     by a neural network. d_0 is set equal to d_K.
 
     Defing the slopes s_k = h_k / w_k and fractional position within a bin
-        
+
             alpha(x) = (x - x_{k-1}) / w_k
 
     the coupling transformation is defined piecewise by
@@ -479,7 +579,7 @@ class CircularSplineLayer(CouplingLayer):
         the dense layers of the network, values are intialised as per the default
         initialisation of `nn.Linear`
     phase_shift: torch.nn.Parameter
-        a learnable phase shift which incurs no Jacobian penalty, the purpose being 
+        a learnable phase shift which incurs no Jacobian penalty, the purpose being
         that 0 and 2\pi are no longer fixed points of the transformation.
 
     Methods
@@ -708,7 +808,7 @@ class InverseProjectionLayer2D(nn.Module):
     The Jacobian determinant of the projection map is
 
         | \det J | = 1/2 \sec^2(\phi_1 / 2) \tan(\phi_1 / 2)
-    
+
     Parameters
     ----------
     size_half: int
