@@ -8,10 +8,11 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import TrainingOutput
+from anvil.core import normalising_flow, convex_combination
+from anvil.geometry import Geometry2D
+from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
 from anvil.models import MODEL_OPTIONS
-from anvil.geometry import Geometry2D
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 from anvil.fields import FIELD_OPTIONS
 
@@ -53,14 +54,6 @@ class ConfigParser(Config):
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
-
-    def parse_target(self, target: str):
-        """String specifying target distrbution."""
-        return target
-
-    def parse_base(self, base: str):
-        """String specifying base distribution."""
-        return base
 
     @explicit_node
     def produce_target_dist(self, target):
@@ -127,8 +120,8 @@ class ConfigParser(Config):
         return beta
 
     def parse_use_arxiv_version(self, do_use: bool):
-        """If true, use the conventional phi^4 action. If false,
-        there is an additional factor of 1/2 for the kinetic part
+        """If false, use the conventional phi^4 action. If true,
+        there is an additional factor of 2 for the kinetic part
         of the phi^4 action."""
         return do_use
 
@@ -136,36 +129,30 @@ class ConfigParser(Config):
         """Inverse temperature."""
         return beta
 
-    def parse_model(self, model: str):
-        """Label for normalising flow model."""
-        return model
-
     @explicit_node
-    def produce_flow_model(self, model):
-        """Return the action which instantiates the normalising flow model."""
+    def produce_model_action(self, model: str):
+        """Given a string, return the flow model action indexed by that string."""
         try:
             return MODEL_OPTIONS[model]
         except KeyError:
-            raise ConfigError(
-                f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
-            )
+            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
 
-    def parse_standardise_inputs(self, do_stand: bool):
-        """Flag specifying whether to standardise input vectors before
-        passing them through a neural network."""
-        return do_stand
-
-    def parse_n_affine(self, n: int):
-        """Number of affine layers."""
+    def parse_n_mixture(self, n: int):
+        """Number of replica models which we can combine using convex combinations."""
         return n
 
-    def produce_affine_layer_index(self, n_affine):
-        """Given n_affine, the number of affine layers, produces a list
-        with n_affine elements, the ith element is {i_affine: i}
+    def produce_mixture_indices(self, n_mixture=1):
+        """Produce iterable which we can collect over to produce multiple flow replicas."""
+        return [{"i_mixture": i} for i in range(n_mixture)]
 
-        we can use affine_layer_index to collect over when producing the model
-        """
-        return [{"i_affine": i} for i in range(n_affine)]
+    @explicit_node
+    def produce_model_to_load(self, n_mixture=1):
+        """Produce the generative model, whose parameters are to be loaded, which maps
+        the base to an approximate of the target distribution."""
+        if n_mixture == 1:
+            return normalising_flow  # no replica flows
+        else:
+            return convex_combination
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

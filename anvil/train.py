@@ -67,10 +67,9 @@ def train(
         x, base_log_density = base_dist(n_batch)
 
         # apply inverse map, calc log density of forward map (gradients tracked)
-        phi, map_log_density = loaded_model(x)
-
+        phi, model_log_density = loaded_model(x, base_log_density)
+        
         # compute loss function (gradients tracked)
-        model_log_density = base_log_density + map_log_density
         target_log_density = target_dist.log_density(phi)
         current_loss = shifted_kl(model_log_density, target_log_density)
 

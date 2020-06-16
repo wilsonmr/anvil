@@ -88,7 +88,10 @@ class UniformDist:
 
         self.x_min, self.x_max = support
 
-        self.log_density = lambda sample: torch.zeros((sample.shape[0], 1))
+        self.log_normalisation = log(self.x_max - self.x_min)
+        self.log_density = (
+            lambda sample: torch.zeros((sample.shape[0], 1)) - self.log_normalisation
+        )
 
     def __call__(self, sample_size):
         """Return a tuple (sample, log_density) for a sample of 'sample_size'
@@ -100,7 +103,7 @@ class UniformDist:
         sample = torch.empty(sample_size, self.size_out).uniform_(
             self.x_min, self.x_max
         )
-        return sample, torch.zeros((sample_size, 1))
+        return sample, self.log_density(sample)
 
     @property
     def pdf(self):
@@ -215,7 +218,7 @@ class VonMisesDist:
         Return shape: (sample_size, lattice_size) for the sample,
         (sample_size, 1) for the log density.
         """
-        sample = self.generator((sample_size, self.size_out))
+        sample = self.generator((sample_size, self.size_out)) + pi  # [0, 2\pi)
         log_density = self.log_density(sample)
         return sample, log_density
 
@@ -320,14 +323,18 @@ def normal_distribution(lattice_size, sigma=1, mean=0):
 def uniform_distribution(lattice_size, support=(-1, 1)):
     """Returns an instance of the UniformDist class.
 
-    The default interval is intentionally zero-centered,
-    anticipating use as a base distribution."""
+    The default interval is intentionally zero-centered, anticipating use
+    as a base distribution."""
     return UniformDist(lattice_size, support=support)
 
 
+def standard_uniform_distribution(lattice_size):
+    """Returns an instance of the UniformDist class with interval [0, 1)"""
+    return UniformDist(lattice_size, support=(0, 1))
+
+
 def circular_uniform_distribution(lattice_size):
-    """Returns an instance of the UniformDist class with interval
-    [0, 2 * pi)"""
+    """Returns an instance of the UniformDist class with interval [0, 2 * pi)"""
     return UniformDist(lattice_size, support=(0, 2 * pi))
 
 
@@ -550,6 +557,7 @@ BASE_OPTIONS = {
     "standard_normal": standard_normal_distribution,
     "normal": normal_distribution,
     "uniform": uniform_distribution,
+    "standard_uniform": standard_uniform_distribution,
     "circular_uniform": circular_uniform_distribution,
     "von_mises": von_mises_distribution,
     "spherical_uniform": spherical_uniform_distribution,

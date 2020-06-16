@@ -62,10 +62,10 @@ def sample_batch(
         boolean tensor containing accept/reject history of chain
     """
     with torch.no_grad():  # don't track gradients
-        x, base_log_density = base_dist(batch_size + 1)
-        phi, map_log_density = loaded_model(x)  # map using trained loaded_model to phi
-
-        model_log_density = base_log_density + map_log_density
+        z, base_log_density = base_dist(batch_size + 1)
+        phi, model_log_density = loaded_model(
+            z, base_log_density
+        )  # map using trained loaded_model to phi
 
         if current_state is not None:
             phi[0] = current_state
@@ -298,9 +298,7 @@ def sample(
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
     return decorrelated_chain
 
-
 _sample_training_output = collect("sample", ("training_context",))
-
 
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""

@@ -34,8 +34,8 @@ def field_components(loaded_model, base_dist, target_dist, lattice_size):
 
     # Generate a large sample from the base distribution and pass it through the trained model
     with torch.no_grad():
-        x_base, _ = base_dist(sample_size)
-        phi_model, _ = loaded_model(x_base)
+        x_base, base_log_density = base_dist(sample_size)
+        phi_model, model_log_density = loaded_model(x_base, base_log_density)
 
     # Convert to shape (n_coords, sample_size * lattice_size)
     x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
