@@ -75,6 +75,7 @@ def sample_batch(
     chain_indices = torch.zeros(batch_size, dtype=torch.long)
 
     log_ratio = model_log_density - target_dist.log_density(phi)
+
     if not isfinite(exp(float(min(log_ratio) - max(log_ratio)))):
         raise LogRatioNanError(
             "could run into nans based on minimum and maximum log of ratio of probabilities"
@@ -301,5 +302,4 @@ _sample_training_output = collect("sample", ("training_context",))
 
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""
-    return _sample_training_output[0]
-
+    return _sample_training_output[0].transpose(0, 1).numpy()
