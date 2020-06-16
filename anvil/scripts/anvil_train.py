@@ -67,6 +67,7 @@ class TrainEnv(Environment):
             raise TrainError("Invalid runcard. Must be a file.")
 
         self.output_path = Path(self.output_path).absolute()
+        self.input_folder = self.output_path / INPUT_FOLDER_NAME
 
         if not re.fullmatch(r"[\w.\-]+", self.output_path.name):
             raise TrainError("Invalid output folder name. Must be alphanumeric.")
@@ -79,7 +80,6 @@ class TrainEnv(Environment):
         self.output_path.mkdir()
         (self.output_path / "checkpoints").mkdir()
         (self.output_path / "logs").mkdir()
-        self.input_folder = self.output_path / INPUT_FOLDER_NAME
         self.input_folder.mkdir()
 
         shutil.copy2(self.config_yml, self.output_path / RUNCARD_COPY_FILENAME)
