@@ -146,6 +146,33 @@ def quadratic_spline(
     )
 
 
+def rational_quadratic_spline(
+    size_half,
+    n_pairs=1,
+    interval=4,
+    n_segments=4,
+    hidden_shape=[24,],
+    activation="leaky_relu",
+    batch_normalise=False,
+):
+    """Action that returns a callable object that performs a pair of circular spline
+    transformations, one on each half of the input vector."""
+    return Sequential(
+        *[
+            coupling_pair(
+                layers.RationalQuadraticSplineLayer,
+                size_half,
+                interval=interval,
+                n_segments=n_segments,
+                hidden_shape=hidden_shape,
+                activation=activation,
+                batch_normalise=batch_normalise,
+            )
+            for _ in range(n_pairs)
+        ]
+    )
+
+
 def circular_spline(
     size_half,
     n_segments=4,
@@ -171,6 +198,7 @@ MODEL_OPTIONS = {
     "real_nvp_sphere": real_nvp_sphere,
     "linear_spline": linear_spline,
     "quadratic_spline": quadratic_spline,
+    "rational_quadratic_spline": rational_quadratic_spline,
     "circular_spline": circular_spline,
     "ncp_circle": ncp_circle,
 }
