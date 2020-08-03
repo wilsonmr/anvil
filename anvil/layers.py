@@ -1029,3 +1029,41 @@ class GlobalAffineLayer(nn.Module):
         """Forward pass of the global affine transformation."""
         log_density -= torch.log(self.scale) * x_input.shape[1]
         return self.scale * x_input + self.shift, log_density
+
+
+class BatchNormLayer(nn.Module):
+    """Performs batch normalisation on the input vector.
+    
+    Unlike traditional batch normalisation, due to translational invariance we take
+    averages over each dimension as well as the batch and scale every dimension by the
+    same quantity.
+
+    In addition, there is the option for a pre-defined or learnable multiplicative
+    factor, to be applied after the batch normalisation.
+
+    Parameters
+    ----------
+    scale: int
+        An additional scale factor to be applied after batch normalisation. A negative
+        input means this will be a learnable parameter, initialised at 1.
+
+    Methods
+    -------
+    forward(x_input, log_density)
+        see docstring for anvil.layers 
+    """
+
+    def __init__(self, scale=1):
+        super().__init__()
+        if scale < 0:
+            self.scale = nn.Parameter(torch.tensor([1.0]))
+        else:
+            self.scale = scale
+        self.eps = 0.00001
+
+    def forward(self, x_input, log_density):
+        """Forward pass of the batch normalisation transformation."""
+        mult = self.scale / torch.sqrt(torch.var(x_input) + self.eps)
+        phi_out = (x_input - x_input.mean()) * mult
+        log_density -= x_input.shape[1] * torch.log(mult)
+        return phi_out, log_density
