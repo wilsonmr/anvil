@@ -8,7 +8,7 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import normalising_flow, convex_combination
+from anvil.core import normalising_flow
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
@@ -137,22 +137,11 @@ class ConfigParser(Config):
         except KeyError:
             raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
 
-    def parse_n_mixture(self, n: int):
-        """Number of replica models which we can combine using convex combinations."""
-        return n
-
-    def produce_mixture_indices(self, n_mixture=1):
-        """Produce iterable which we can collect over to produce multiple flow replicas."""
-        return [{"i_mixture": i} for i in range(n_mixture)]
-
     @explicit_node
     def produce_model_to_load(self, n_mixture=1):
         """Produce the generative model, whose parameters are to be loaded, which maps
         the base to an approximate of the target distribution."""
-        if n_mixture == 1:
-            return normalising_flow  # no replica flows
-        else:
-            return convex_combination
+        return normalising_flow
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

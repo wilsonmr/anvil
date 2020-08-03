@@ -13,7 +13,7 @@ model: ncp_circle
 model_spec:
     hidden_shape: [24]    
 
-n_mixture: 1
+
 
 # Training
 n_batch: 1000

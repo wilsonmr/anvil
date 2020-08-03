@@ -119,77 +119,6 @@ class NeuralNetwork(nn.Module):
         return self.network(x)
 
 
-class ConvexCombination(nn.Module):
-    r"""
-    Class which takes a set of normalising flows and constructs a convex combination
-    of their outputs to produce a single output distribution and the logarithm of its
-    volume element, calculated using the change of variables formula.
-
-    A convex combination is a weighted sum of elements
-        
-        f(x_1, x_2, ..., x_N) = \sum_{i=1}^N \rho_i x_i
-
-    where the weights are normalised, \sum_{i=1}^N \rho_i = 1.
-
-    Parameters
-    ----------
-    flow_replica
-        A list of replica normalising flow models.
-    
-    Methods
-    -------
-    forward(x_input, log_density):
-        Returns the convex combination of probability densities output by the flow
-        replica, along with the convex combination of logarithms of probability 
-        densities.
-
-    Notes
-    -----
-    It is assumed that the log_density input to the forward method is the logarithm
-    of a *normalised* probability density - i.e. the base log density is normalised and
-    we don't neglect additive constants to the log density during the flow.
-    """
-
-    def __init__(self, flow_replica):
-        super().__init__()
-        self.flows = nn.ModuleList(flow_replica)
-        self.weights = nn.Parameter(torch.rand(len(flow_replica)))
-        self.norm_func = nn.Softmax(dim=0)
-
-    def forward(self, x_input, log_density_base):
-        """Forward pass of the model.
-
-        Parameters
-        ----------
-        x_input: torch.Tensor
-            stack of input vectors drawn from the base distribution
-        log_density_base: torch.Tensor
-            The logarithm of the probability density of the base distribution.
-
-        Returns
-        -------
-        out: torch.Tensor
-            the convex combination of the output probability densities.
-        log_density: torch.Tensor
-            the logarithm of the probability density for the convex combination of
-            output densities, added to the base log density.
-        """
-        weights_norm = self.norm_func(self.weights)
-
-        phi_out, density = 0, 0
-        for weight, flow in zip(weights_norm, self.flows):
-            # don't want each flow to update same input tensor
-            input_copy = x_input.clone()
-            # don't want to add to base density
-            zero_density = torch.zeros_like(log_density_base)
-
-            phi_flow, log_dens_flow = flow(input_copy, zero_density)
-            phi_out += weight * phi_flow
-            density += weight * torch.exp(log_dens_flow)
-
-        return phi_out, log_density_base + torch.log(density)
-
-
 _normalising_flow = collect("model_action", ("model_spec",))
 
 
@@ -197,12 +126,3 @@ def normalising_flow(_normalising_flow, i_mixture=1):
     """Return a callable model which is a normalising flow constructed via
     function composition."""
     return _normalising_flow[0]
-
-
-_flow_replica = collect("normalising_flow", ("mixture_indices",))
-
-
-def convex_combination(_flow_replica):
-    """Return a callable model which is a convex combination of multiple
-    normalising flows."""
-    return ConvexCombination(_flow_replica)

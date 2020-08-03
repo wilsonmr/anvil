@@ -5,7 +5,7 @@ lattice_dimension: 2
 # Target
 target: von_mises
 concentration: 0.7
-mean: 1.0
+mean.0
 
 # Model
 base: circular_uniform
@@ -13,7 +13,6 @@ model: real_nvp_circle
 model_spec:
     n_affine: 1
     hidden_shape: [24]
-n_mixture: 4
           
 # Training
 n_batch: 1000

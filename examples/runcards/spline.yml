@@ -13,7 +13,7 @@ model: circular_spline
 model_spec:
     n_segments: 16
     hidden_shape: [64]
-n_mixture: 1
+
 
 # Training
 n_batch: 1000

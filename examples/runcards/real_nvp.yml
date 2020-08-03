@@ -14,7 +14,7 @@ model: real_nvp
 model_spec:
     n_affine: 4
     hidden_shape: [36]
-n_mixture: 1
+
 
 # Training
 n_batch: 1000
