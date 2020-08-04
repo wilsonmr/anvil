@@ -13,7 +13,7 @@ ACTIVATION_LAYERS = {
     "tanh": nn.Tanh,
     None: nn.Identity,
 }
-
+SYMMETRIC_ACTIVATIONS = ("tanh", None)
 
 class Sequential(nn.Sequential):
     """Modify the nn.Sequential class so that it takes an input vector *and* a
@@ -48,9 +48,6 @@ class NeuralNetwork(nn.Module):
     final_activation: (str, None)
         Key representing the activation function used on the final
         layer.
-    batch_normalise: bool
-        Flag dictating whether batch normalisation should be performed
-        before the activation function.
 
     Methods
     -------
@@ -67,34 +64,35 @@ class NeuralNetwork(nn.Module):
         hidden_shape: list,
         activation: (str, None),
         final_activation: (str, None) = None,
-        batch_normalise: bool = False,
+        symmetric: bool = False,
     ):
         super(NeuralNetwork, self).__init__()
         self.size_in = size_in
         self.size_out = size_out
         self.hidden_shape = hidden_shape
 
-        if batch_normalise:
-            self.batch_norm = nn.BatchNorm1d
-        else:
-            self.batch_norm = nn.Identity
-
         self.activation_func = ACTIVATION_LAYERS[activation]
         self.final_activation_func = ACTIVATION_LAYERS[final_activation]
+
+        if symmetric:
+            self.bias = False
+            # TODO: check this in config
+            assert activation in SYMMETRIC_ACTIVATIONS
+            assert final_activation in SYMMETRIC_ACTIVATIONS
+        else:
+            self.bias = True
 
         # nn.Sequential object containing the network layers
         self.network = self._construct_network()
 
     def _block(self, f_in, f_out, activation_func):
         """Constructs a single 'dense block' which maps 'f_in' inputs to
-        'f_out' output features. Returns a list with three elements:
-            - Dense (linear) layer
-            - Batch normalisation (or identity if this is switched off)
+        'f_out' output features. Returns a list with two elements:
+            - Fully connected layer
             - Activation function
         """
         return [
-            nn.Linear(f_in, f_out),
-            self.batch_norm(f_out),
+            nn.Linear(f_in, f_out, bias=self.bias),
             activation_func(),
         ]
 

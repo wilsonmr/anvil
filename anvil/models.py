@@ -31,9 +31,9 @@ def real_nvp(
     size_half,
     n_affine,
     hidden_shape=[24,],
-    activation="leaky_relu",
-    s_final_activation="leaky_relu",
-    batch_normalise=False,
+    activation="tanh",
+    s_final_activation=None,
+    symmetric=True,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
@@ -44,7 +44,7 @@ def real_nvp(
             hidden_shape=hidden_shape,
             activation=activation,
             s_final_activation=s_final_activation,
-            batch_normalise=batch_normalise,
+            symmetric=symmetric,
         )
         for _ in range(n_affine)
     ]
@@ -77,7 +77,6 @@ def ncp_circle(
     hidden_shape=[24,],
     activation="leaky_relu",
     s_final_activation=None,
-    batch_normalise=False,
 ):
     """Action that returns a callable object that performs a sequence of transformations
     from (0, 2\pi) -> (0, 2\pi), each of which are the composition of a stereographic
@@ -89,7 +88,6 @@ def ncp_circle(
             hidden_shape=hidden_shape,
             activation=activation,
             s_final_activation=s_final_activation,
-            batch_normalise=batch_normalise,
         )
         for _ in range(n_layers)
     ]
@@ -102,7 +100,6 @@ def linear_spline(
     n_segments=4,
     hidden_shape=[24,],
     activation="leaky_relu",
-    batch_normalise=False,
 ):
     """Action that returns a callable object that performs a pair of linear spline
     transformations, one on each half of the input vector."""
@@ -113,7 +110,6 @@ def linear_spline(
             n_segments=n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
-            batch_normalise=batch_normalise,
         ),
         layers.GlobalAffineLayer(
             scale=target_support[1] - target_support[0], shift=target_support[0]
@@ -127,7 +123,6 @@ def quadratic_spline(
     n_segments=4,
     hidden_shape=[24,],
     activation="leaky_relu",
-    batch_normalise=False,
 ):
     """Action that returns a callable object that performs a pair of linear spline
     transformations, one on each half of the input vector."""
@@ -138,7 +133,6 @@ def quadratic_spline(
             n_segments=n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
-            batch_normalise=batch_normalise,
         ),
         layers.GlobalAffineLayer(
             scale=target_support[1] - target_support[0], shift=target_support[0]
@@ -149,11 +143,10 @@ def quadratic_spline(
 def rational_quadratic_spline(
     size_half,
     n_pairs=1,
-    interval=4,
+    interval=2,
     n_segments=4,
     hidden_shape=[24,],
-    activation="leaky_relu",
-    batch_normalise=False,
+    activation="tanh",
 ):
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
@@ -166,7 +159,6 @@ def rational_quadratic_spline(
                 n_segments=n_segments,
                 hidden_shape=hidden_shape,
                 activation=activation,
-                batch_normalise=batch_normalise,
             )
             for _ in range(n_pairs)
         ]
@@ -178,7 +170,6 @@ def circular_spline(
     n_segments=4,
     hidden_shape=[24,],
     activation="leaky_relu",
-    batch_normalise=False,
 ):
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
@@ -188,7 +179,6 @@ def circular_spline(
         n_segments=n_segments,
         hidden_shape=hidden_shape,
         activation=activation,
-        batch_normalise=batch_normalise,
     )
 
 

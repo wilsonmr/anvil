@@ -113,9 +113,6 @@ class AffineLayer(CouplingLayer):
     s_final_activation: str
         string which is a key for an activation function, which the output of the s
         network will be passed through.
-    batch_normalise: bool
-        flag indicating whether or not to use batch normalising within the neural
-        networks.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -143,17 +140,18 @@ class AffineLayer(CouplingLayer):
         hidden_shape: list,
         activation: str,
         s_final_activation: str,
-        batch_normalise: bool,
+        symmetric: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
+
         self.s_network = NeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=s_final_activation,
-            batch_normalise=batch_normalise,
+            symmetric=symmetric,
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
@@ -161,10 +159,12 @@ class AffineLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=None,
-            batch_normalise=batch_normalise,
+            symmetric=symmetric,
         )
         # NOTE: Could potentially have non-default inputs for s and t networks
         # by adding dictionary of overrides - e.g. s_options = {}
+
+        self.symmetric = symmetric
 
     def forward(self, x_input, log_density) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
@@ -173,6 +173,9 @@ class AffineLayer(CouplingLayer):
         x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
+
+        if self.symmetric:
+            s_out.abs_()
 
         phi_b = (x_b - t_out) * torch.exp(-s_out)
 
@@ -231,7 +234,6 @@ class NCPLayer(CouplingLayer):
         hidden_shape: list,
         activation: str,
         s_final_activation: str,
-        batch_normalise: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
@@ -242,7 +244,6 @@ class NCPLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=s_final_activation,
-            batch_normalise=batch_normalise,
         )
         self.t_network = NeuralNetwork(
             size_in=size_half,
@@ -250,7 +251,6 @@ class NCPLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=None,
-            batch_normalise=batch_normalise,
         )
         self.phase_shift = nn.Parameter(torch.rand(1))
 
@@ -312,9 +312,6 @@ class LinearSplineLayer(CouplingLayer):
     activation: str
         string which is a key for an activation function for all but the final layers
         of the network.
-    batch_normalise: bool
-        flag indicating whether or not to use batch normalising within the neural
-        network.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -339,7 +336,6 @@ class LinearSplineLayer(CouplingLayer):
         n_segments: int,
         hidden_shape: list,
         activation: str,
-        batch_normalise: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
@@ -356,7 +352,6 @@ class LinearSplineLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
-            batch_normalise=batch_normalise,
         )
         self.norm_func = nn.Softmax(dim=2)
 
@@ -423,9 +418,6 @@ class QuadraticSplineLayer(CouplingLayer):
     activation: str
         string which is a key for an activation function for all but the final layers
         of the network.
-    batch_normalise: bool
-        flag indicating whether or not to use batch normalising within the neural
-        network.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -449,7 +441,6 @@ class QuadraticSplineLayer(CouplingLayer):
         n_segments: int,
         hidden_shape: list,
         activation: str,
-        batch_normalise: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
@@ -462,7 +453,6 @@ class QuadraticSplineLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
-            batch_normalise=batch_normalise,
         )
         self.w_norm_func = nn.Softmax(dim=2)
 
@@ -565,9 +555,6 @@ class RationalQuadraticSplineLayer(CouplingLayer):
     activation: str
         string which is a key for an activation function for all but the final layers
         of the network.
-    batch_normalise: bool
-        flag indicating whether or not to use batch normalising within the neural
-        network.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -592,7 +579,6 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         n_segments: int,
         hidden_shape: list,
         activation: str,
-        batch_normalise: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
@@ -604,8 +590,8 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             size_out=size_half * (3 * n_segments - 1),
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=activation,
-            batch_normalise=batch_normalise,
+            final_activation=None,
+            symmetric=False,  # biases very useful
         )
 
         self.norm_func = nn.Softmax(dim=1)
@@ -631,13 +617,14 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         h_raw, w_raw, d_raw = (
             self.network(x_a_stand)
             .view(-1, self.size_half, 3 * self.n_segments - 1)
-            .split((self.n_segments, self.n_segments, self.n_segments - 1), dim=2)
+            .split(
+                (self.n_segments, self.n_segments, self.n_segments - 1),
+                dim=2,
+            )
         )
         h_norm = self.norm_func(h_raw[inside_mask]) * 2 * self.B
         w_norm = self.norm_func(w_raw[inside_mask]) * 2 * self.B
-        d_norm = nn.functional.pad(
-            self.softplus(d_raw[inside_mask]), (1, 1), "constant", 1
-        )
+        d_pad = nn.functional.pad(self.softplus(d_raw)[inside_mask], (1, 1), "constant", 1)
 
         x_knot_points = (
             torch.cat(
@@ -664,8 +651,8 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         w_k = torch.gather(w_norm, 1, k_ind)
         h_k = torch.gather(h_norm, 1, k_ind)
         s_k = h_k / w_k
-        d_k = torch.gather(d_norm, 1, k_ind)
-        d_kp1 = torch.gather(d_norm, 1, k_ind + 1)
+        d_k = torch.gather(d_pad, 1, k_ind)
+        d_kp1 = torch.gather(d_pad, 1, k_ind + 1)
 
         x_km1 = torch.gather(x_knot_points, 1, k_ind)
         phi_km1 = torch.gather(phi_knot_points, 1, k_ind)
@@ -725,9 +712,6 @@ class CircularSplineLayer(CouplingLayer):
     activation: str
         string which is a key for an activation function for all but the final layers
         of the network.
-    batch_normalise: bool
-        flag indicating whether or not to use batch normalising within the neural
-        network.
     even_sites: bool
         dictates which half of the data is transformed as a and b, since successive
         affine transformations alternate which half of the data is passed through
@@ -754,7 +738,6 @@ class CircularSplineLayer(CouplingLayer):
         n_segments: int,
         hidden_shape: list,
         activation: str,
-        batch_normalise: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
@@ -767,7 +750,6 @@ class CircularSplineLayer(CouplingLayer):
             hidden_shape=hidden_shape,
             activation=activation,
             final_activation=activation,
-            batch_normalise=batch_normalise,
         )
         self.phase_shift = nn.Parameter(torch.rand(1))
 
