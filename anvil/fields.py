@@ -60,16 +60,42 @@ class ScalarField:
         numpy.ndarray, dimensions (lattice_volume, *, ensemble_size)"""
         return self._coords
 
+    @property
+    def coords_pos(self):
+        return self._coords_pos
+
     @coords.setter
     def coords(self, new):
         """Setter for coords which performs some basic checks (see _valid_field)."""
         self._coords = self._valid_ensemble(new)
+        self._coords_pos = np.copy(self._coords)
+        #sign = np.sign(self._coords_pos.sum(axis=0))
+        #neg = np.squeeze(np.nonzero(sign < 0))
+        #self._coords_pos[:, neg] = -self._coords_pos[:, neg]
+
+    def two_point_correlator_pos(self, bootstrap_sample_size=100):
+        correlator = np.zeros((self.lattice.volume, bootstrap_sample_size))
+        n_ens = self._coords_pos.shape[-1]
+        state = np.random.RandomState()
+
+        for i, shift in enumerate(self.lattice.two_point_iterator()):
+            for j in range(bootstrap_sample_size):
+                boot_index = state.randint(0, n_ens, size=n_ens)
+                phi = self._coords_pos[..., boot_index]
+                correlator[i, j] = np.mean(
+                    (phi[shift] * phi).mean(axis=-1) - phi.mean(axis=-1) ** 2,
+                    axis=0,  # volume average
+                )
+
+        return correlator.reshape(
+            self.lattice.length, self.lattice.length, bootstrap_sample_size
+        )
 
     @property
     def first_moment_sq(self):
         """Calculate the first moment (mean) squared of the field. Average over volume as
         well, thanks to translation invariance."""
-        return self.coords.mean(axis=(0, -1)) ** 2  # volume and ensemble dims
+        return np.abs(self.coords.mean(axis=0)).mean(axis=-1) ** 2 # ensemble av, square, volume av
 
     def _vol_avg_two_point_correlator(self, shift):
         """Helper function which calculates the volume-averaged two point correlation
@@ -113,17 +139,24 @@ class ScalarField:
     def two_point_correlator(self):
         """Two point connected correlation function. Uses multiprocessing.
         numpy.ndarray, dimensions (*lattice_dimensions, *)"""
-        return self._two_point_correlator() - self.first_moment_sq
+        return self._two_point_correlator()# - self.first_moment_sq
 
     def boot_two_point_correlator(self, bootstrap_sample_size):
         """Two point connected correlation function for a bootstrap sample of ensembles
         numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
+        #return self.two_point_correlator_pos(bootstrap_sample_size)
         return (
             self._two_point_correlator(
                 bootstrap=True, bootstrap_sample_size=bootstrap_sample_size
             )
-            - self.first_moment_sq
+            #- self.first_moment_sq
         )  # NOTE: not bootstrapping first moment. Hopefully inconsequential
+        
+        
+
+    @property
+    def magnetisation_series(self):
+        return self.coords.sum(axis=0)
 
 
 class ClassicalSpinField(ScalarField):
@@ -171,6 +204,10 @@ class ClassicalSpinField(ScalarField):
         """Updates the spin configuration or ensemble (by updating coords), also checking
         that the spin vectors have unit norm."""
         self.coords = new  # calls coords.__set__
+    
+    @property
+    def magnetisation_series(self):
+        return np.sqrt((self.coords.sum(axis=0)**2).sum(axis=0))
 
     @property
     def first_moment_sq(self):

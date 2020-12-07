@@ -13,11 +13,13 @@ from reportengine.figure import figure, figuregen
 from reportengine import collect
 
 
-def field_component(i, x_base, phi_model, phi_target=None):
+def field_component(i, x_base, phi_model, base_neg, model_neg, phi_target=None):
     fig, ax = plt.subplots()
 
     ax.hist(x_base, bins=50, density=True, histtype="step", label="base")
-    ax.hist(phi_model, bins=50, density=True, histtype="step", label="model")
+    ax.hist(phi_model, bins=50, density=True, histtype="step", label="model, full")
+    ax.hist(base_neg, bins=50, density=True, histtype="step", label="model, $M_{base} < 0$")
+    ax.hist(model_neg, bins=50, density=True, histtype="step", label="model, $M_{mod} < 0$")
     if phi_target is not None:
         ax.plot(*phi_target, label="target")
 
@@ -30,16 +32,27 @@ def field_component(i, x_base, phi_model, phi_target=None):
 def field_components(loaded_model, base_dist, target_dist, lattice_size):
     """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
     if known, plot the pdf of the target distribution."""
-    sample_size = 100000
+    sample_size = 10000
 
     # Generate a large sample from the base distribution and pass it through the trained model
     with torch.no_grad():
         x_base, base_log_density = base_dist(sample_size)
-        phi_model, model_log_density = loaded_model(x_base, base_log_density)
+        sign = x_base.sum(dim=1).sign()
+        neg = (sign < 0).nonzero().squeeze() 
+        phi_model, model_log_density = loaded_model(x_base, base_log_density, neg)
+
+    base_neg = phi_model[neg]
+        
+    sign = phi_model.sum(dim=1).sign()
+    neg = (sign < 0).nonzero().squeeze()
+    model_neg = phi_model[neg]
 
     # Convert to shape (n_coords, sample_size * lattice_size)
     x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
     phi_model = phi_model.reshape(sample_size * lattice_size, -1).transpose(0, 1)
+
+    base_neg = base_neg.reshape(1, -1)
+    model_neg = model_neg.reshape(1, -1)
 
     # Include target density if known
     if hasattr(target_dist, "pdf"):
@@ -48,10 +61,42 @@ def field_components(loaded_model, base_dist, target_dist, lattice_size):
         phi_target = [None for _ in range(x_base.shape[0])]
 
     for i in range(x_base.shape[0]):
-        yield field_component(i, x_base[i], phi_model[i], phi_target[i])
+        yield field_component(i, x_base[i], phi_model[i], base_neg[i], model_neg[i], phi_target[i])
 
 
 _plot_field_components = collect("field_components", ("training_context",))
+
+
+def example_configs(loaded_model, base_dist, training_geometry):
+    sample_size = 10
+
+    # Generate a large sample from the base distribution and pass it through the trained model
+    with torch.no_grad():
+        x_base, base_log_density = base_dist(sample_size)
+        sign = x_base.sum(dim=1).sign()
+        neg = (sign < 0).nonzero().squeeze()
+        phi_model, model_log_density = loaded_model(x_base, base_log_density, neg)
+
+    L = int(np.sqrt(phi_model.shape[1]))
+
+    phi_true = np.zeros((4, L, L))
+    phi_true[:, training_geometry.checkerboard] = phi_model[:4, :L**2 // 2]
+    phi_true[:, ~training_geometry.checkerboard] = phi_model[:4, L**2 // 2:]
+
+    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)
+    for i, ax in enumerate(axes.flatten()):
+        conf = ax.imshow(phi_true[i])
+        fig.colorbar(conf, ax=ax)
+    
+    fig.suptitle("Example configurations")
+
+    return fig
+
+_plot_example_configs = collect("example_configs", ("training_context",))
+
+@figure
+def plot_example_configs(_plot_example_configs):
+    return _plot_example_configs[0]
 
 
 @figuregen
@@ -119,6 +164,8 @@ def plot_exponential_correlation_length(
     ax.set_xlabel("$t$")
     ax.set_title("Exponential correlation length")
     return fig
+
+
 
 
 @figure
@@ -227,9 +274,7 @@ def plot_two_point_correlator_integrated_autocorr(
     """
     cut = max(10, 2 * np.max(two_point_correlator_optimal_window))
     chain_indices = np.arange(cut) * sample_interval
-    tau = np.max(
-        two_point_correlator_integrated_autocorr[:, two_point_correlator_optimal_window]
-    )
+    tau = two_point_correlator_integrated_autocorr[:, two_point_correlator_optimal_window].mean()
 
     fig, ax = plt.subplots()
     ax.set_title("Integrated autocorrelation of volume-averaged two point function")
@@ -261,12 +306,79 @@ def plot_two_point_correlator_integrated_autocorr(
     ax.legend()
     return fig
 
+@figure
+def plot_magnetisation_series(magnetisation_series, sample_interval):
+    chain_indices = np.arange(magnetisation_series.shape[-1]) * sample_interval
+    fig, ax = plt.subplots()
+    ax.set_title("Magnetisation")
+    ax.set_ylabel("$M(t)$")
+    ax.set_xlabel("$t$")
+    ax.plot(
+        chain_indices, magnetisation_series, linestyle="-", linewidth=0.5,
+    )
+    return fig
+
+@figure
+def plot_magnetisation_autocorr(
+    magnetisation_autocorr, magnetisation_optimal_window, sample_interval
+):
+    cut = max(10, 2 * magnetisation_optimal_window)
+    chain_indices = np.arange(cut) * sample_interval
+
+    fig, ax = plt.subplots()
+    ax.set_title("Autocorrelation of magnetisation")
+    ax.set_ylabel(r"$\Gamma_M(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    ax.plot(
+        chain_indices, magnetisation_autocorr[:cut], linestyle="--", linewidth=0.5,
+    )
+    ax.axvline(
+        magnetisation_optimal_window * sample_interval, linestyle="-", color="r",
+    )
+    ax.set_xlim(left=0)
+    ax.set_ylim(top=1)
+    return fig
+
+
+@figure
+def plot_magnetisation_integrated_autocorr(
+    magnetisation_integrated_autocorr,
+    magnetisation_optimal_window,
+    sample_interval,
+):
+    cut = max(10, 2 * np.max(magnetisation_optimal_window))
+    chain_indices = np.arange(cut) * sample_interval
+    tau = magnetisation_integrated_autocorr[magnetisation_optimal_window]
+
+    fig, ax = plt.subplots()
+    ax.set_title("Integrated autocorrelation of magnetisation")
+    ax.set_ylabel(r"$\sum \Gamma_M(\delta t)$")
+    ax.set_xlabel("$\delta t$")
+
+    ax.plot(
+        chain_indices,
+        magnetisation_integrated_autocorr[:cut],
+        linestyle="--",
+        linewidth=0.5,
+    )
+    ax.axvline(
+        magnetisation_optimal_window * sample_interval, linestyle="-", color="r",
+    )
+    ax.annotate(
+        fr"$\tau_M$ / {sample_interval} = {tau:.2g}",
+        xy=(0.05, 0.05),
+        xycoords="axes fraction",
+    )
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0.5)
+    return fig
 
 @figure
 def plot_topological_charge_series(topological_charge_series, sample_interval):
     """Plot the topological charge of the ensemble as a series, ordered by the positions
     of the configurations in the Markov chain."""
-    chain_indices = np.arange(topological_series.shape[-1]) * sample_interval
+    chain_indices = np.arange(topological_charge_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
     ax.set_title("Topological charge")
     ax.set_ylabel("$Q(t)$")
