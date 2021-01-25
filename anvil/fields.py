@@ -1,5 +1,6 @@
 import numpy as np
 from math import pi
+from sys import maxsize
 
 from anvil.utils import Multiprocessing, bootstrap_sample, spher_to_eucl, unit_norm
 
@@ -8,8 +9,8 @@ from reportengine import collect
 
 class ScalarField:
     """
-    Class for ensembles of scalar fields. 
-    
+    Class for ensembles of scalar fields.
+
     Parameters
     ----------
     input_coords: numpy.ndarray
@@ -25,10 +26,11 @@ class ScalarField:
 
     Notes
     -----
-    (1) The lattice field theory is assumed to possess a translational symmetry in the
-        directions specified by the primitive lattice vectors. This allows the definition
-        of a two point correlation function that is a function of separations only (not
-        absolute coordinates) by averaging over the lattice sites.
+    (1) The lattice field theory is assumed to respect the lattice analogues of homogeneity
+    and isotropy, i.e. to be invariant under global translations along the natural axes of
+    the lattice, and under discrete rotations mapping lattice axes onto each other. This
+    allows the definition of a two point correlation function that is a function of separations
+    only (not absolute coordinates) by averaging over the lattice sites.
     """
 
     minimum_dimensions = 2
@@ -60,68 +62,25 @@ class ScalarField:
         numpy.ndarray, dimensions (lattice_volume, *, ensemble_size)"""
         return self._coords
 
-    @property
-    def coords_pos(self):
-        return self._coords_pos
-
     @coords.setter
     def coords(self, new):
         """Setter for coords which performs some basic checks (see _valid_field)."""
         self._coords = self._valid_ensemble(new)
         self._coords_pos = np.copy(self._coords)
-        #sign = np.sign(self._coords_pos.sum(axis=0))
-        #neg = np.squeeze(np.nonzero(sign < 0))
-        #self._coords_pos[:, neg] = -self._coords_pos[:, neg]
-
-    def two_point_correlator_pos(self, bootstrap_sample_size=100):
-        correlator = np.zeros((self.lattice.volume, bootstrap_sample_size))
-        n_ens = self._coords_pos.shape[-1]
-        state = np.random.RandomState()
-
-        for i, shift in enumerate(self.lattice.two_point_iterator()):
-            for j in range(bootstrap_sample_size):
-                boot_index = state.randint(0, n_ens, size=n_ens)
-                phi = self._coords_pos[..., boot_index]
-                correlator[i, j] = np.mean(
-                    (phi[shift] * phi).mean(axis=-1) - phi.mean(axis=-1) ** 2,
-                    axis=0,  # volume average
-                )
-
-        return correlator.reshape(
-            self.lattice.length, self.lattice.length, bootstrap_sample_size
-        )
 
     @property
-    def first_moment_sq(self):
-        """Calculate the first moment (mean) squared of the field. Average over volume as
-        well, thanks to translation invariance."""
-        return np.abs(self.coords.mean(axis=0)).mean(axis=-1) ** 2 # ensemble av, square, volume av
+    def magnetisation_series(self):
+        return self.coords.sum(axis=0)
+
+    @property
+    def magnetisation(self):
+        return magnetisation_series.mean(axis=-1)
 
     def _vol_avg_two_point_correlator(self, shift):
         """Helper function which calculates the volume-averaged two point correlation
         function for a single shift, given in lexicographical form as an argument.
         """
         return (self.coords[shift] * self.coords).mean(axis=0)
-
-    def _two_point_correlator(self, bootstrap=False, bootstrap_sample_size=100):
-        """Helper function which executes multiprocessing function to calculate two
-        point correlator."""
-        if bootstrap:
-            func = lambda shift: bootstrap_sample(
-                self._vol_avg_two_point_correlator(shift), bootstrap_sample_size
-            ).mean(axis=-1)
-        else:
-            func = lambda shift: self._vol_avg_two_point_correlator(shift).mean(axis=-1)
-        mp_correlator = Multiprocessing(
-            func=func, generator=self.lattice.two_point_iterator
-        )
-        correlator_dict = mp_correlator()
-        extra_dims = correlator_dict[0].shape  # bootstrap/concurrent sample dimension
-
-        correlator = np.array([correlator_dict[i] for i in range(self.lattice.volume)])
-        return correlator.reshape(
-            (self.lattice.length, self.lattice.length, *extra_dims)
-        )
 
     @property
     def two_point_correlator_series(self):
@@ -135,28 +94,86 @@ class ScalarField:
             correlator.append(self._vol_avg_two_point_correlator(shift))
         return np.array(correlator)
 
+    def _two_point_correlator(self, connected=False):
+        """Helper function which calculates the two point correlation function for all
+        shifts, using multiprocessing. The order of the sums over volume and ensemble
+        are swapped for efficiency reasons - we can bootstrap the volume-averaged
+        correlator rather than the ensemble of fields themselves."""
+        # Compute first term, using multiprocessing
+        mp_correlator = Multiprocessing(
+            func=lambda shift: self._vol_avg_two_point_correlator(shift).mean(axis=-1),
+            generator=self.lattice.two_point_iterator,
+        )
+        correlator_dict = mp_correlator()  # multiprocessing returns a dict
+        extra_dims = correlator_dict[0].shape  # concurrent samples dimension
+
+        # Expand dict to numpy array, dimensions (lattice.length**2, *extra_dims)
+        correlator = np.array([correlator_dict[i] for i in range(self.lattice.volume)])
+
+        if connected:  # subtract disconnected part: <|m|>^2
+            correlator -= np.abs(self.coords.mean(axis=0)).mean(axis=-1) ** 2
+
+        return correlator.reshape(
+            (self.lattice.length, self.lattice.length, *extra_dims)
+        )
+
+    def _boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
+        """Helper function which executes multiprocessing function to calculate the
+        bootstrapped two point correlation function."""
+        
+        # Want to use a seed for the RNG that generates the bootstrap indices,
+        # so we can generate the same indices for both terms in the correlator.
+        seed = np.random.randint(maxsize)
+
+        # Compute first term, using multiprocessing
+        func = lambda shift: bootstrap_sample(
+            self._vol_avg_two_point_correlator(shift),
+            bootstrap_sample_size,
+            seed=seed,
+        ).mean(axis=-1)
+
+        mp_correlator = Multiprocessing(
+            func=func, generator=self.lattice.two_point_iterator
+        )
+        correlator_dict = mp_correlator()
+        extra_dims = correlator_dict[0].shape  # bootstrap+concurrent sample dimensions
+
+        correlator = np.array([correlator_dict[i] for i in range(self.lattice.volume)])
+
+        # Subtract disconnected part
+        if connected:  
+            correlator -= (
+                bootstrap_sample(
+                    np.abs(self.coords.mean(axis=0)),  # absolute magnetisation |m|
+                    bootstrap_sample_size,
+                    seed=seed,  # same seed -> same bootstrap sample as first term
+                )
+            ).mean(
+                axis=-1  # ensemble average <|m|> ...
+            ) ** 2  # ...squared <|m|>^2
+
+        return correlator.reshape(
+            (self.lattice.length, self.lattice.length, *extra_dims)
+        )
+
     @property
     def two_point_correlator(self):
-        """Two point connected correlation function. Uses multiprocessing.
+        """Two point correlation function. Uses multiprocessing.
         numpy.ndarray, dimensions (*lattice_dimensions, *)"""
-        return self._two_point_correlator()# - self.first_moment_sq
-
-    def boot_two_point_correlator(self, bootstrap_sample_size):
-        """Two point connected correlation function for a bootstrap sample of ensembles
-        numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
-        #return self.two_point_correlator_pos(bootstrap_sample_size)
-        return (
-            self._two_point_correlator(
-                bootstrap=True, bootstrap_sample_size=bootstrap_sample_size
-            )
-            #- self.first_moment_sq
-        )  # NOTE: not bootstrapping first moment. Hopefully inconsequential
-        
-        
+        return self._two_point_correlator()
 
     @property
-    def magnetisation_series(self):
-        return self.coords.sum(axis=0)
+    def two_point_connected_correlator(self):
+        """Two point correlation function. Uses multiprocessing.
+        numpy.ndarray, dimensions (*lattice_dimensions, *)"""
+        return self._two_point_correlator(connected=True)
+
+    def boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
+        """Two point correlation function for a bootstrap sample of ensembles
+        numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
+        return self._boot_two_point_correlator(
+            connected=connected, bootstrap_sample_size=bootstrap_sample_size
+        )
 
 
 class ClassicalSpinField(ScalarField):
@@ -204,17 +221,10 @@ class ClassicalSpinField(ScalarField):
         """Updates the spin configuration or ensemble (by updating coords), also checking
         that the spin vectors have unit norm."""
         self.coords = new  # calls coords.__set__
-    
-    @property
-    def magnetisation_series(self):
-        return np.sqrt((self.coords.sum(axis=0)**2).sum(axis=0))
 
     @property
-    def first_moment_sq(self):
-        """Calculate the first moment (mean) squared of the field. Average over volume as
-        well, thanks to translation invariance."""
-        # Average over volume and ensemble, then do dot product
-        return self.spins.mean(axis=(0, -1)).sum(axis=0)
+    def magnetisation_series(self):
+        return np.sqrt((self.coords.sum(axis=0) ** 2).sum(axis=0))
 
     @property
     def hamiltonian(self):
@@ -240,7 +250,8 @@ class ClassicalSpinField(ScalarField):
         function for a single shift, given in lexicographical form as an argument.
         """
         return np.sum(
-            self.spins[shift] * self.spins, axis=1,  # sum over vector components
+            self.spins[shift] * self.spins,
+            axis=1,  # sum over vector components
         ).mean(
             axis=0  # average over volume
         )

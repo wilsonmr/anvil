@@ -116,18 +116,12 @@ class AdditiveLayer(CouplingLayer):
             symmetric=symmetric,
         )
 
-        self.symmetric = symmetric
-
-    def forward(self, x_input, log_density) -> torch.Tensor:
+    def forward(self, x_input, log_density, *unused) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
-        if self.symmetric:
-            x_a_stand = x_a / x_a.std()
-        else:
-            x_a_stand = (
-                x_a  # (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
-            )
+        x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
+
         t_out = self.t_network(x_a_stand)
 
         phi_b = x_b - t_out
@@ -217,24 +211,17 @@ class AffineLayer(CouplingLayer):
 
         self.symmetric_networks = symmetric_networks
 
-    def forward(self, x_input, log_density, neg) -> torch.Tensor:
+    def forward(self, x_input, log_density, *unused) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
-        if self.symmetric_networks:
-            x_a_stand = x_a / x_a.std()
-        else:
-            x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
-
-            x_a_stand[neg] = -x_a_stand[neg]  # still symmetric, but different approach
+        x_a_stand = (x_a - x_a.mean()) / x_a.std()
 
         s_out = self.s_network(x_a_stand)
         t_out = self.t_network(x_a_stand)
 
         if self.symmetric_networks:
             s_out.abs_()
-        else:
-            t_out[neg] = -t_out[neg]
 
         phi_b = (x_b - t_out) * torch.exp(-s_out)
 
@@ -316,7 +303,7 @@ class NCPLayer(CouplingLayer):
         )
         self.phase_shift = nn.Parameter(torch.rand(1))
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the project-affine-inverse transformation."""
         x_a = x_input[..., self._a_ind]
         x_b = x_input[..., self._b_ind]
@@ -417,7 +404,7 @@ class LinearSplineLayer(CouplingLayer):
         )
         self.norm_func = nn.Softmax(dim=2)
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the linear spline layer."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
@@ -527,7 +514,7 @@ class QuadraticSplineLayer(CouplingLayer):
             0.5 * w_norm * (torch.exp(h_raw[..., :-1]) + torch.exp(h_raw[..., 1:]))
         ).sum(dim=2, keepdim=True)
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the quadratic spline layer."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
@@ -670,14 +657,15 @@ class RationalQuadraticSplineLayer(CouplingLayer):
 
         self.force_symmetry = symmetric_spline
 
-    def forward(self, x_input, log_density, neg):
+    def forward(self, x_input, log_density, negative_mag):
         """Forward pass of the rational quadratic spline layer."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
         x_a_stand = (x_a - x_a.mean()) / x_a.std()  # reduce numerical instability
 
+        # Naively enforce \phi \to -\phi symmetry
         if self.force_symmetry:
-            x_a_stand[neg] = -x_a_stand[neg]
+            x_a_stand[negative_mag] = -x_a_stand[negative_mag]
 
         phi_b = torch.zeros_like(x_b)
         grad = torch.ones_like(x_b).unsqueeze(dim=-1)
@@ -697,9 +685,9 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         )
 
         if self.force_symmetry:
-            h_raw[neg] = torch.flip(h_raw[neg], dims=(2,))
-            w_raw[neg] = torch.flip(w_raw[neg], dims=(2,))
-            d_raw[neg] = torch.flip(d_raw[neg], dims=(2,))
+            h_raw[negative_mag] = torch.flip(h_raw[negative_mag], dims=(2,))
+            w_raw[negative_mag] = torch.flip(w_raw[negative_mag], dims=(2,))
+            d_raw[negative_mag] = torch.flip(d_raw[negative_mag], dims=(2,))
 
         h_norm = self.norm_func(h_raw[inside_mask]) * 2 * self.B
         w_norm = self.norm_func(w_raw[inside_mask]) * 2 * self.B
@@ -860,7 +848,7 @@ class CircularSplineLayer(CouplingLayer):
 
         self.eps = 1e-6
 
-    def forward(self, x_input, log_density, neg):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the rational quadratic spline layer."""
         x_a = x_input[:, self._a_ind]
         x_b = x_input[:, self._b_ind]
@@ -968,7 +956,7 @@ class ProjectionLayer(nn.Module):
         see docstring for anvil.layers
     """
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the projection transformation."""
         phi_out = torch.tan(0.5 * (x_input - pi))
         log_density -= torch.log1p(phi_out ** 2).sum(dim=1, keepdim=True)
@@ -1002,7 +990,7 @@ class InverseProjectionLayer(nn.Module):
         super().__init__()
         self.phase_shift = nn.Parameter(torch.rand(1))
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the inverse projection transformation."""
         phi_out = 2 * torch.atan(x_input) + pi
         log_density -= 2 * torch.log(torch.cos(0.5 * (phi_out - pi))).sum(
@@ -1090,7 +1078,7 @@ class InverseProjectionLayer2D(nn.Module):
         self.size_half = size_half
         self.size_out = 2 * size_half
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the inverse projection transformation."""
         proj_x, proj_y = x_input.view(-1, self.size_half, 2).split(1, dim=2)
 
@@ -1116,7 +1104,7 @@ class GlobalAdditiveLayer(nn.Module):
             self.shift = shift_init
             self.F = lambda x: x
 
-    def forward(self, x_input, log_density, neg):
+    def forward(self, x_input, log_density, *unused):
         shift = x_input.mean(dim=1, keepdim=True).sign() * self.F(self.shift)
         return x_input + shift, log_density
 
@@ -1150,10 +1138,9 @@ class GlobalAffineLayer(nn.Module):
 
         self.shift = shift
 
-    def forward(self, x_input, log_density):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the global affine transformation."""
         gamma = self.softplus(self.scale)
-        # print(gamma)
         log_density -= torch.log(gamma) * x_input.shape[1]
         return gamma * x_input + self.shift, log_density
 
@@ -1192,7 +1179,7 @@ class BatchNormLayer(nn.Module):
 
         self.eps = 0.00001
 
-    def forward(self, x_input, log_density, neg):
+    def forward(self, x_input, log_density, *unused):
         """Forward pass of the batch normalisation transformation."""
         gamma = self.soft(self.scale)
         mult = gamma / torch.sqrt(torch.var(x_input) + self.eps)

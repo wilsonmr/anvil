@@ -231,6 +231,9 @@ class ConfigParser(Config):
         log.warning(f"Using user specified n_boot: {n_boot}")
         return n_boot
 
+    def parse_connected_correlator(self, connected: bool):
+        return connected
+
     @element_of("windows")
     def parse_window(self, window: float):
         """A numerical factor featuring in the calculation of the optimal 'window'

@@ -26,7 +26,7 @@ def loaded_checkpoint(checkpoint):
 def train_range(loaded_checkpoint, epochs):
     if loaded_checkpoint is not None:
         cp_epoch = loaded_checkpoint["epoch"]
-        train_range = (cp_epoch, cp_epoch + epochs)
+        train_range = (cp_epoch, epochs)
     else:
         train_range = (0, epochs)
     return train_range

@@ -20,7 +20,7 @@ def autocorrelation(chain):
 def optimal_window(integrated, mult=2.0, eps=1e-6):
     """Calculates a window length such that, when the integrated autocorrelation is
     calculated within this window, the total error is at a minimum.
-    
+
     Notes
     -----
     See U. Wolff, Monte Carlo errors with less errors, section 3.3
@@ -53,11 +53,12 @@ def optimal_window(integrated, mult=2.0, eps=1e-6):
 # ------------------------------------------------------------------------------------- #
 
 
-def two_point_correlator(field_ensemble, n_boot):
+def two_point_correlator(field_ensemble, connected_correlator, n_boot):
     """Bootstrap sample of two point connected correlation functions for the
     field ensemble."""
-    return field_ensemble.boot_two_point_correlator(n_boot)
-
+    return field_ensemble.boot_two_point_correlator(
+        connected=connected_correlator, bootstrap_sample_size=n_boot
+    )
 
 def zero_momentum_correlator(two_point_correlator):
     """Two point correlator at zero spatial momentum."""
@@ -167,9 +168,7 @@ def magnetisation(_magnetisation, training_geometry):
 
 
 def magnetic_susceptibility(_magnetisation, training_geometry):
-    return (
-        (_magnetisation ** 2).mean(axis=-1)
-    ) / training_geometry.length ** 2
+    return ((_magnetisation ** 2).mean(axis=-1)) / training_geometry.length ** 2
 
 
 def magnetic_susceptibility_v2(_magnetisation, training_geometry):

@@ -6,6 +6,9 @@ Module containing functions required to train model
 
 from tqdm import tqdm
 
+import signal
+import sys
+
 import torch
 import torch.optim as optim
 
@@ -14,6 +17,31 @@ from anvil.utils import get_num_parameters
 import logging
 
 log = logging.getLogger(__name__)
+
+
+def handler(signum, frame):
+    """Handles keyboard interruptions and terminations and exits in such a way that,
+    if the program is currently inside a try-except-finally block, the finally clause
+    will be executed."""
+    sys.exit(1)
+
+
+signal.signal(signal.SIGTERM, handler)  # termination
+signal.signal(signal.SIGINT, handler)  # keyboard interrupt
+
+
+def save_checkpoint(outpath, epoch, loss, model, optimizer, scheduler):
+    torch.save(
+        {
+            "epoch": epoch,
+            "loss": loss,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+        },
+        f"{outpath}/checkpoint_{epoch}.pt",
+    )
+    tqdm.write(f"Checkpoint saved at epoch {epoch}")
 
 
 def shifted_kl(
@@ -42,88 +70,110 @@ def shifted_kl(
     return torch.mean(model_log_density - target_log_density, dim=0)
 
 
+def training_update(
+    loaded_model,
+    base_dist,
+    target_dist,
+    n_batch,
+    current_loss,
+    loaded_optimizer,
+    loaded_scheduler,
+):
+    """A single training update or 'epoch'."""
+    # gen simple states (gradients not tracked)
+    x, base_log_density = base_dist(n_batch)
+
+    # pick out configs whose d.o.f sum to < 0
+    # TODO: annoying to do this in the training loop
+    # TODO: replace with call to function which returns *extra_args for loaded_model,
+    # which is chosen by user based on theory being studied.
+    negative_mag = (x.sum(dim=1).sign() < 0).nonzero().squeeze()
+
+    # apply inverse map, calc log density of forward map (gradients tracked)
+    phi, model_log_density = loaded_model(x, base_log_density, negative_mag)
+
+    # compute loss function (gradients tracked)
+    target_log_density = target_dist.log_density(phi)
+    current_loss = shifted_kl(model_log_density, target_log_density)
+
+    # backprop and step model parameters
+    loaded_optimizer.zero_grad()  # zero gradients from prev minibatch
+    current_loss.backward()  # accumulate new gradients
+    loaded_optimizer.step()
+
+    # TODO: we have different scheduler updates depending on which we're using...
+    # loaded_scheduler.step(current_loss)
+    loaded_scheduler.step()
+
+    return current_loss
+
+
 def train(
     loaded_model,
     base_dist,
     target_dist,
     *,
     train_range,
-    save_interval,
     n_batch,
     outpath,
     current_loss,
     loaded_optimizer,
     loaded_scheduler,
-    increase_batch=False,
-    decrease_lr=False,
+    save_interval=1000,
 ):
-    """training loop of model"""
+    """Loop over training updates, periodically saving checkpoints."""
 
+    # Let the user know the total number of model parameters
+    # TODO: should have a --verbose option which controls whether we care about stuff like this
     num_parameters = get_num_parameters(loaded_model)
     log.info(f"Model has {num_parameters} trainable parameters.")
 
-    if increase_batch is not False:
-        ib_epoch, ib_add = increase_batch
-        increase_batch = True
-    if decrease_lr is not False:
-        dlr_epoch, dlr_mult = decrease_lr
-        decrease_lr = True
+    current_epoch, final_epoch = train_range
+    pbar = tqdm(total=(final_epoch - current_epoch))
 
-    # let's use tqdm to see progress
-    pbar = tqdm(range(*train_range), desc=f"loss: {current_loss}")
-    for i in pbar:
-        if (i % save_interval) == 0:
-            torch.save(
-                {
-                    "epoch": i,
-                    "model_state_dict": loaded_model.state_dict(),
-                    "optimizer_state_dict": loaded_optimizer.state_dict(),
-                    "loss": current_loss,
-                },
-                f"{outpath}/checkpoint_{i}.pt",
+    # try, finally statement allows us to save checkpoint in case of unexpected SIGTERM or SIGINT
+    try:
+        while current_epoch < final_epoch:
+
+            if (current_epoch % save_interval) == 0:
+                save_checkpoint(
+                    outpath,
+                    epoch=current_epoch,
+                    loss=current_loss,
+                    model=loaded_model,
+                    optimizer=loaded_optimizer,
+                    scheduler=loaded_scheduler,
+                )
+
+            current_loss = training_update(
+                loaded_model,
+                base_dist,
+                target_dist,
+                n_batch,
+                current_loss,
+                loaded_optimizer,
+                loaded_scheduler,
             )
-        # gen simple states (gradients not tracked)
-        x, base_log_density = base_dist(n_batch)
+            # Increment counter immediately after training update
+            current_epoch += 1
+            pbar.update()
 
-        sign = x.sum(dim=1).sign()
-        neg = (sign < 0).nonzero().squeeze()
+            if (current_epoch % 25) == 0:
+                pbar.set_description(f"loss: {current_loss.item()}")
 
-        # apply inverse map, calc log density of forward map (gradients tracked)
-        phi, model_log_density = loaded_model(x, base_log_density, neg)
+                # TODO again want some flag that controls whether to save this data
+                with open("loss.txt", "a") as f:
+                    f.write(f"{float(current_loss)}\n")
 
-        # compute loss function (gradients tracked)
-        target_log_density = target_dist.log_density(phi)
-        current_loss = shifted_kl(model_log_density, target_log_density)
-
-        # backprop and step model parameters
-        loaded_optimizer.zero_grad()  # zero gradients from prev minibatch
-        current_loss.backward()  # accumulate new gradients
-        loaded_optimizer.step()
-        
-        #loaded_scheduler.step(current_loss)
-        loaded_scheduler.step()
-        
-        if (i % 50) == 0:
-            pbar.set_description(f"loss: {current_loss.item()}")
-            with open("loss.txt", "a") as f:
-                f.write(f"{float(current_loss)}\n")
-
-        if increase_batch and i == ib_epoch:
-            n_batch += ib_add
-            log.info(f"increasing batch size to {n_batch}")
-        if decrease_lr and i == dlr_epoch:
-            loaded_scheduler.base_lrs[0] *= dlr_mult
-            log.info(f"decreasing max lr to {loaded_scheduler.base_lrs[0]}")
-        
-    torch.save(
-        {
-            "epoch": train_range[-1],
-            "model_state_dict": loaded_model.state_dict(),
-            "optimizer_state_dict": loaded_optimizer.state_dict(),
-            "loss": current_loss,
-        },
-        f"{outpath}/checkpoint_{train_range[-1]}.pt",
-    )
+    finally:  # executed after while loop, or if sys.exit is called
+        save_checkpoint(
+            outpath,
+            epoch=current_epoch,
+            loss=current_loss,
+            model=loaded_model,
+            optimizer=loaded_optimizer,
+            scheduler=loaded_scheduler,
+        )
 
     return loaded_model
 
@@ -245,6 +295,7 @@ def rms_prop(
 
 def reduce_lr_on_plateau(
     loaded_optimizer,
+    loaded_checkpoint,
     *,
     lr_reduction_factor=0.1,
     min_learning_rate=0,
@@ -255,7 +306,7 @@ def reduce_lr_on_plateau(
     scheduler_threshold_mode="rel",
     scheduler_stability_factor=1e-08,
 ):
-    return optim.lr_scheduler.ReduceLROnPlateau(
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         loaded_optimizer,
         factor=lr_reduction_factor,
         patience=patience,
@@ -266,20 +317,23 @@ def reduce_lr_on_plateau(
         min_lr=min_learning_rate,
         eps=scheduler_stability_factor,
     )
+    if loaded_checkpoint is not None:
+        scheduler.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return scheduler
+
 
 def cosine_annealing_warm_restarts(
-    loaded_optimizer,
-    *,
-    T_0=1000,
-    T_mult=2,
-    eta_min=0
+    loaded_optimizer, loaded_checkpoint, *, T_0=1000, T_mult=2, eta_min=0
 ):
-    return optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
         loaded_optimizer,
         T_0=T_0,
         T_mult=T_mult,
         eta_min=eta_min,
     )
+    if loaded_checkpoint is not None:
+        scheduler.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return scheduler
 
 
 OPTIMIZER_OPTIONS = {

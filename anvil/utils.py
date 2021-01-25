@@ -68,13 +68,13 @@ class Multiprocessing:
         return output_dict
 
 
-def bootstrap_sample(data, bootstrap_sample_size):
-    state = np.random.RandomState()
+def bootstrap_sample(data, bootstrap_sample_size, seed=None):
+    rng = np.random.default_rng(seed=seed)
     *dims, data_size = data.shape
 
     sample = []
     for j in range(bootstrap_sample_size):
-        boot_index = state.randint(0, data_size, size=data_size)
+        boot_index = rng.integers(low=0, high=data_size, size=data_size)
         sample.append(data[..., boot_index])
 
     return np.stack(sample, axis=-2)
