@@ -117,15 +117,17 @@ class ScalarField:
             (self.lattice.length, self.lattice.length, *extra_dims)
         )
 
-    def _boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
+    def _boot_two_point_correlator(self, connected=False, broken=False, bootstrap_sample_size=100):
         """Helper function which executes multiprocessing function to calculate the
         bootstrapped two point correlation function."""
         
         # Want to use a seed for the RNG that generates the bootstrap indices,
         # so we can generate the same indices for both terms in the correlator.
+        # Also required for bootstrapping individual shifts.
         seed = np.random.randint(maxsize)
 
         # Compute first term, using multiprocessing
+        # NB bootstrap each shift seprately to reduce peak memory requirements
         func = lambda shift: bootstrap_sample(
             self._vol_avg_two_point_correlator(shift),
             bootstrap_sample_size,
@@ -142,9 +144,12 @@ class ScalarField:
 
         # Subtract disconnected part
         if connected:  
+            magnetisation_density = self.coords.mean(axis=0)
+            if broken:
+                magnetisation_density = np.abs(magnetisation_density)
             correlator -= (
                 bootstrap_sample(
-                    np.abs(self.coords.mean(axis=0)),  # absolute magnetisation |m|
+                    magnetisation_density,
                     bootstrap_sample_size,
                     seed=seed,  # same seed -> same bootstrap sample as first term
                 )
@@ -168,11 +173,11 @@ class ScalarField:
         numpy.ndarray, dimensions (*lattice_dimensions, *)"""
         return self._two_point_correlator(connected=True)
 
-    def boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
+    def boot_two_point_correlator(self, connected=False, broken=False, bootstrap_sample_size=100):
         """Two point correlation function for a bootstrap sample of ensembles
         numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
         return self._boot_two_point_correlator(
-            connected=connected, bootstrap_sample_size=bootstrap_sample_size
+            connected=connected, broken=broken, bootstrap_sample_size=bootstrap_sample_size
         )
 
 

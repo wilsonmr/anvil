@@ -53,12 +53,15 @@ def optimal_window(integrated, mult=2.0, eps=1e-6):
 # ------------------------------------------------------------------------------------- #
 
 
-def two_point_correlator(field_ensemble, connected_correlator, n_boot):
+def two_point_correlator(field_ensemble, connected_correlator, broken_phase, n_boot):
     """Bootstrap sample of two point connected correlation functions for the
     field ensemble."""
     return field_ensemble.boot_two_point_correlator(
-        connected=connected_correlator, bootstrap_sample_size=n_boot
+        connected=connected_correlator,
+        broken=broken_phase,
+        bootstrap_sample_size=n_boot,
     )
+
 
 def zero_momentum_correlator(two_point_correlator):
     """Two point correlator at zero spatial momentum."""
@@ -167,14 +170,16 @@ def magnetisation(_magnetisation, training_geometry):
     return np.abs(_magnetisation).mean(axis=-1) / training_geometry.length ** 2
 
 
-def magnetic_susceptibility(_magnetisation, training_geometry):
-    return ((_magnetisation ** 2).mean(axis=-1)) / training_geometry.length ** 2
-
-
-def magnetic_susceptibility_v2(_magnetisation, training_geometry):
-    return (
-        (_magnetisation ** 2).mean(axis=-1) - np.abs(_magnetisation).mean(axis=-1) ** 2
-    ) / training_geometry.length ** 2
+def magnetic_susceptibility(_magnetisation, broken_phase, training_geometry):
+    if broken_phase:
+        return (
+            (_magnetisation ** 2).mean(axis=-1)
+            - np.abs(_magnetisation).mean(axis=-1) ** 2
+        ) / training_geometry.length ** 2
+    else:
+        return (
+            (_magnetisation ** 2).mean(axis=-1) - _magnetisation.mean(axis=-1) ** 2
+        ) / training_geometry.length ** 2
 
 
 def magnetisation_autocorr(magnetisation_series):

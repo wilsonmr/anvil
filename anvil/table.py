@@ -15,8 +15,6 @@ def table_two_point_scalars(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken
     across boostrap samples
     """
-    #with open("mag_data.txt", "w") as f:
-    #   f.write(f"{susceptibility.mean()} {susceptibility.std()} ")
     res = [
         [ising_energy.mean(), ising_energy.std()],
         [susceptibility.mean(), susceptibility.std()],
@@ -29,23 +27,15 @@ def table_two_point_scalars(ising_energy, susceptibility):
     return df
 
 @table
-def table_magnetisation(magnetisation, magnetic_susceptibility, magnetic_susceptibility_v2):
-    
-    #with open("mag_data.txt", "a") as f:
-    #    f.write(f"{magnetisation.mean()} {magnetisation.std()} ")
-    #    f.write(f"{magnetic_susceptibility.mean()} {magnetic_susceptibility.std()} ")
-    #    f.write(f"{magnetic_susceptibility_v2.mean()} {magnetic_susceptibility_v2.std()} ")
-    
-    
+def table_magnetisation(magnetisation, magnetic_susceptibility):
     res = [
         [magnetisation.mean(), magnetisation.std()],
         [magnetic_susceptibility.mean(), magnetic_susceptibility.std()],
-        [magnetic_susceptibility_v2.mean(), magnetic_susceptibility_v2.std()],
     ]
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
-        index=["magnetisation density", "susceptibility", "susceptibility v2"],
+        index=["magnetisation density", "susceptibility"],
     )
     return df
 
@@ -90,11 +80,6 @@ def table_correlation_length(
             training_geometry.length / low_momentum_correlation_length.mean(),
         ],
     ]
-    #with open("corr_data.txt", "w") as f:
-    #    f.write(f"{ecl_mean} {ecl_error} ")
-    #    f.write(f"{second_moment_correlation_length.mean()} {second_moment_correlation_length.std()} ")
-    #    f.write(f"{low_momentum_correlation_length.mean()} {low_momentum_correlation_length.std()} ")
-    
     
     df = pd.DataFrame(
         res,
