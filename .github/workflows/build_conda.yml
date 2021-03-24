@@ -23,8 +23,7 @@ jobs:
                 conda install conda-build --yes
                 conda build conda-recipe -c pytorch -c https://packages.nnpdf.science/conda
           - name: Upload
-          # test if upload works
-#             if: github.ref == 'refs/heads/master'
+            if: github.ref == 'refs/heads/master'
             shell: bash -l {0}
             env:
                 ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
