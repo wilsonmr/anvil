@@ -26,6 +26,8 @@ jobs:
           # test if upload works
 #             if: github.ref == 'refs/heads/master'
             shell: bash -l {0}
+            env:
+                ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
             run: |
                 conda install anaconda-client --yes
-                anaconda upload ${CONDA_PREFIX}/conda-bld/noarch/anvil-*.tar.bz2 -t ${{ secrets.ANACONDA_TOKEN }}
+                anaconda -t "$ANACONDA_TOKEN" upload ${CONDA_PREFIX}/conda-bld/noarch/anvil-*.tar.bz2
