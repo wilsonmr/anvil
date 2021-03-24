@@ -1,10 +1,11 @@
 # A Non-Volume preserving transformation Implementation on the Lattice - ANVIL
 
-Framework for generating lattice proposals for a MCMC from a real NVP model
+Framework for training and analysing a normalising flow which is used to generate
+lattice configurations.
 
 ## Installation
 
-The supported installation method is via `conda`. At present a conda package
+The supported installation method is via `conda`. At present a `conda` package
 exists for `python=3.8`. Here is an example for creating a new `conda`
 environment and installing the `anvil` package:
 
@@ -21,15 +22,23 @@ python projects. To get an idea of how to do this, look at the
 
 ### Development installation
 
-If you wish to develop the code, then replace the anvil package you just downloaded
-via `conda` with a development installation, whilst in the root of this
-repository and with the anvil conda environment active run:
+If you wish to develop the code, then replace the `anvil` package you just downloaded
+via `conda` with a development installation. We still recommend installing
+the `anvil` package via conda to ensure you have the correct dependencies. Then,
+whilst in the root of this repository and with the relevant `conda` environment
+active run:
 
 ```bash
 python -m pip install -e .
 ```
 
-If you plan on developing the code, then we highly recommend also installing the following packages
+If you plan on developing the code, then we highly recommend also installing the following packages:
+
+ - [Jupyter](https://jupyter.org/)
+ - [black](https://pypi.org/project/black/)
+ - [pylint](https://pypi.org/project/pylint/)
+
+Those packages can be installed using `conda`:
 
 ```bash
 conda install jupyter black pylint
@@ -38,7 +47,8 @@ conda install jupyter black pylint
 ## Running tests
 
 If you wish to run the tests, then the test dependencies can be found in
-`conda-recipe/meta.yaml` under `test::requires`.
+`conda-recipe/meta.yaml` under `test::requires`. Simply install the dependencies
+via `conda`.
 
 The tests can be run from any location, provided the code is installed, with
 the command
@@ -110,5 +120,5 @@ sampled from the trained model over the input covariance should be approximately
 
 ![ratio plot of sampled vs. target covariance](./examples/example_output/ratio.png)
 
-if you have any issues using the anvil tools in your own projects feel free to
+if you have any issues using the `anvil` tools in your own projects feel free to
 open an issue.
