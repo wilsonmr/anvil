@@ -1,51 +1,56 @@
 # A Non-Volume preserving transformation Implementation on the Lattice - ANVIL
 
-Framework for generating lattice proposals for a MCMC from a real NVP model
+Framework for training and analysing a normalising flow which is used to generate
+lattice configurations.
 
 ## Installation
 
-At present installing the code into a conda environment is supported. First
-create a new environment and install conda dependencies
+The supported installation method is via `conda`. At present a `conda` package
+exists for `python=3.8`. Here is an example for creating a new `conda`
+environment and installing the `anvil` package:
 
 ```bash
-conda create -n anvil-dev reportengine -y
-conda install pytorch torchvision -c pytorch
-conda install reportengine -c https://packages.nnpdf.science/conda
-conda install -c conda-forge tqdm
-conda install scipy
+conda create -n anvil-dev python=3.8
+conda activate anvil-dev
+conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda
 ```
-
-These are the minimal requirements for running the code, however if you plan
-on developing the code or doing small external tests, then I highly recommend also
-installing the following packages
-
-```bash
-conda install jupyter black pylint
-```
-
-To install the `anvil` code, run the following whilst in the root of this repository
-
-```
-$ python -m pip install -e .
-```
-
-where `python` here refers to the specific python of the conda environment with
-the rest of the dependencies installed.
 
 Once the code is installed you can import the various objects into your own
 python projects. To get an idea of how to do this, look at the
 `examples/train_example.py` which is discussed in
 [this section](##using-objects-in-external-code.).
 
-## Running tests
+### Development installation
 
-If you wish to run tests you will additionally need to install pytest
+If you wish to develop the code, then replace the `anvil` package you just downloaded
+via `conda` with a development installation. We still recommend installing
+the `anvil` package via conda to ensure you have the correct dependencies. Then,
+whilst in the root of this repository and with the relevant `conda` environment
+active run:
 
 ```bash
-conda install pytest
+python -m pip install -e .
 ```
 
-the tests can be run from any location, provided the code is installed, with
+If you plan on developing the code, then we highly recommend also installing the following packages:
+
+ - [Jupyter](https://jupyter.org/)
+ - [black](https://pypi.org/project/black/)
+ - [pylint](https://pypi.org/project/pylint/)
+
+Those packages can be installed using `conda`:
+
+```bash
+conda install jupyter black pylint
+```
+
+## Running tests
+
+If you wish to run the tests, then the test dependencies can be found in
+`conda-recipe/meta.yaml` under `test::requires`. Simply install the dependencies
+via `conda`.
+
+The tests can be run from any location, provided the code is installed, with
 the command
 
 ```
@@ -115,5 +120,5 @@ sampled from the trained model over the input covariance should be approximately
 
 ![ratio plot of sampled vs. target covariance](./examples/example_output/ratio.png)
 
-if you have any issues using the anvil tools in your own projects feel free to
+if you have any issues using the `anvil` tools in your own projects feel free to
 open an issue.
