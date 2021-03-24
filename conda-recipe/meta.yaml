@@ -16,6 +16,9 @@ requirements:
     - reportengine
     - matplotlib
     - pytorch
+    - scipy
+    - pandas
+    - numpy
 
 build:
   noarch: python
