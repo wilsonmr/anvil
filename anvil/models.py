@@ -221,6 +221,8 @@ def quadratic_spline(
 
 def rational_quadratic_spline(
     size_half,
+    sigma,
+    scale_sigma_before_spline=1,
     n_pairs=1,
     interval=2,
     n_segments=4,
@@ -234,6 +236,7 @@ def rational_quadratic_spline(
     transformations, one on each half of the input vector."""
     return Sequential(
         # layers.GlobalAffineLayer(-1, 0),
+        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
         *[
             coupling_pair(
                 layers.RationalQuadraticSplineLayer,
@@ -281,8 +284,12 @@ def circular_spline(
     )
 
 
-def spline_affine(real_nvp, rational_quadratic_spline):
-    return Sequential(rational_quadratic_spline, real_nvp)
+def spline_affine(real_nvp, rational_quadratic_spline, sigma, scale_sigma_before_spline=1):
+    return Sequential(
+        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
+        rational_quadratic_spline,
+        real_nvp
+    )
 
 
 def affine_spline(

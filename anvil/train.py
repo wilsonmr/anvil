@@ -292,6 +292,20 @@ def rms_prop(
         optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
     return optimizer
 
+def adagrad(
+    loaded_model,
+    loaded_checkpoint,
+    *,
+    learning_rate=0.01,
+):
+    optimizer = optim.Adagrad(
+        loaded_model.parameters(),
+        lr=learning_rate,
+    )
+    if loaded_checkpoint is not None:
+        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optimizer
+
 
 def reduce_lr_on_plateau(
     loaded_optimizer,
@@ -342,6 +356,7 @@ OPTIMIZER_OPTIONS = {
     "adadelta": adadelta,
     "sgd": stochastic_gradient_descent,
     "rms_prop": rms_prop,
+    "adagrad": adagrad,
 }
 
 SCHEDULER_OPTIONS = {

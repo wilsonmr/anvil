@@ -9,8 +9,45 @@ import pandas as pd
 
 from reportengine.table import table
 
+@table
+def table_stuff_i_want(
+    table_fit,
+    table_two_point_scalars,
+    table_magnetisation,
+    table_correlation_length,
+    ):
+    df = pd.concat([
+        table_fit,
+        table_two_point_scalars,
+        table_magnetisation,
+        table_correlation_length,
+        ],
+    )
+    return df
+
 
 @table
+def table_autocorrelation(acceptance, magnetisation_integrated_autocorr, magnetisation_optimal_window, tau_chain):
+    tau_mag = magnetisation_integrated_autocorr[magnetisation_optimal_window]
+
+    df = pd.DataFrame([acceptance, tau_mag, tau_chain], index=["acceptance", "tau_mag", "tau_chain"], columns=["value"])
+    return df
+
+
+def table_fit(fit_zero_momentum_correlator, training_geometry):
+    popt, pcov, t0 = fit_zero_momentum_correlator
+
+    res = [
+            [popt[0], np.sqrt(pcov[0, 0]), training_geometry.length / popt[0]],
+            [popt[2], np.sqrt(pcov[2, 2]), np.nan],
+        ]
+    df = pd.DataFrame(
+        res,
+        columns=["Mean", "Standard deviation", "L / xi"],
+        index=["xi_fit", "m_fit" ],
+    )
+    return df
+
 def table_two_point_scalars(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken
     across boostrap samples
@@ -26,7 +63,6 @@ def table_two_point_scalars(ising_energy, susceptibility):
     )
     return df
 
-@table
 def table_magnetisation(magnetisation, magnetic_susceptibility):
     res = [
         [magnetisation.mean(), magnetisation.std()],
@@ -40,7 +76,6 @@ def table_magnetisation(magnetisation, magnetic_susceptibility):
     return df
 
 
-@table
 def table_correlation_length(
     exponential_correlation_length,
     second_moment_correlation_length,
@@ -53,9 +88,6 @@ def table_correlation_length(
     The exponential correlation length is provided as a function of 't' separations,
     so to get a scalar estimate the weighted average over positive t>1 is taken.
     """
-    exponential_correlation_length = np.sqrt(exponential_correlation_length)
-    second_moment_correlation_length = np.sqrt(second_moment_correlation_length)
-    low_momentum_correlation_length = np.sqrt(low_momentum_correlation_length)
 
     # Weighted average of positive shifts, ignoring first point
     T = exponential_correlation_length.shape[0]
@@ -85,7 +117,7 @@ def table_correlation_length(
         res,
         columns=["Mean", "Standard deviation", "L / xi"],
         index=[
-            "Exponential correlation length",
+            "Inverse pole mass",
             "Second moment correlation length",
             "Low momentum correlation length",
         ],

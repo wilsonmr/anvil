@@ -38,7 +38,11 @@ class ScalarField:
     def __init__(self, input_coords, lattice):
 
         self.lattice = lattice  # must do this before setting coords!
-        self.coords = input_coords
+
+        # HACK
+        self.coords = input_coords[0].transpose(0, 1).numpy()
+        self.tau_chain = float(input_coords[1])
+        self.acceptance = float(input_coords[2])
 
         self.shift = self.lattice.get_shift().transpose(
             0, 1
@@ -117,7 +121,7 @@ class ScalarField:
             (self.lattice.length, self.lattice.length, *extra_dims)
         )
 
-    def _boot_two_point_correlator(self, connected=False, broken=False, bootstrap_sample_size=100):
+    def _boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
         """Helper function which executes multiprocessing function to calculate the
         bootstrapped two point correlation function."""
         
@@ -145,8 +149,7 @@ class ScalarField:
         # Subtract disconnected part
         if connected:  
             magnetisation_density = self.coords.mean(axis=0)
-            if broken:
-                magnetisation_density = np.abs(magnetisation_density)
+            magnetisation_density = np.abs(magnetisation_density)
             correlator -= (
                 bootstrap_sample(
                     magnetisation_density,
@@ -173,11 +176,11 @@ class ScalarField:
         numpy.ndarray, dimensions (*lattice_dimensions, *)"""
         return self._two_point_correlator(connected=True)
 
-    def boot_two_point_correlator(self, connected=False, broken=False, bootstrap_sample_size=100):
+    def boot_two_point_correlator(self, connected=False, bootstrap_sample_size=100):
         """Two point correlation function for a bootstrap sample of ensembles
         numpy.ndarray, dimensions (*lattice_dimensions, *, bootstrap_sample_size)"""
         return self._boot_two_point_correlator(
-            connected=connected, broken=broken, bootstrap_sample_size=bootstrap_sample_size
+            connected=connected, bootstrap_sample_size=bootstrap_sample_size
         )
 
 

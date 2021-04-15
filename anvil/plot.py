@@ -12,6 +12,7 @@ from matplotlib.ticker import MaxNLocator
 from reportengine.figure import figure, figuregen
 from reportengine import collect
 
+from anvil.observables import cosh_shift
 
 def field_component(i, x_base, phi_model, base_neg, model_neg, phi_target=None):
     fig, ax = plt.subplots()
@@ -103,24 +104,34 @@ def plot_example_configs(_plot_example_configs):
 def plot_field_components(_plot_field_components):
     yield from _plot_field_components[0]
 
-
 @figure
-def plot_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
+def plot_zero_momentum_correlator(zero_momentum_correlator, training_geometry, fit_zero_momentum_correlator):
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
     sample and errorbars are standard deviations across boostrap samples
     """
+    popt, pcov, t0 = fit_zero_momentum_correlator
+    T = training_geometry.length
+    
     fig, ax = plt.subplots()
     ax.errorbar(
-        x=range(training_geometry.length),
-        y=zero_momentum_correlator.mean(axis=-1),
+        x=np.arange(T),
+        y=zero_momentum_correlator.mean(axis=-1) - popt[2],  # subtract shift to get pure exp
         yerr=zero_momentum_correlator.std(axis=-1),
-        fmt="-r",
-        label=f"L = {training_geometry.length}",
+        fmt="bo",
+    )
+    
+    t = np.linspace(t0, T - t0, 100)
+    ax.plot(
+        t,
+        cosh_shift(t - T // 2, *popt) - popt[2],
+        "r--",
+        label=r"fit $A \cosh(-(t - T/2) / \xi) + c$",
     )
     ax.set_yscale("log")
     ax.set_ylabel(r"$\hat{G}(0, t)$")
     ax.set_xlabel("$t$")
     ax.set_title("Zero momentum two point function")
+    ax.legend()
     return fig
 
 

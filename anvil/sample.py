@@ -65,14 +65,14 @@ def sample_batch(
     """
     with torch.no_grad():  # don't track gradients
         z, base_log_density = base_dist(batch_size + 1)
-        np.savetxt("model_in.txt", z)
+        #np.savetxt("model_in.txt", z)
         
         negative_mag = (z.sum(dim=1).sign() < 0).nonzero().squeeze()
         
         phi, model_log_density = loaded_model(
             z, base_log_density, negative_mag
         )  # map using trained loaded_model to phi
-        np.savetxt("model_out.txt", phi)
+        #np.savetxt("model_out.txt", phi)
 
         if current_state is not None:
             phi[0] = current_state
@@ -178,13 +178,13 @@ def chain_autocorrelation(
     """
     if sample_interval:  # if specified sample_interval will evaluate to true
         return sample_interval
-
+    
     # Hard coded num states for estimating integrated autocorrelation
     batch_size = 10000
 
     # Sample some states
     _, _, history = sample_batch(
-        loaded_model, base_dist, target_dist, batch_size, *thermalised_state
+            loaded_model, base_dist, target_dist, batch_size, *thermalised_state
     )
 
     accepted = float(torch.sum(history))
@@ -219,6 +219,34 @@ def chain_autocorrelation(
 
     return sample_interval
 
+
+def calc_tau_chain(history):
+    accepted = float(torch.sum(history))
+    n_states = len(history)
+    autocorrelations = torch.zeros(
+        n_states + 1, dtype=torch.float
+    )  # +1 in case 100% rejected
+    consecutive_rejections = 0
+
+    for step in history:
+        if step:  # move accepted
+            if consecutive_rejections > 0:  # faster than unnecessarily accessing array
+                autocorrelations[1 : consecutive_rejections + 1] += torch.arange(
+                    consecutive_rejections, 0, -1, dtype=torch.float
+                )
+            consecutive_rejections = 0
+        else:  # move rejected
+            consecutive_rejections += 1
+    if consecutive_rejections > 0:  # pick up last rejection run
+        autocorrelations[1 : consecutive_rejections + 1] += torch.arange(
+            consecutive_rejections, 0, -1, dtype=torch.float
+        )
+
+    # Compute integrated autocorrelation
+    integrated_autocorrelation = 0.5 + torch.sum(
+        autocorrelations / torch.arange(n_states + 1, 0, -1, dtype=torch.float)
+    )
+    return integrated_autocorrelation
 
 def sample(
     loaded_model,
@@ -269,6 +297,11 @@ def sample(
         (actual_length, base_dist.size_out), dtype=torch.float32
     )
     accepted = 0
+    
+    # hack
+    history = torch.empty(
+        actual_length, dtype=torch.bool
+    )
 
     log.debug(
         f"Generating {n_batches * batch_size} configurations "
@@ -296,6 +329,11 @@ def sample(
         decorrelated_chain[start : start + dec_samp_per_batch, :] = batch_chain[
             ::sample_interval
         ]
+        # hack
+        history[start : start + dec_samp_per_batch] = batch_history[
+            ::sample_interval
+        ]
+
     accepted = float(accepted)
     # Accept-reject statistics
     rejected = n_batches * batch_size - accepted
@@ -303,15 +341,20 @@ def sample(
 
     log.info(f"Accepted: {accepted}, Rejected: {rejected}, Fraction: {fraction:.2g}")
     log.debug(f"Returning a decorrelated chain of length: {actual_length}")
+    
+    # hack
+    tau_chain = calc_tau_chain(history)
 
     #np.savetxt("ensemble_out.txt", decorrelated_chain)
-    with open("acceptance.txt", "a") as f:
-        f.write(f"{fraction}\n")
+    #with open("acceptance.txt", "a") as f:
+    #    f.write(f"{fraction}\n")
 
-    return decorrelated_chain
+    return decorrelated_chain, tau_chain, fraction
 
 _sample_training_output = collect("sample", ("training_context",))
 
+
 def sample_training_output(_sample_training_output):
     """Returns a sample of the training_output"""
-    return _sample_training_output[0].transpose(0, 1).numpy()
+    return _sample_training_output[0]#.transpose(0, 1).numpy()
+

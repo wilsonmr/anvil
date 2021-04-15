@@ -7,6 +7,27 @@ from math import ceil, pi, sin
 
 from anvil.utils import bootstrap_sample
 
+import scipy.optimize as optim
+
+def cosh_shift(x, xi, A, c):
+    return A * np.cosh(-x / xi) + c
+
+def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
+    T = training_geometry.length
+    t0 = T // 4
+    window = slice(t0, T - t0 + 1)
+
+    t = np.arange(T)
+    y = zero_momentum_correlator.mean(axis=-1)
+    yerr = zero_momentum_correlator.std(axis=-1)
+
+    popt, pcov = optim.curve_fit(
+            cosh_shift,
+            xdata=t[window] - T // 2,
+            ydata=y[window],
+            sigma=yerr[window],
+    )
+    return (popt, pcov, t0)
 
 def autocorrelation(chain):
     """Calculate the one-dimensional normalised autocorrelation function for a one-
@@ -52,13 +73,18 @@ def optimal_window(integrated, mult=2.0, eps=1e-6):
 #                               Two point observables                                   #
 # ------------------------------------------------------------------------------------- #
 
+# HACK
+def tau_chain(field_ensemble):
+    return field_ensemble.tau_chain
 
-def two_point_correlator(field_ensemble, connected_correlator, broken_phase, n_boot):
+def acceptance(field_ensemble):
+    return field_ensemble.acceptance
+
+def two_point_correlator(field_ensemble, connected_correlator, n_boot):
     """Bootstrap sample of two point connected correlation functions for the
     field ensemble."""
     return field_ensemble.boot_two_point_correlator(
         connected=connected_correlator,
-        broken=broken_phase,
         bootstrap_sample_size=n_boot,
     )
 
@@ -86,9 +112,8 @@ def effective_pole_mass(zero_momentum_correlator):
 
 
 def exponential_correlation_length(effective_pole_mass):
-    """Squared exponential correlation length, defined as the inverse of the pole mass."""
-    return (1 / effective_pole_mass) ** 2
-
+    """Exponential correlation length, defined as the inverse of the pole mass."""
+    return (1 / effective_pole_mass)
 
 def susceptibility(two_point_correlator):
     """Susceptibility defined as the first moment of the two point correlator."""
@@ -102,7 +127,7 @@ def ising_energy(two_point_correlator):
 
 
 def second_moment_correlation_length(two_point_correlator, susceptibility):
-    """Squared second moment correlation length, defined as the normalised second
+    """Second moment correlation length, defined as the normalised second
     moment of the two point correlator."""
     L = two_point_correlator.shape[0]
     x = np.concatenate((np.arange(0, L // 2 + 1), np.arange(-L // 2 + 1, 0)))
@@ -112,18 +137,22 @@ def second_moment_correlation_length(two_point_correlator, susceptibility):
     mu_0 = susceptibility
     mu_2 = (x_sq * two_point_correlator).sum(axis=(0, 1))  # second moment
 
-    return mu_2 / (4 * mu_0)  # normalisation
+    xi_sq = mu_2 / (4 * mu_0)  # normalisation
+
+    return np.sqrt(xi_sq)
 
 
 def low_momentum_correlation_length(two_point_correlator, susceptibility):
-    """A low-momentum estimate for the squared correlation length."""
+    """A low-momentum estimate for the correlation length."""
     L = two_point_correlator.shape[0]
     kernel = np.cos(2 * pi / L * np.arange(L)).reshape(L, 1, 1)
 
     g_tilde_00 = susceptibility
     g_tilde_10 = (kernel * two_point_correlator).sum(axis=(0, 1))
 
-    return (g_tilde_00 / g_tilde_10 - 1) / (4 * sin(pi / L) ** 2)
+    xi_sq = (g_tilde_00 / g_tilde_10 - 1) / (4 * sin(pi / L) ** 2)
+    
+    return np.sqrt(xi_sq)
 
 
 def two_point_correlator_series(field_ensemble):
@@ -170,16 +199,11 @@ def magnetisation(_magnetisation, training_geometry):
     return np.abs(_magnetisation).mean(axis=-1) / training_geometry.length ** 2
 
 
-def magnetic_susceptibility(_magnetisation, broken_phase, training_geometry):
-    if broken_phase:
-        return (
-            (_magnetisation ** 2).mean(axis=-1)
-            - np.abs(_magnetisation).mean(axis=-1) ** 2
-        ) / training_geometry.length ** 2
-    else:
-        return (
-            (_magnetisation ** 2).mean(axis=-1) - _magnetisation.mean(axis=-1) ** 2
-        ) / training_geometry.length ** 2
+def magnetic_susceptibility(_magnetisation, training_geometry):
+    return (
+        (_magnetisation ** 2).mean(axis=-1)
+        - np.abs(_magnetisation).mean(axis=-1) ** 2
+    ) / training_geometry.length ** 2
 
 
 def magnetisation_autocorr(magnetisation_series):
