@@ -33,7 +33,7 @@ import torch.nn as nn
 from torchsearchsorted import searchsorted
 from math import pi
 
-from anvil.core import NeuralNetwork
+from anvil.core import FullyConnectedNeuralNetwork
 
 import numpy as np
 
@@ -99,13 +99,13 @@ class CouplingLayer(nn.Module):
 
         if even_sites:
             # a is first half of input vector
-            self._a_ind = slice(0, size_half)
-            self._b_ind = slice(size_half, 2 * size_half)
+            self._passive_ind = slice(0, size_half)
+            self._active_ind = slice(size_half, 2 * size_half)
             self._join_func = torch.cat
         else:
             # a is second half of input vector
-            self._a_ind = slice(size_half, 2 * size_half)
-            self._b_ind = slice(0, size_half)
+            self._passive_ind = slice(size_half, 2 * size_half)
+            self._active_ind = slice(0, size_half)
             self._join_func = lambda a, *args, **kwargs: torch.cat(
                 (a[1], a[0]), *args, **kwargs
             )
@@ -129,28 +129,30 @@ class AdditiveLayer(CouplingLayer):
         *,
         hidden_shape: list,
         activation: str,
-        symmetric: bool,
+        z2_equivar: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
 
-        self.t_network = NeuralNetwork(
+        self.t_network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=None,
-            symmetric=symmetric,
+            no_final_activation=True,
+            bias=not z2_equivar,
         )
 
     def forward(self, v_in, log_density, *unused) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
-        v_a = v_in[:, self._a_ind]
-        v_b = v_in[:, self._b_ind]
+        v_in_passive = v_in[:, self._passive_ind]
+        v_in_active = v_in[:, self._active_ind]
 
-        t_out = self.t_network((v_a - v_a.mean()) / v_a.std())
+        t_out = self.t_network(
+            (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
+        )
 
-        v_out = self._join_func([v_a, v_b - t_out], dim=1)
+        v_out = self._join_func([v_in_passive, v_in_active - t_out], dim=1)
 
         return v_out, log_density
 
@@ -176,47 +178,48 @@ class AffineLayer(CouplingLayer):
         *,
         hidden_shape: list,
         activation: str,
-        s_final_activation: str,
-        symmetric_networks: bool,
+        z2_equivar: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
 
-        self.s_network = NeuralNetwork(
+        self.s_network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=s_final_activation,
-            symmetric=symmetric_networks,
+            no_final_activation=False,
+            bias=not z2_equivar,
         )
-        self.t_network = NeuralNetwork(
+        self.t_network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=None,
-            symmetric=symmetric_networks,
+            no_final_activation=True,
+            bias=not z2_equivar,
         )
         # NOTE: Could potentially have non-default inputs for s and t networks
         # by adding dictionary of overrides - e.g. s_options = {}
 
-        self.symmetric_networks = symmetric_networks
+        self.z2_equivar = z2_equivar
 
     def forward(self, v_in, log_density, *unused) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
-        v_a = v_in[:, self._a_ind]
-        v_b = v_in[:, self._b_ind]
-        v_a_stand = (v_a - v_a.mean()) / v_a.std()
+        v_in_passive = v_in[:, self._passive_ind]
+        v_in_active = v_in[:, self._active_ind]
+        v_for_net = (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
 
-        s_out = self.s_network(v_a_stand)
-        t_out = self.t_network(v_a_stand)
+        s_out = self.s_network(v_for_net)
+        t_out = self.t_network(v_for_net)
 
-        # If enforcing s(-y) = -s(y), we want to use |s(y)| in affine transf.
-        if self.symmetric_networks:
+        # If enforcing s(-v) = -s(v), we want to use |s(v)| in affine transf.
+        if self.z2_equivar:
             s_out.abs_()
 
-        v_out = self._join_func([v_a, (v_b - t_out) * torch.exp(-s_out)], dim=1)
+        v_out = self._join_func(
+            [v_in_passive, (v_in_active - t_out) * torch.exp(-s_out)], dim=1
+        )
         log_density += s_out.sum(dim=1, keepdim=True)
 
         return v_out, log_density
@@ -263,27 +266,26 @@ class LinearSplineLayer(CouplingLayer):
         self.n_segments = n_segments
         self.width = 1 / n_segments
 
-        eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
-
         # x coordinates of the knots are just n/K for n = 0, ..., K
-        self.knots_xcoords = torch.linspace(-eps, 1 + eps, n_segments + 1).view(1, -1)
+        self.knots_xcoords = torch.linspace(0, 1, n_segments + 1).view(1, -1)
 
-        self.network = NeuralNetwork(
+        self.network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half * n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=activation,
+            no_final_activation=False,
+            bias=True,
         )
         self.norm_func = nn.Softmax(dim=2)
 
     def forward(self, v_in, log_density, *unused):
         """Forward pass of the linear spline layer."""
-        v_a = v_in[:, self._a_ind]
-        v_b = v_in[:, self._b_ind]
+        v_in_passive = v_in[:, self._passive_ind]
+        v_in_active = v_in[:, self._active_ind]
 
         net_out = self.norm_func(
-            self.network(v_a - 0.5).view(-1, self.size_half, self.n_segments)
+            self.network(v_in_passive - 0.5).view(-1, self.size_half, self.n_segments)
         )
         # Build the y coordinates of the knots
         knots_ycoords = torch.cat(
@@ -294,19 +296,22 @@ class LinearSplineLayer(CouplingLayer):
             dim=2,
         )
 
-        # Sort inputs v_b into the appropriate segment or 'bin'
-        # NOTE: need to make v_b contiguous, otherwise searchsorted returns nonsense
-        k_this_segment = searchsorted(self.knots_xcoords, v_b.contiguous()) - 1
-        k_this_segment.unsqueeze_(dim=-1)
+        # Sort inputs v_in_active into the appropriate segment or 'bin'
+        # NOTE: need to make v_in_active contiguous, otherwise searchsorted returns nonsense
+        k_this_segment = (
+            searchsorted(self.knots_xcoords, v_in_active.contiguous().view(-1, 1)) - 1
+        ).clamp(0, self.n_segments - 1)
 
         # Get P_k*, alpha_k and the value v would take at the lower knot point
-        p_this_segment = torch.gather(net_out, 2, k_this_segment)
-        alpha = (v_b.unsqueeze(dim=-1) - k_this_segment * self.width) / self.width
-        v_out_at_lower_knot = torch.gather(knots_ycoords, 2, k_this_segment)
+        p_this_segment = torch.gather(net_out, 1, k_this_segment)
+        v_out_at_lower_knot = torch.gather(knots_ycoords, 1, k_this_segment)
+        alpha = (
+            v_in_active.unsqueeze(dim=-1) - k_this_segment * self.width
+        ) / self.width
 
         v_out = self._join_func(
             [
-                v_a,
+                v_in_passive,
                 (v_out_at_lower_knot + alpha * p_this_segment).squeeze(),
             ],
             dim=1,
@@ -353,16 +358,15 @@ class QuadraticSplineLayer(CouplingLayer):
         self.size_half = size_half
         self.n_segments = n_segments
 
-        self.network = NeuralNetwork(
+        self.network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half * (2 * n_segments + 1),
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=activation,
+            no_final_activation=False,
+            bias=True,
         )
         self.w_norm_func = nn.Softmax(dim=2)
-
-        self.eps = 1e-6  # prevent rounding error which causes sorting into -1th bin
 
     @staticmethod
     def h_norm_func(h_net, w_norm):
@@ -372,17 +376,17 @@ class QuadraticSplineLayer(CouplingLayer):
                 \sum_{k'=1}^K 1/2 w_k' ( \exp(h_{k'-1}) + \exp(h_k') )
             )
         """
-        return torch.exp(h_raw) / (
-            0.5 * w_norm * (torch.exp(h_raw[..., :-1]) + torch.exp(h_raw[..., 1:]))
+        return torch.exp(h_net) / (
+            0.5 * w_norm * (torch.exp(h_out[..., :-1]) + torch.exp(h_out[..., 1:]))
         ).sum(dim=2, keepdim=True)
 
     def forward(self, v_in, log_density, *unused):
         """Forward pass of the quadratic spline layer."""
-        v_a = v_in[:, self._a_ind]
-        v_b = v_in[:, self._b_ind]
+        v_in_passive = v_in[:, self._passive_ind]
+        v_in_active = v_in[:, self._active_ind]
 
         h_net, w_net = (
-            self.network(v_a - 0.5)
+            self.network(v_in_passive - 0.5)
             .view(-1, self.size_half, 2 * self.n_segments + 1)
             .split((self.n_segments + 1, self.n_segments), dim=2)
         )
@@ -392,7 +396,7 @@ class QuadraticSplineLayer(CouplingLayer):
         # x and y coordinates of the spline knots
         knots_xcoords = torch.cat(
             (
-                torch.zeros(h_norm.shape[0], self.size_half, 1) - self.eps,
+                torch.zeros(h_norm.shape[0], self.size_half, 1),
                 torch.cumsum(w_norm, dim=2),
             ),
             dim=2,
@@ -412,24 +416,24 @@ class QuadraticSplineLayer(CouplingLayer):
         # can be done in a single operation
         k_this_segment = (
             searchsorted(
-                knots_xcoords.contiguous().view(-1, self.n_segments + 1),
-                v_b.contiguous().view(-1, 1),
+                knots_xcoords.contiguous(),
+                v_in_b_inside_interval.contiguous().view(-1, 1),
             )
             - 1
-        ).view(-1, self.size_half, 1)
+        ).clamp(0, self.n_segments - 1)
 
-        w_this_segment = torch.gather(w_norm, 2, k_this_segment)
-        h_at_lower_knot = torch.gather(h_norm, 2, k_this_segment)
-        h_at_upper_knot = torch.gather(h_norm, 2, k_this_segment + 1)
+        w_this_segment = torch.gather(w_norm, 1, k_this_segment)
+        h_at_lower_knot = torch.gather(h_norm, 1, k_this_segment)
+        h_at_upper_knot = torch.gather(h_norm, 1, k_this_segment + 1)
 
-        v_in_at_lower_knot = torch.gather(knots_xcoords, 2, k_this_segment)
-        v_out_at_lower_knot = torch.gather(knots_ycoords, 2, k_this_segment)
+        v_in_at_lower_knot = torch.gather(knots_xcoords, 1, k_this_segment)
+        v_out_at_lower_knot = torch.gather(knots_ycoords, 1, k_this_segment)
 
-        alpha = (v_b.unsqueeze(dim=-1) - v_in_at_lower_knot) / w_this_segment
+        alpha = (v_in_active.unsqueeze(dim=-1) - v_in_at_lower_knot) / w_this_segment
 
         v_out = self._join_func(
             [
-                v_a,
+                v_in_passive,
                 (
                     v_out_at_lower_knot
                     + alpha * h_at_lower_knot * w_this_segment
@@ -479,51 +483,52 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         n_segments: int,
         hidden_shape: list,
         activation: str,
-        symmetric_spline: bool,
+        z2_equivar: bool,
         even_sites: bool,
     ):
         super().__init__(size_half, even_sites)
         self.size_half = size_half
         self.n_segments = n_segments
 
-        self.network = NeuralNetwork(
+        self.network = FullyConnectedNeuralNetwork(
             size_in=size_half,
             size_out=size_half * (3 * n_segments - 1),
             hidden_shape=hidden_shape,
             activation=activation,
-            final_activation=None,
-            symmetric=False,  # biases very useful
+            no_final_activation=False,
+            bias=True,
         )
 
         self.norm_func = nn.Softmax(dim=1)
         self.softplus = nn.Softplus()
 
         self.B = interval
-        self.eps = 1e-6
 
-        self.force_equivariance = symmetric_spline
+        self.z2_equivar = z2_equivar
 
     def forward(self, v_in, log_density, negative_mag):
         """Forward pass of the rational quadratic spline layer."""
-        v_a = v_in[:, self._a_ind]
-        v_b = v_in[:, self._b_ind]
-        v_a_stand = (v_a - v_a.mean()) / v_a.std()  # reduce numerical instability
+        v_in_passive = v_in[:, self._passive_ind]
+        v_in_active = v_in[:, self._active_ind]
+        v_for_net = (
+            v_in_passive - v_in_passive.mean()
+        ) / v_in_passive.std()  # reduce numerical instability
 
         # Naively enforce C(-v) = -C(v)
-        if self.force_equivariance:
-            v_a_stand[negative_mag] = -v_a_stand[negative_mag]
+        if self.z2_equivar:
+            v_in_passive_stand[negative_mag] = -v_in_passive_stand[negative_mag]
 
-        v_out_b = torch.zeros_like(v_b)
-        gradient = torch.ones_like(v_b).unsqueeze(dim=-1)
+        v_out_b = torch.zeros_like(v_in_active)
+        gradient = torch.ones_like(v_in_active).unsqueeze(dim=-1)
 
         # Apply mask for linear tails
         # NOTE potentially a waste of time since we NEVER want to map out <- Id(in)
-        inside_interval_mask = torch.abs(v_b) <= self.B
-        v_in_b_inside_interval = v_b[inside_interval_mask]
-        v_out_b[~inside_interval_mask] = v_b[~inside_interval_mask]
+        inside_interval_mask = torch.abs(v_in_active) <= self.B
+        v_in_b_inside_interval = v_in_active[inside_interval_mask]
+        v_out_b[~inside_interval_mask] = v_in_active[~inside_interval_mask]
 
         h_net, w_net, d_net = (
-            self.network(v_a_stand)
+            self.network(v_for_net)
             .view(-1, self.size_half, 3 * self.n_segments - 1)
             .split(
                 (self.n_segments, self.n_segments, self.n_segments - 1),
@@ -531,7 +536,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             )
         )
 
-        if self.force_equivariance:
+        if self.z2_equivar:
             h_net[negative_mag] = torch.flip(h_net[negative_mag], dims=(2,))
             w_net[negative_mag] = torch.flip(w_net[negative_mag], dims=(2,))
             d_net[negative_mag] = torch.flip(d_net[negative_mag], dims=(2,))
@@ -545,7 +550,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         knots_xcoords = (
             torch.cat(
                 (
-                    torch.zeros(w_norm.shape[0], 1) - self.eps,
+                    torch.zeros(w_norm.shape[0], 1),
                     torch.cumsum(w_norm, dim=1),
                 ),
                 dim=1,
@@ -617,7 +622,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             2
         )
 
-        v_out = self._join_func([v_a, v_out_b], dim=1)
+        v_out = self._join_func([v_in_passive, v_out_b], dim=1)
         log_density -= torch.log(gradient).sum(dim=1)
 
         return v_out, log_density
@@ -635,28 +640,16 @@ class GlobalAffineLayer(nn.Module):
         Every data point will be multiplied by this factor.
     shift: (int, float)
         Every scaled data point will be shifted by this factor.
-
-    Methods
-    -------
-    forward(x_input, log_density)
-        see docstring for anvil.layers
     """
 
-    def __init__(self, scale=1, shift=0):
+    def __init__(self, scale, shift):
         super().__init__()
-        if scale < 0:
-            self.scale = nn.Parameter(torch.tensor([1.0]))
-        else:
-            self.scale = scale
-        self.softplus = nn.Softplus()
-
+        self.scale = scale
         self.shift = shift
 
-    def forward(self, x_input, log_density, *unused):
+    def forward(self, v_in, log_density):
         """Forward pass of the global affine transformation."""
-        gamma = self.softplus(self.scale)
-        log_density -= torch.log(gamma) * x_input.shape[1]
-        return gamma * x_input + self.shift, log_density
+        return self.scale * v_in + self.shift, log_density
 
 
 # TODO not necessary to define a nn.module for this now I've taken otu learnable gamma
@@ -675,7 +668,10 @@ class BatchNormLayer(nn.Module):
 
     def forward(self, v_in, log_density, *unused):
         """Forward pass of the batch normalisation transformation."""
-        
+
         v_out = self.gamma * (v_in - v_in.mean()) / torch.std(x_in)
 
-        return phi_out, log_density # don't need to update log dens - nothing to optimise
+        return (
+            phi_out,
+            log_density,
+        )  # don't need to update log dens - nothing to optimise

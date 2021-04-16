@@ -7,13 +7,11 @@ import torch.nn as nn
 from reportengine import collect
 
 ACTIVATION_LAYERS = {
-    "relu": nn.ReLU,
     "leaky_relu": nn.LeakyReLU,
-    "sigmoid": nn.Sigmoid,
     "tanh": nn.Tanh,
     None: nn.Identity,
 }
-SYMMETRIC_ACTIVATIONS = ("tanh", None)
+
 
 class Sequential(nn.Sequential):
     """Modify the nn.Sequential class so that it takes an input vector *and* a
@@ -26,13 +24,8 @@ class Sequential(nn.Sequential):
         return x_input, log_density
 
 
-class NeuralNetwork(nn.Module):
+class FullyConnectedNeuralNetwork(nn.Module):
     """Generic class for neural networks used in coupling layers.
-
-    Networks consist of 'blocks' of
-        - Dense (linear) layer
-        - Batch normalisation layer
-        - Activation function
 
     Parameters
     ----------
@@ -45,16 +38,10 @@ class NeuralNetwork(nn.Module):
     activation: (str, None)
         Key representing the activation function used for each layer
         except the final one.
-    final_activation: (str, None)
-        Key representing the activation function used on the final
-        layer.
-
-    Methods
-    -------
-    forward:
-        The forward pass of the network, mapping a batch of input vectors
-        with 'size_in' nodes to a batch of output vectors of 'size_out'
-        nodes.
+    no_final_activation: bool
+        If True, leave the network output unconstrained.
+    bias: bool
+        Whether to use biases in networks.
     """
 
     def __init__(
@@ -62,65 +49,38 @@ class NeuralNetwork(nn.Module):
         size_in: int,
         size_out: int,
         hidden_shape: list,
-        activation: (str, None),
-        final_activation: (str, None) = None,
-        symmetric: bool = False,
+        activation: str,
+        no_final_activation: bool = False,
+        bias: bool = True,
     ):
-        super(NeuralNetwork, self).__init__()
-        self.size_in = size_in
-        self.size_out = size_out
-        self.hidden_shape = hidden_shape
+        super().__init__()
+        network_shape = [size_in, *hidden_shape, size_out]
 
-        self.activation_func = ACTIVATION_LAYERS[activation]
-        self.final_activation_func = ACTIVATION_LAYERS[final_activation]
+        activation = ACTIVATION_LAYERS[activation]
+        activations = [activation for _ in hidden_shape]
+        activations.append(nn.Identity if no_final_activation else activation)
 
-        if symmetric:
-            self.bias = False
-            # TODO: check this in config
-            #assert activation in SYMMETRIC_ACTIVATIONS
-            #assert final_activation in SYMMETRIC_ACTIVATIONS
-        else:
-            self.bias = True
+        # Construct network
+        layers = []
+        for f_in, f_out, act in zip(network_shape[:-1], network_shape[1:], activations):
+            layers.append(nn.Linear(f_in, f_out, bias=bias))
+            layers.append(act())
 
-        # nn.Sequential object containing the network layers
-        self.network = self._construct_network()
+        self.network = nn.Sequential(*layers)
 
-    def _block(self, f_in, f_out, activation_func):
-        """Constructs a single 'dense block' which maps 'f_in' inputs to
-        'f_out' output features. Returns a list with two elements:
-            - Fully connected layer
-            - Activation function
-        """
-        return [
-            nn.Linear(f_in, f_out, bias=self.bias),
-            activation_func(),
-        ]
-
-    def _construct_network(self):
-        """Constructs the neural network from multiple calls to _block.
-        Returns a torch.nn.Sequential object which has the 'forward' method built in.
-        """
-        layers = self._block(self.size_in, self.hidden_shape[0], self.activation_func)
-        for f_in, f_out in zip(self.hidden_shape[:-1], self.hidden_shape[1:]):
-            layers += self._block(f_in, f_out, self.activation_func)
-        layers += self._block(
-            self.hidden_shape[-1], self.size_out, self.final_activation_func
-        )
-        return nn.Sequential(*layers)
-
-    def forward(self, x: torch.tensor):
+    def forward(self, v_in: torch.tensor):
         """Forward pass of the network.
-        
+
         Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
         shape (n_batch, size_out)
         """
-        return self.network(x)
+        return self.network(v_in)
 
 
 _normalising_flow = collect("model_action", ("model_spec",))
 
 
-def normalising_flow(_normalising_flow, i_mixture=1):
+def normalising_flow(_normalising_flow):
     """Return a callable model which is a normalising flow constructed via
     function composition."""
     return _normalising_flow[0]
