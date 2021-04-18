@@ -37,25 +37,51 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_config_size(self, lattice_size, target):
-        """Size of a single configuration or input vector for neural network."""
-        if target == "o3":
-            return 2 * lattice_size
-        return lattice_size
-
-    def produce_size_half(self, config_size):
+    def produce_size_half(self, lattice_size):
         """Given the number of nodes in a field configuration, return an integer
-        of config_size/2 which is the size of the input vector for each coupling layer.
+        of lattice_size/2 which is the size of the input vector for each coupling layer.
         """
         # NOTE: we may want to make this more flexible
-        if (config_size % 2) != 0:
+        if (lattice_size % 2) != 0:
             raise ConfigError("Config size is expected to be an even number")
-        return int(config_size / 2)
+        return int(lattice_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
+    
+    def produce_target_class(self, target):
+        """Return the function which initialises the correct action"""
+        try:
+            return TARGET_OPTIONS[target]
+        except KeyError:
+            raise ConfigError(
+                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
+            )
+    
+    def parse_parameterisation(self, param: str, target_class):
+        """Parameterisation for the phi^4 action."""
+        if param not in target_class.available_parameterisations.keys():
+            raise ConfigError(
+                f"Invalid parameterisation {param}",
+                param,
+                target_class.available_parameterisations.keys(),
+            )
+        return param
 
-    @explicit_node
+    def parse_couplings(self, couplings: dict, parameterisation: str, target_class: str):
+        """Couplings for field theory."""
+        required_couplings = target_class.available_parameterisations[parameterisation]
+        for req in required_couplings:
+            if req not in couplings.keys():
+                raise ConfigError(
+                    f"Missing required coupling {req}",
+                )
+        return couplings
+
+    def produce_target_dist(self, target_class, geometry, parameterisation, couplings):
+        return target_class(geometry, parameterisation, couplings)
+
+    '''@explicit_node
     def produce_target_dist(self, target):
         """Return the function which initialises the correct action"""
         try:
@@ -64,6 +90,7 @@ class ConfigParser(Config):
             raise ConfigError(
                 f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
             )
+    '''
 
     @explicit_node
     def produce_field(self, target):
@@ -95,24 +122,6 @@ class ConfigParser(Config):
         """Standard deviation of normal distribution."""
         return sigma
 
-    def parse_support(self, supp: list):
-        """Support of uniform distrbution."""
-        return supp
-
-    def parse_concentration(self, conc: float):
-        """Concentration parameter of von Mises distribution."""
-        return conc
-
-    def parse_radius(self, rad: (int, float, str)):
-        """Radius for semicircle distribution."""
-        return rad
-
-    def parse_couplings(self, couplings: dict):
-        """Couplings for field theory."""
-        return couplings  # TODO: obviously need to be more fool-proof about this
-
-    def parse_parameterisation(self, param: str):
-        return param
 
     @explicit_node
     def produce_model_action(self, model: str):
