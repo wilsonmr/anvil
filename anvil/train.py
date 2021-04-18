@@ -126,8 +126,6 @@ def train(
     current_loss,
     loaded_optimizer,
     loaded_scheduler,
-    #optimizer,
-    #scheduler,
     save_interval=1000,
 ):
     """Loop over training updates, periodically saving checkpoints."""
@@ -187,188 +185,25 @@ def train(
     return loaded_model
 
 
-def adam(
+def loaded_optimizer(
     loaded_model,
     loaded_checkpoint,
-    *,
-    learning_rate=0.001,
-    adam_betas=(0.9, 0.999),
-    optimizer_stability_factor=1e-08,
-    optimizer_weight_decay=0,
-    adam_use_amsgrad=False,
+    optimizer,
+    optimizer_kwargs,
 ):
-    optimizer = optim.Adam(
-        loaded_model.parameters(),
-        lr=learning_rate,
-        betas=adam_betas,
-        eps=optimizer_stability_factor,
-        weight_decay=optimizer_weight_decay,
-        amsgrad=adam_use_amsgrad,
-    )
+    instance = optimizer(loaded_model.parameters(), **optimizer_kwargs)
     if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
+        instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return instance
 
 
-def adamw(
-    loaded_model,
-    loaded_checkpoint,
-    *,
-    learning_rate=0.001,
-    adam_betas=(0.9, 0.999),
-    optimizer_stability_factor=1e-08,
-    optimizer_weight_decay=0,
-    adam_use_amsgrad=False,
-):
-    optimizer = optim.AdamW(
-        loaded_model.parameters(),
-        lr=learning_rate,
-        betas=adam_betas,
-        eps=optimizer_stability_factor,
-        weight_decay=optimizer_weight_decay,
-        amsgrad=adam_use_amsgrad,
-    )
-    if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
-
-
-def adadelta(
-    loaded_model,
-    loaded_checkpoint,
-    *,
-    learning_rate=1.0,
-    adadelta_rho=0.9,
-    optimizer_stability_factor=1e-06,
-    optimizer_weight_decay=0,
-):
-    optimizer = optim.Adadelta(
-        loaded_model.parameters(),
-        lr=learning_rate,
-        rho=adadelta_rho,
-        eps=optimizer_stability_factor,
-        weight_decay=optimizer_weight_decay,
-    )
-    if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
-
-
-def stochastic_gradient_descent(
-    loaded_model,
-    loaded_checkpoint,
-    *,
-    learning_rate,
-    optimizer_momentum=0,
-    optimizer_dampening=0,
-    optimizer_weight_decay=0,
-    sgd_use_nesterov=False,
-):
-    optimizer = optim.SGD(
-        loaded_model.parameters(),
-        lr=learning_rate,
-        momentum=optimizer_momentum,
-        dampening=optimizer_dampening,
-        weight_decay=optimizer_weight_decay,
-        nesterov=sgd_use_nesterov,
-    )
-    if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
-
-
-def rms_prop(
-    loaded_model,
-    loaded_checkpoint,
-    *,
-    learning_rate=0.01,
-    rmsprop_smoothing=0.99,
-    optimizer_stability_factor=1e-08,
-    optimizer_weight_decay=0,
-    optimizer_momentum=0,
-    rmsprop_use_centered=False,
-):
-    optimizer = optim.RMSprop(
-        loaded_model.parameters(),
-        lr=learning_Rate,
-        alpha=rmsprop_smoothing,
-        eps=optimizer_stability_factor,
-        weight_decay=optimizer_weight_decay,
-        momentum=optimizer_momentum,
-        centered=rmsprop_use_centered,
-    )
-    if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
-
-def adagrad(
-    loaded_model,
-    loaded_checkpoint,
-    *,
-    learning_rate=0.01,
-):
-    optimizer = optim.Adagrad(
-        loaded_model.parameters(),
-        lr=learning_rate,
-    )
-    if loaded_checkpoint is not None:
-        optimizer.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optimizer
-
-
-def reduce_lr_on_plateau(
+def loaded_scheduler(
     loaded_optimizer,
     loaded_checkpoint,
-    *,
-    lr_reduction_factor=0.1,
-    min_learning_rate=0,
-    patience=500,  # not the PyTorch default
-    cooldown=0,
-    verbose_scheduler=True,
-    scheduler_threshold=0.0001,
-    scheduler_threshold_mode="rel",
-    scheduler_stability_factor=1e-08,
+    scheduler,
+    scheduler_kwargs,
 ):
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        loaded_optimizer,
-        factor=lr_reduction_factor,
-        patience=patience,
-        verbose=verbose_scheduler,
-        threshold=scheduler_threshold,
-        threshold_mode=scheduler_threshold_mode,
-        cooldown=cooldown,
-        min_lr=min_learning_rate,
-        eps=scheduler_stability_factor,
-    )
+    instance = scheduler(loaded_optimizer, **scheduler_kwargs)
     if loaded_checkpoint is not None:
-        scheduler.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
-    return scheduler
-
-
-def cosine_annealing_warm_restarts(
-    loaded_optimizer, loaded_checkpoint, *, T_0=1000, T_mult=1, eta_min=0
-):
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        loaded_optimizer,
-        T_0=T_0,
-        T_mult=T_mult,
-        eta_min=eta_min,
-    )
-    if loaded_checkpoint is not None:
-        scheduler.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
-    return scheduler
-
-
-OPTIMIZER_OPTIONS = {
-    "adam": adam,
-    "adamw": adamw,
-    "adadelta": adadelta,
-    "sgd": stochastic_gradient_descent,
-    "rms_prop": rms_prop,
-    "adagrad": adagrad,
-}
-
-SCHEDULER_OPTIONS = {
-    "rlrop": reduce_lr_on_plateau,
-    "cosine": cosine_annealing_warm_restarts,
-}
+        instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return instance

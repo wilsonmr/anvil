@@ -4,6 +4,7 @@ config.py
 Module to parse runcards
 """
 import logging
+import torch.optim
 
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
@@ -11,7 +12,6 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 from anvil.core import normalising_flow
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
-from anvil.train import OPTIMIZER_OPTIONS, SCHEDULER_OPTIONS
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 from anvil.fields import FIELD_OPTIONS
@@ -48,7 +48,7 @@ class ConfigParser(Config):
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
-    
+
     def produce_target_class(self, target):
         """Return the function which initialises the correct action"""
         try:
@@ -57,7 +57,7 @@ class ConfigParser(Config):
             raise ConfigError(
                 f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
             )
-    
+
     def parse_parameterisation(self, param: str, target_class):
         """Parameterisation for the phi^4 action."""
         if param not in target_class.available_parameterisations.keys():
@@ -68,7 +68,9 @@ class ConfigParser(Config):
             )
         return param
 
-    def parse_couplings(self, couplings: dict, parameterisation: str, target_class: str):
+    def parse_couplings(
+        self, couplings: dict, parameterisation: str, target_class: str
+    ):
         """Couplings for field theory."""
         required_couplings = target_class.available_parameterisations[parameterisation]
         for req in required_couplings:
@@ -121,7 +123,6 @@ class ConfigParser(Config):
     def parse_sigma(self, sigma: (float, int)):
         """Standard deviation of normal distribution."""
         return sigma
-
 
     @explicit_node
     def produce_model_action(self, model: str):
@@ -181,26 +182,47 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    @explicit_node
-    def produce_loaded_optimizer(self, optimizer):
-        """Returns an action which itself returns a torch.optim.Optimizer object
-        that knows about the current state of the model."""
+    def parse_optimizer(self, optimizer):
         try:
-            return OPTIMIZER_OPTIONS[optimizer]
+            optim_class = getattr(torch.optim, optimizer)  # could make case-insensitive
         except KeyError:
-            raise ConfigError(
-                f"Invalid optimizer {optimizer}", optimizer, OPTIMIZER_OPTIONS.keys()
-            )
+            raise ConfigError(f"Invalid optimizer {optimizer}. Consult torch.optim.")
+        return optim_class
 
-    @explicit_node
-    def produce_loaded_scheduler(self, scheduler):
-        """Currently fixed to ReduceLROnPlateau"""
+    def parse_optimizer_kwargs(self, kwargs, optimizer):
         try:
-            return SCHEDULER_OPTIONS[scheduler]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid scheduler {scheduler}", scheduler, SCHEDULER_OPTIONS.keys()
+            test = optimizer(
+                [{"params": []}],
+                **kwargs,
             )
+        except TypeError as error:
+            print(error)
+            raise ConfigError(
+                f"Invalid optimizer keyword argument dict. Consult documentation for {optimizer}."
+            )
+        return kwargs
+
+    def parse_scheduler(self, scheduler):
+        try:
+            sched_class = getattr(
+                torch.optim.lr_scheduler, scheduler
+            )  # could make case-insensitive
+        except KeyError:
+            raise ConfigError(f"Invalid scheduler {scheduler}. Consult torch.optim.")
+        return sched_class
+
+    def parse_scheduler_kwargs(self, kwargs, scheduler):
+        try:
+            test = scheduler(
+                torch.optim.Optimizer([{"params": [], "lr": 1}], {}),
+                **kwargs,
+            )
+        except TypeError as error:
+            print(error)
+            raise ConfigError(
+                f"Invalid scheduler keyword argument dict. Consult documentation for {scheduler}"
+            )
+        return kwargs
 
     def parse_target_length(self, targ: int):
         """Target number of decorrelated field configurations to generate."""
