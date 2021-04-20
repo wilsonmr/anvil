@@ -23,6 +23,42 @@ def loaded_checkpoint(checkpoint):
     return cp_loaded
 
 
+def loaded_model(loaded_checkpoint, model_to_load):
+    new_model = deepcopy(model_to_load)
+    if loaded_checkpoint is not None:
+        new_model.load_state_dict(loaded_checkpoint["model_state_dict"])
+    return new_model
+
+
+def loaded_model_from_training(loaded_checkpoint, model_to_load_from_training):
+    model_to_load_from_training.load_state_dict(loaded_checkpoint["model_state_dict"])
+    return model_to_load_from_training
+
+
+def loaded_optimizer(
+    loaded_model,
+    loaded_checkpoint,
+    optimizer,
+    optimizer_params,
+):
+    instance = optimizer(loaded_model.parameters(), **optimizer_params)
+    if loaded_checkpoint is not None:
+        instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return instance
+
+
+def loaded_scheduler(
+    loaded_optimizer,
+    loaded_checkpoint,
+    scheduler,
+    scheduler_params,
+):
+    instance = scheduler(loaded_optimizer, **scheduler_params)
+    if loaded_checkpoint is not None:
+        instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return instance
+
+
 def train_range(loaded_checkpoint, epochs):
     if loaded_checkpoint is not None:
         cp_epoch = loaded_checkpoint["epoch"]
@@ -30,13 +66,6 @@ def train_range(loaded_checkpoint, epochs):
     else:
         train_range = (0, epochs)
     return train_range
-
-
-def loaded_model(loaded_checkpoint, model_to_load):
-    new_model = deepcopy(model_to_load)  # need to copy model so we don't get weird results
-    if loaded_checkpoint is not None:
-        new_model.load_state_dict(loaded_checkpoint["model_state_dict"])
-    return new_model
 
 
 def current_loss(loaded_checkpoint):

@@ -18,10 +18,10 @@ class Sequential(nn.Sequential):
     value for the current logarithm of the model density, returning an output
     vector and the updated log density."""
 
-    def forward(self, x_input, log_density, *args):
+    def forward(self, v, log_density, *args):
         for module in self:
-            x_input, log_density = module(x_input, log_density, *args)
-        return x_input, log_density
+            v, log_density = module(v, log_density, *args)
+        return v, log_density
 
 
 class FullyConnectedNeuralNetwork(nn.Module):
@@ -76,11 +76,3 @@ class FullyConnectedNeuralNetwork(nn.Module):
         """
         return self.network(v_in)
 
-
-_normalising_flow = collect("model_action", ("model_spec",))
-
-
-def normalising_flow(_normalising_flow):
-    """Return a callable model which is a normalising flow constructed via
-    function composition."""
-    return _normalising_flow[0]

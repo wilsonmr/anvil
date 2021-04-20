@@ -5,16 +5,16 @@ Module to parse runcards
 """
 import logging
 import torch.optim
+from random import randint
+from sys import maxsize
 
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import normalising_flow
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import MODEL_OPTIONS
-from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
-from anvil.fields import FIELD_OPTIONS
+from anvil.distributions import BASE_OPTIONS, THEORY_OPTIONS
 
 log = logging.getLogger(__name__)
 
@@ -27,15 +27,9 @@ class ConfigParser(Config):
     def parse_lattice_length(self, length: int):
         return length
 
-    def parse_lattice_dimension(self, dim: int):
-        """Parse lattice dimension from runcard"""
-        if dim != 2:
-            raise ConfigError("Currently only 2 dimensions is supported")
-        return dim
-
     def produce_lattice_size(self, lattice_length, lattice_dimension):
         """returns the total number of nodes on lattice"""
-        return pow(lattice_length, lattice_dimension)
+        return lattice_length ** 2
 
     def produce_size_half(self, lattice_size):
         """Given the number of nodes in a field configuration, return an integer
@@ -43,108 +37,34 @@ class ConfigParser(Config):
         """
         # NOTE: we may want to make this more flexible
         if (lattice_size % 2) != 0:
-            raise ConfigError("Config size is expected to be an even number")
+            raise ConfigError("Lattice size is expected to be an even number")
         return int(lattice_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def produce_target_class(self, target):
-        """Return the function which initialises the correct action"""
-        try:
-            return TARGET_OPTIONS[target]
-        except KeyError:
-            raise ConfigError(
-                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
-            )
+    def produce_target(self, theory, geometry, parameterisation, couplings):
+        theory_class = THEORY_OPTIONS[theory]
+        constructor = getattr(theory_class, f"from_{parameterisation}")
+        instance = constructor(geometry, **couplings)
+        return instance
 
-    def parse_parameterisation(self, param: str, target_class):
-        """Parameterisation for the phi^4 action."""
-        if param not in target_class.available_parameterisations.keys():
-            raise ConfigError(
-                f"Invalid parameterisation {param}",
-                param,
-                target_class.available_parameterisations.keys(),
-            )
-        return param
+    def produce_base(self, latents, latent_params, lattice_size):
+        base_class = BASE_OPTIONS[latents]
+        instance = base_class(lattice_size, **latent_params)
+        return instance
 
-    def parse_couplings(
-        self, couplings: dict, parameterisation: str, target_class: str
-    ):
-        """Couplings for field theory."""
-        required_couplings = target_class.available_parameterisations[parameterisation]
-        for req in required_couplings:
-            if req not in couplings.keys():
-                raise ConfigError(
-                    f"Missing required coupling {req}",
-                )
-        return couplings
-
-    def produce_target_dist(self, target_class, geometry, parameterisation, couplings):
-        return target_class(geometry, parameterisation, couplings)
-
-    '''@explicit_node
-    def produce_target_dist(self, target):
-        """Return the function which initialises the correct action"""
-        try:
-            return TARGET_OPTIONS[target]
-        except KeyError:
-            raise ConfigError(
-                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
-            )
-    '''
-
-    @explicit_node
-    def produce_field(self, target):
-        """Return the function which instantiates the field object, for
-        calculating observables."""
-        try:
-            return FIELD_OPTIONS[target]
-        except KeyError:
-            log.warning(
-                f"Target {target} does not match an implemented field theory. Using generic field class."
-            )
-            return FIELD_OPTIONS[None]
-
-    @explicit_node
-    def produce_base_dist(self, base: str):
-        """Return the action which loads appropriate base distribution"""
-        try:
-            return BASE_OPTIONS[base]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
-            )
-
-    def parse_mean(self, mean: (float, int)):
-        """Mean of normal or von Mises distribution."""
-        return mean
-
-    def parse_sigma(self, sigma: (float, int)):
-        """Standard deviation of normal distribution."""
-        return sigma
-
-    @explicit_node
-    def produce_model_action(self, model: str):
-        """Given a string, return the flow model action indexed by that string."""
-        try:
-            return MODEL_OPTIONS[model]
-        except KeyError:
-            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
-
-    @explicit_node
-    def produce_model_to_load(self, n_mixture=1):
-        """Produce the generative model, whose parameters are to be loaded, which maps
-        the base to an approximate of the target distribution."""
-        return normalising_flow
+    def produce_model_to_load(self, model, model_params, size_half):
+        model_class = MODEL_OPTIONS[model]
+        instance = model_class(size_half, **model_params)
+        return instance
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""
         return nb
 
     def parse_epochs(self, epochs: int):
-        """Number of epochs to train. Equivalent to number of passes
-        multiplied by the batch size."""
+        """Number of optimization steps during training."""
         return epochs
 
     def parse_save_interval(self, save_int: int):
@@ -176,31 +96,47 @@ class ConfigParser(Config):
         # file - hopefully doesn't cause any issues..
         return training_output.as_input()
 
-    def produce_training_geometry(self, training_context):
+    def produce_geometry_from_training(self, training_context):
         """Produces the geometry object used in training."""
         with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
+    def produce_base_from_training(self, training_context):
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
+            _, base = self.parse_from_(None, "base", write=False)
+        return base
+    
+    def produce_target_from_training(self, training_context):
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
+            _, target = self.parse_from_(None, "target", write=False)
+        return target
+    
+    def produce_model_to_load_from_training(self, training_context):
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
+            _, model_to_load = self.parse_from_(None, "model_to_load", write=False)
+        return model_to_load
+
     def parse_optimizer(self, optimizer):
+        # NOTE: requires loaded_model for instance
         try:
             optim_class = getattr(torch.optim, optimizer)  # could make case-insensitive
         except KeyError:
             raise ConfigError(f"Invalid optimizer {optimizer}. Consult torch.optim.")
         return optim_class
 
-    def parse_optimizer_kwargs(self, kwargs, optimizer):
+    def parse_optimizer_params(self, params, optimizer):
         try:
             test = optimizer(
                 [{"params": []}],
-                **kwargs,
+                **params,
             )
         except TypeError as error:
             print(error)
             raise ConfigError(
                 f"Invalid optimizer keyword argument dict. Consult documentation for {optimizer}."
             )
-        return kwargs
+        return params
 
     def parse_scheduler(self, scheduler):
         try:
@@ -211,24 +147,24 @@ class ConfigParser(Config):
             raise ConfigError(f"Invalid scheduler {scheduler}. Consult torch.optim.")
         return sched_class
 
-    def parse_scheduler_kwargs(self, kwargs, scheduler):
+    def parse_scheduler_params(self, params, scheduler):
         try:
             test = scheduler(
                 torch.optim.Optimizer([{"params": [], "lr": 1}], {}),
-                **kwargs,
+                **params,
             )
         except TypeError as error:
             print(error)
             raise ConfigError(
                 f"Invalid scheduler keyword argument dict. Consult documentation for {scheduler}"
             )
-        return kwargs
+        return params
 
-    def parse_target_length(self, targ: int):
-        """Target number of decorrelated field configurations to generate."""
-        return targ
+    def parse_sample_size(self, size: int):
+        """Number of field configurations in output sample."""
+        return size
 
-    def parse_thermalisation(self, therm: (int, type(None))):
+    def parse_thermalization(self, therm: (int, type(None))):
         """Number of Markov chain steps to discard to allow the chain to
         reach an approximately stationary distribution."""
         if therm is None:
@@ -255,15 +191,15 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_n_boot(self, n_boot: int):
+    def parse_bootstrap_sample_size(self, n_boot: int):
         """Size of the bootstrap sample."""
         if n_boot < 2:
-            raise ConfigError("n_boot must be greater than 1")
-        log.warning(f"Using user specified n_boot: {n_boot}")
+            raise ConfigError("bootstrap_sample_size must be greater than 1")
+        log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def parse_connected_correlator(self, connected: bool):
-        return connected
+    def produce_bootstrap_seed(self):
+        return randint(0, maxsize)
 
     @element_of("windows")
     def parse_window(self, window: float):

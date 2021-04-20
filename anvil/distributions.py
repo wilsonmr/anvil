@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 
-class NormalDist:
+class Gaussian:
     """
     Class which handles the generation of a sample of latent Gaussian variables.
 
@@ -21,12 +21,12 @@ class NormalDist:
         Mean for the distribution.
     """
 
-    def __init__(self, lattice_size, *, sigma, mean):
-        self.size_out = lattice_size
+    def __init__(self, size_out, *, sigma=1, mean=0):
+        self.size_out = size_out
         self.sigma = sigma
         self.mean = mean
 
-    def __call__(self, sample_size) -> tuple:
+    def __call__(self, sample_size):
         """Return a sample of variables drawn from the normal distribution,
         with dimensions (sample_size, lattice_size)."""
         return torch.empty(sample_size, self.size_out).normal_(
@@ -34,12 +34,7 @@ class NormalDist:
         )
 
 
-def normal_distribution(lattice_size, sigma=1, mean=0):
-    """Returns an instance of the NormalDist class"""
-    return NormalDist(lattice_size, sigma=sigma, mean=mean)
-
-
-class PhiFourAction:
+class PhiFourScalar:
     """Return the phi^4 action given either a single state size
     (1, length * length) or a stack of N states (N, length * length).
     See Notes about action definition.
@@ -103,49 +98,40 @@ class PhiFourAction:
             [-1.9730]])
     """
 
-    available_parameterisations = {
-        "standard": ("m_sq", "g"),
-        "albergo2019": ("m_sq", "lam"),
-        "nicoli2020": ("kappa", "lam"),
-        "bosetti2015": ("beta", "lam"),
-    }
-
-    def __init__(self, geometry, parameterisation, couplings):
-        super().__init__()
-
+    def __init__(
+        self,
+        geometry,
+        ising_coefficient,
+        quadratic_coefficient,
+        quartic_coefficient,
+    ):
         self.shift = geometry.get_shift()
+        self.c_ising = ising_coefficient
+        self.c2 = quadratic_coefficient
+        self.c4 = quartic_coefficient
 
-        self.__dict__.update(couplings)
+    @classmethod
+    def from_standard(cls, geometry, *, m_sq, g):
+        return cls(geometry, -1, (4 + m_sq) / 2, g / 24)
 
-        if parameterisation == "standard":
-            self.ising_coeff = -1
-            self.quadratic_coeff = (4 + self.m_sq) / 2
-            self.quartic_coeff = self.g / 24
+    @classmethod
+    def from_bosetti2015(cls, geometry, *, beta, lam):
+        return cls(geometry, -beta, 1 - 2 * lam, lam)
 
-        elif parameterisation == "albergo2019":
-            self.ising_coeff = -2
-            self.quadratic_coeff = 4 + self.m_sq
-            self.quartic_coeff = self.lam
+    @classmethod
+    def from_albergo2019(cls, geometry, *, m_sq, lam):
+        return cls(geometry, -2, 4 + m_sq, lam)
 
-        elif parameterisation == "nicoli2020":
-            self.ising_coeff = -2 * self.kappa
-            self.quadratic_coeff = 1 - 2 * self.lam
-            self.quartic_coeff = self.lam
-
-        elif parameterisation == "bosetti2015":
-            self.ising_coeff = -self.beta
-            self.quadratic_coeff = 1 - 2 * self.lam
-            self.quartic_coeff = self.lam
-
-        else:
-            raise ValueError(f"invalid parameterisation: {parameterisation}")
+    @classmethod
+    def from_nicoli2020(cls, geometry, *, kappa, lam):
+        return cls.from_bosetti2015(geometry, beta=2 * kappa, lam=lam)
 
     def action(self, phi):
         """Action computed for a sample of field configurations."""
         return (
-            self.ising_coeff * (phi[:, self.shift] * phi.unsqueeze(dim=1)).sum(dim=1)
-            + self.quadratic_coeff * phi.pow(2)
-            + self.quartic_coeff * phi.pow(4)
+            self.c_ising * (phi[:, self.shift] * phi.unsqueeze(dim=1)).sum(dim=1)
+            + self.c2 * phi.pow(2)
+            + self.c4 * phi.pow(4)
         ).sum(dim=1, keepdim=True)
 
     def log_density(self, phi):
@@ -154,14 +140,9 @@ class PhiFourAction:
         return -self.action(phi)
 
 
-def phi_four_action(geometry, couplings, parameterisation):
-    """returns instance of PhiFourAction"""
-    return PhiFourAction(geometry, parameterisation, couplings)
-
-
 BASE_OPTIONS = {
-    "normal": normal_distribution,
+    "gaussian": Gaussian,
 }
-TARGET_OPTIONS = {
-    "phi_four": PhiFourAction,
+THEORY_OPTIONS = {
+    "phi_four": PhiFourScalar,
 }

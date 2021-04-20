@@ -1,10 +1,9 @@
 training_output: /tmp/del_me_anvil_benchmark
-
 cp_id: -1
-target_length: 10000
 
-thermalisation: 1000
-sample_interval: null
+sample_size: 10000
+sample_interval: 1
+thermalization: null
 
 meta:
   author: Author

@@ -29,7 +29,7 @@ class Geometry2D:
 
     def __init__(self, length):
         self.length = length
-        self.volume = length ** 2
+        self.volume = length ** 2  # NOTE: currently alias of lattice_size, which is not ideal
         # TODO: Make the split pattern flexible and controllable at level of instance
         checkerboard = torch.zeros((self.length, self.length), dtype=bool)
         checkerboard[1::2, 1::2] = True

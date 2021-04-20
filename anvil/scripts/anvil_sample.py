@@ -21,7 +21,6 @@ PROVIDERS = [
     "anvil.checkpoint",
     "reportengine.report",
     "anvil.benchmarks",
-    "anvil.fields",
 ]
 
 

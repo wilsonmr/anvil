@@ -31,12 +31,8 @@ and returns two torch.tensor objects:
 import torch
 import torch.nn as nn
 from torchsearchsorted import searchsorted
-from math import pi
 
 from anvil.core import FullyConnectedNeuralNetwork
-
-import numpy as np
-
 
 class CouplingLayer(nn.Module):
     """
@@ -64,32 +60,13 @@ class CouplingLayer(nn.Module):
         successive affine transformations alternate which half of the data is
         passed through neural networks.
 
-    ################Parameters
-    ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector for the
-        neural networks.
-    hidden_shape: list
-        list containing hidden vector sizes for the neural networks.
-    activation: str
-        string which is a key for an activation function for all but the final layers
-        of the networks.
-    s_final_activation: str
-        string which is a key for an activation function, which the output of the s
-        network will be passed through.
-    even_sites: bool
-        dictates which half of the data is transformed as a and b, since successive
-        affine transformations alternate which half of the data is passed through
-        neural networks.
-
-
     Attributes
     ----------
-    a_ind: slice (protected)
+    _passive_ind: slice
         Slice object which can be used to access the passive partition.
-    b_ind: slice (protected)
+    _active_ind: slice
         Slice object which can be used to access the partition that gets transformed.
-    join_func: function (protected)
+    _join_func: function
         Function which returns the concatenation of the two partitions in the
         appropriate order.
     """
@@ -199,9 +176,6 @@ class AffineLayer(CouplingLayer):
             no_final_activation=True,
             bias=not z2_equivar,
         )
-        # NOTE: Could potentially have non-default inputs for s and t networks
-        # by adding dictionary of overrides - e.g. s_options = {}
-
         self.z2_equivar = z2_equivar
 
     def forward(self, v_in, log_density, *unused) -> torch.Tensor:
@@ -215,7 +189,8 @@ class AffineLayer(CouplingLayer):
 
         # If enforcing s(-v) = -s(v), we want to use |s(v)| in affine transf.
         if self.z2_equivar:
-            s_out.abs_()
+            s_out = torch.abs(s_out)
+            #s_out.abs_()  # NOTE: this now throws an error, but didn't used to..
 
         v_out = self._join_func(
             [v_in_passive, (v_in_active - t_out) * torch.exp(-s_out)], dim=1
@@ -544,7 +519,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         h_norm = self.norm_func(h_net[inside_interval_mask]) * 2 * self.B
         w_norm = self.norm_func(w_net[inside_interval_mask]) * 2 * self.B
         d_pad = nn.functional.pad(
-            self.softplus(d_raw)[inside_interval_mask], (1, 1), "constant", 1
+            self.softplus(d_net)[inside_interval_mask], (1, 1), "constant", 1
         )
 
         knots_xcoords = (
@@ -589,7 +564,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             v_in_b_inside_interval.unsqueeze(dim=-1) - v_in_at_lower_knot
         ) / w_at_lower_knot
 
-        v_out_b[inside_mask] = (
+        v_out_b[inside_interval_mask] = (
             v_out_at_lower_knot
             + (
                 h_at_lower_knot
@@ -606,7 +581,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             )
         ).squeeze()
 
-        gradient[inside_mask] = (
+        gradient[inside_interval_mask] = (
             s_at_lower_knot.pow(2)
             * (
                 d_at_upper_knot * alpha.pow(2)
@@ -652,7 +627,7 @@ class GlobalAffineLayer(nn.Module):
         return self.scale * v_in + self.shift, log_density
 
 
-# TODO not necessary to define a nn.module for this now I've taken otu learnable gamma
+# TODO not necessary to define a nn.module for this now I've taken out learnable gamma
 class BatchNormLayer(nn.Module):
     """Performs batch normalisation on the input vector.
 
@@ -669,9 +644,9 @@ class BatchNormLayer(nn.Module):
     def forward(self, v_in, log_density, *unused):
         """Forward pass of the batch normalisation transformation."""
 
-        v_out = self.gamma * (v_in - v_in.mean()) / torch.std(x_in)
+        v_out = self.gamma * (v_in - v_in.mean()) / torch.std(v_in)
 
         return (
-            phi_out,
+            v_out,
             log_density,
         )  # don't need to update log dens - nothing to optimise

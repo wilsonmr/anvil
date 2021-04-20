@@ -86,7 +86,7 @@ def linear_spline(
         layers.GlobalAffineLayer(scale=2 * interval, shift=-interval),
     )
 
-
+# TODO: same as above
 def quadratic_spline(
     size_half,
     n_segments,
@@ -110,19 +110,18 @@ def quadratic_spline(
 
 def rational_quadratic_spline(
     size_half,
-    sigma,
     n_spline,
     interval,
     n_segments,
     hidden_shape,
     activation,
     spline_z2_equivar=False,
-    scale_sigma_before_spline=1,
+    scale_before_spline=1,
 ):
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
     return Sequential(
-        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
+        layers.BatchNormLayer(scale=scale_before_spline),
         *[
             coupling_block(
                 layers.RationalQuadraticSplineLayer,
@@ -141,7 +140,7 @@ def rational_quadratic_spline(
 MODEL_OPTIONS = {
     "nice": nice,
     "real_nvp": real_nvp,
-    "linear_spline": linear_spline,
-    "quadratic_spline": quadratic_spline,
+    #"linear_spline": linear_spline,
+    #"quadratic_spline": quadratic_spline,
     "rational_quadratic_spline": rational_quadratic_spline,
 }

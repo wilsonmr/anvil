@@ -79,8 +79,8 @@ def reverse_kl(
 
 def training_update(
     loaded_model,
-    base_dist,
-    target_dist,
+    base,
+    target,
     n_batch,
     current_loss,
     loaded_optimizer,
@@ -88,7 +88,7 @@ def training_update(
 ):
     """A single training update or 'epoch'."""
     # generate latent variables
-    z = base_dist(n_batch)
+    z = base(n_batch)
 
     # pick out configs whose d.o.f sum to < 0
     # TODO: annoying to do this in the training loop
@@ -100,7 +100,7 @@ def training_update(
     phi, log_det_jacob = loaded_model(z, 0, negative_mag)
 
     # compute loss function (gradients tracked)
-    target_log_density = target_dist.log_density(phi)
+    target_log_density = target.log_density(phi)
     current_loss = reverse_kl(log_det_jacob, target_log_density)
 
     # backprop and step model parameters
@@ -117,8 +117,8 @@ def training_update(
 
 def train(
     loaded_model,
-    base_dist,
-    target_dist,
+    base,
+    target,
     *,
     train_range,
     n_batch,
@@ -154,8 +154,8 @@ def train(
 
             current_loss = training_update(
                 loaded_model,
-                base_dist,
-                target_dist,
+                base,
+                target,
                 n_batch,
                 current_loss,
                 loaded_optimizer,
@@ -183,27 +183,3 @@ def train(
         )
 
     return loaded_model
-
-
-def loaded_optimizer(
-    loaded_model,
-    loaded_checkpoint,
-    optimizer,
-    optimizer_kwargs,
-):
-    instance = optimizer(loaded_model.parameters(), **optimizer_kwargs)
-    if loaded_checkpoint is not None:
-        instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return instance
-
-
-def loaded_scheduler(
-    loaded_optimizer,
-    loaded_checkpoint,
-    scheduler,
-    scheduler_kwargs,
-):
-    instance = scheduler(loaded_optimizer, **scheduler_kwargs)
-    if loaded_checkpoint is not None:
-        instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
-    return instance
