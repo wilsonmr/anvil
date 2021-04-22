@@ -87,25 +87,9 @@ class ConfigParser(Config):
                 f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
             )
 
-    def parse_mean(self, mean: (float, int)):
-        """Mean of normal or von Mises distribution."""
-        return mean
-
     def parse_sigma(self, sigma: (float, int)):
         """Standard deviation of normal distribution."""
         return sigma
-
-    def parse_support(self, supp: list):
-        """Support of uniform distrbution."""
-        return supp
-
-    def parse_concentration(self, conc: float):
-        """Concentration parameter of von Mises distribution."""
-        return conc
-
-    def parse_radius(self, rad: (int, float, str)):
-        """Radius for semicircle distribution."""
-        return rad
 
     def parse_couplings(self, couplings: dict):
         """Couplings for field theory."""
