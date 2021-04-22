@@ -9,45 +9,42 @@ import pandas as pd
 
 from reportengine.table import table
 
+
+# TODO: need actions for tau and acceptance
 @table
-def table_stuff_i_want(
-    table_fit,
-    table_two_point_scalars,
-    table_magnetisation,
-    table_correlation_length,
-    ):
-    df = pd.concat([
-        table_fit,
-        table_two_point_scalars,
-        table_magnetisation,
-        table_correlation_length,
-        ],
+def table_autocorrelation(
+    magnetization_integrated_autocorr,
+    magnetization_optimal_window,
+    tau_chain,
+    acceptance,
+):
+    tau_mag = magnetization_integrated_autocorr[magnetization_optimal_window]
+
+    df = pd.DataFrame(
+        [acceptance, tau_mag, tau_chain],
+        index=["acceptance", "tau_mag", "tau_chain"],
+        columns=["value"],
     )
     return df
 
 
 @table
-def table_autocorrelation(acceptance, magnetisation_integrated_autocorr, magnetisation_optimal_window, tau_chain):
-    tau_mag = magnetisation_integrated_autocorr[magnetisation_optimal_window]
-
-    df = pd.DataFrame([acceptance, tau_mag, tau_chain], index=["acceptance", "tau_mag", "tau_chain"], columns=["value"])
-    return df
-
-
 def table_fit(fit_zero_momentum_correlator, training_geometry):
     popt, pcov, t0 = fit_zero_momentum_correlator
 
     res = [
-            [popt[0], np.sqrt(pcov[0, 0]), training_geometry.length / popt[0]],
-            [popt[2], np.sqrt(pcov[2, 2]), np.nan],
-        ]
+        [popt[0], np.sqrt(pcov[0, 0])],
+        [popt[2], np.sqrt(pcov[2, 2])],
+    ]
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation", "L / xi"],
-        index=["xi_fit", "m_fit" ],
+        columns=["Mean", "Standard deviation"],
+        index=["xi_fit", "m_fit"],
     )
     return df
 
+
+@table
 def table_two_point_scalars(ising_energy, susceptibility):
     """Table of the ising observables, with mean and standard deviation taken
     across boostrap samples
@@ -63,65 +60,55 @@ def table_two_point_scalars(ising_energy, susceptibility):
     )
     return df
 
-def table_magnetisation(magnetisation, magnetic_susceptibility):
+
+@table
+def table_magnetization(abs_magnetization_squared, magnetic_susceptibility):
     res = [
-        [magnetisation.mean(), magnetisation.std()],
+        [abs_magnetization_squared.mean(), abs_magnetization_squared.std()],
         [magnetic_susceptibility.mean(), magnetic_susceptibility.std()],
     ]
     df = pd.DataFrame(
         res,
         columns=["Mean", "Standard deviation"],
-        index=["magnetisation density", "susceptibility"],
+        index=["<|m|>^2", "<m^2> - <|m|>^2"],
     )
     return df
 
 
+@table
 def table_correlation_length(
-    exponential_correlation_length,
+    inverse_pole_mass,
     second_moment_correlation_length,
     low_momentum_correlation_length,
+    correlation_length_from_fit,
     training_geometry,
 ):
-    """Tabulate three estimators of correlation length, with values and errors
+    """Tabulate four estimators of correlation length, with values and errors
     taken as the mean and standard deviation of the bootstrap sample.
-    
-    The exponential correlation length is provided as a function of 't' separations,
-    so to get a scalar estimate the weighted average over positive t>1 is taken.
     """
-
-    # Weighted average of positive shifts, ignoring first point
-    T = exponential_correlation_length.shape[0]
-    #ecl_values = exponential_correlation_length[1 : T // 2 + 1].mean(axis=-1)
-    #ecl_errors = exponential_correlation_length[1 : T // 2 + 1].std(axis=-1)
-    ecl_values = np.nanmean(exponential_correlation_length, axis=-1)
-    ecl_errors = np.nanstd(exponential_correlation_length, axis=-1)
-    weights = 1 / ecl_errors
-    ecl_mean = np.sum(ecl_values * weights) / np.sum(weights)
-    ecl_error = 1 / np.sum(weights)  # standard error on the mean
+    # TODO could add column with inverse (i.e. effective pole mass)
 
     res = [
-        [ecl_mean, ecl_error, training_geometry.length / ecl_mean ],
+        list(correlation_length_from_fit),
+        [inverse_pole_mass.mean(), inverse_pole_mass.std()],
         [
             second_moment_correlation_length.mean(),
             second_moment_correlation_length.std(),
-            training_geometry.length / second_moment_correlation_length.mean(),
         ],
-        [
-            low_momentum_correlation_length.mean(), 
-            low_momentum_correlation_length.std(),
-            training_geometry.length / low_momentum_correlation_length.mean(),
-        ],
+        [low_momentum_correlation_length.mean(), low_momentum_correlation_length.std()],
     ]
-    
+
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation", "L / xi"],
+        columns=["Mean", "Standard deviation"],
         index=[
-            "Inverse pole mass",
-            "Second moment correlation length",
-            "Low momentum correlation length",
+            "Estimate from fit",
+            "Estimate using arcosh",
+            "Second moment estimate",
+            "Low momentum estimate",
         ],
     )
+    df["No. correlation lengths"] = training_geometry.length / df["Mean"]
     return df
 
 
@@ -175,31 +162,4 @@ def table_two_point_correlator(training_geometry, two_point_correlator):
             corr.append([float(means[i, j]), float(stds[i, j])])
             index.append((i, j))
     df = pd.DataFrame(corr, columns=["Mean", "Standard deviation"], index=index)
-    return df
-
-
-@table
-def table_two_point_correlator_autocorr(two_point_correlator_autocorr):
-    """Tabulate the autocorrelation of the two point function"""
-    df = pd.DataFrame(
-        two_point_correlator_autocorr,
-        columns=["Autocorrelation"],
-        index=range(len(two_point_correlator_autocorr)),
-    )
-    return df
-
-
-@table
-def table_topological_observables(topological_charge, topological_susceptibility):
-    """Tabulate the topological charge and susceptibility, with values and errors
-    taken as the mean and standard deviation of the bootstrap sample."""
-    res = [
-        [topological_charge.mean(), topological_charge.std()],
-        [topological_susceptibility.mean(), topological_susceptibility.std()],
-    ]
-    df = pd.DataFrame(
-        res,
-        columns=["Mean", "Standard deviation"],
-        index=["Topological charge", "Topological susceptibility"],
-    )
     return df

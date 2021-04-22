@@ -15,7 +15,10 @@ def cosh_shift(x, xi, A, c):
 
 
 def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
+    # TODO should I bootstrap this whole process...?
+
     T = training_geometry.length
+    # TODO: would be good to specify this in runcard
     t0 = T // 4
     window = slice(t0, T - t0 + 1)
 
@@ -30,6 +33,11 @@ def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
         sigma=yerr[window],
     )
     return (popt, pcov, t0)
+
+
+def correlation_length_from_fit(fit_zero_momentum_correlator):
+    popt, pcov, _ = fit_zero_momentum_correlator
+    return popt[0], np.sqrt(pcov[0, 0])
 
 
 def autocorrelation(chain):
@@ -195,7 +203,7 @@ def inverse_pole_mass(effective_pole_mass, training_geometry):
 
     xi = np.reciprocal(effective_pole_mass)[window]
 
-    return xi.mean(axis=0)  # average over "large" t points
+    return np.nanmean(xi, axis=0)  # average over "large" t points
 
 
 def second_moment_correlation_length(two_point_correlator, susceptibility):

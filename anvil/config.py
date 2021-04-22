@@ -12,7 +12,6 @@ from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
-from anvil.fields import FIELD_OPTIONS
 
 import torch
 from random import randint
@@ -60,18 +59,6 @@ class ConfigParser(Config):
             raise ConfigError(
                 f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
             )
-
-    @explicit_node
-    def produce_field(self, target):
-        """Return the function which instantiates the field object, for
-        calculating observables."""
-        try:
-            return FIELD_OPTIONS[target]
-        except KeyError:
-            log.warning(
-                f"Target {target} does not match an implemented field theory. Using generic field class."
-            )
-            return FIELD_OPTIONS[None]
 
     @explicit_node
     def produce_base_dist(self, base: str):
