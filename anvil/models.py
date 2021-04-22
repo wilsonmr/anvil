@@ -11,10 +11,10 @@ from anvil.core import Sequential
 import anvil.layers as layers
 
 
-def coupling_pair(coupling_layer, i, size_half, **layer_spec):
+def coupling_pair(coupling_layer, size_half, **layer_spec):
     """Helper function which returns a callable object that performs a coupling
     transformation on both even and odd lattice sites."""
-    coupling_transformation = partial(coupling_layer, i, size_half, **layer_spec)
+    coupling_transformation = partial(coupling_layer, size_half, **layer_spec)
     return Sequential(
         coupling_transformation(even_sites=True),
         coupling_transformation(even_sites=False),
@@ -28,7 +28,6 @@ def real_nvp(
         24,
     ],
     activation="tanh",
-    s_final_activation=None,
     symmetric_networks=True,
     bnorm=False,
     bn_scale=1.0,
@@ -39,12 +38,10 @@ def real_nvp(
         affine_pairs = [
             coupling_pair(
                 layers.AffineLayer,
-                i + 1,
                 size_half,
                 hidden_shape=hidden_shape,
                 activation=activation,
-                s_final_activation=s_final_activation,
-                symmetric_networks=symmetric_networks,
+                z2_equivar=symmetric_networks,
             )
             for i in range(n_affine)
         ]
@@ -55,12 +52,10 @@ def real_nvp(
             output.append(
                 coupling_pair(
                     layers.AffineLayer,
-                    i + 1,
                     size_half,
                     hidden_shape=hidden_shape,
                     activation=activation,
-                    s_final_activation=s_final_activation,
-                    symmetric_networks=symmetric_networks,
+                    z2_equivar=symmetric_networks,
                 )
             )
             if i < n_affine - 1:
@@ -85,11 +80,10 @@ def nice(
         pairs = [
             coupling_pair(
                 layers.AdditiveLayer,
-                i + 1,
                 size_half,
                 hidden_shape=hidden_shape,
                 activation=activation,
-                symmetric=symmetric,
+                z2_equivar=symmetric,
             )
             for i in range(n_additive)
         ]
@@ -100,11 +94,10 @@ def nice(
             output.append(
                 coupling_pair(
                     layers.AdditiveLayer,
-                    i + 1,
                     size_half,
                     hidden_shape=hidden_shape,
                     activation=activation,
-                    symmetric=symmetric,
+                    z2_equivar=symmetric,
                 )
             )
             if i < n_additive - 1:
@@ -114,10 +107,9 @@ def nice(
 
 def rational_quadratic_spline(
     size_half,
-    sigma,
-    scale_sigma_before_spline=1,
+    interval,
+    gamma,
     n_pairs=1,
-    interval=2,
     n_segments=4,
     hidden_shape=[
         24,
@@ -128,17 +120,16 @@ def rational_quadratic_spline(
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
     return Sequential(
-        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
+        layers.BatchNormLayer(scale=gamma),
         *[
             coupling_pair(
                 layers.RationalQuadraticSplineLayer,
-                i + 3,
                 size_half,
                 interval=interval,
                 n_segments=n_segments,
                 hidden_shape=hidden_shape,
                 activation=activation,
-                symmetric_spline=symmetric_spline,
+                z2_equivar=symmetric_spline,
             )
             for i in range(n_pairs)
         ],
@@ -174,31 +165,26 @@ def spline_sandwich(
         24,
     ],
     activation="tanh",
-    s_final_activation=None,
     symmetric_networks=True,
     scale_sigma_before_spline=1,
 ):
     affine_1 = [
         coupling_pair(
             layers.AffineLayer,
-            i + 1,
             size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            s_final_activation=s_final_activation,
-            symmetric_networks=symmetric_networks,
+            z2_equivar=symmetric_networks,
         )
         for i in range(n_affine)
     ]
     affine_2 = [
         coupling_pair(
             layers.AffineLayer,
-            i + 3,
             size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            s_final_activation=s_final_activation,
-            symmetric_networks=symmetric_networks,
+            z2_equivar=symmetric_networks,
         )
         for i in range(n_affine)
     ]

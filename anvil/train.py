@@ -162,8 +162,8 @@ def train(
                 pbar.set_description(f"loss: {current_loss.item()}")
 
                 # TODO again want some flag that controls whether to save this data
-                with open("loss.txt", "a") as f:
-                    f.write(f"{float(current_loss)}\n")
+                #with open("loss.txt", "a") as f:
+                #    f.write(f"{float(current_loss)}\n")
 
     finally:  # executed after while loop, or if sys.exit is called
         save_checkpoint(

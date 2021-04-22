@@ -11,11 +11,17 @@ couplings:
 
 # Model
 base: gaussian
+sigma: 1
+
+#model: rational_quadratic_spline
 model: real_nvp
 model_spec:
     n_affine: 2
     hidden_shape: [36]
     activation: leaky_relu
+
+    interval: 2
+    gamma: 0.4
 
 # Training length
 n_batch: 1000
