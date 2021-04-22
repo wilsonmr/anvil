@@ -10,7 +10,7 @@ couplings:
     g: 0
 
 # Model
-base: standard_normal
+base: gaussian
 model: real_nvp
 model_spec:
     n_affine: 2
