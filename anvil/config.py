@@ -216,9 +216,6 @@ class ConfigParser(Config):
     def produce_bootstrap_seed(self):
         return randint(0, maxsize)
 
-    def parse_connected_correlator(self, connected: bool):
-        return connected
-
     @element_of("windows")
     def parse_window(self, window: float):
         """A numerical factor featuring in the calculation of the optimal 'window'
