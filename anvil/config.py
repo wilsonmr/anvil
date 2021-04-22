@@ -15,6 +15,8 @@ from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 from anvil.fields import FIELD_OPTIONS
 
 import torch
+from random import randint
+from sys import maxsize
 
 log = logging.getLogger(__name__)
 
@@ -217,12 +219,15 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_n_boot(self, n_boot: int):
+    def parse_bootstrap_sample_size(self, n_boot: int):
         """Size of the bootstrap sample."""
         if n_boot < 2:
-            raise ConfigError("n_boot must be greater than 1")
-        log.warning(f"Using user specified n_boot: {n_boot}")
+            raise ConfigError("bootstrap sample size must be greater than 1")
+        log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
+
+    def produce_bootstrap_seed(self):
+        return randint(0, maxsize)
 
     def parse_connected_correlator(self, connected: bool):
         return connected

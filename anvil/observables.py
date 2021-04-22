@@ -5,12 +5,14 @@ import numpy as np
 from scipy.signal import correlate
 from math import ceil, pi, sin
 
-from anvil.utils import bootstrap_sample
+from anvil.utils import bootstrap_sample, Multiprocessing
 
 import scipy.optimize as optim
 
+
 def cosh_shift(x, xi, A, c):
     return A * np.cosh(-x / xi) + c
+
 
 def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     T = training_geometry.length
@@ -22,12 +24,13 @@ def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     yerr = zero_momentum_correlator.std(axis=-1)
 
     popt, pcov = optim.curve_fit(
-            cosh_shift,
-            xdata=t[window] - T // 2,
-            ydata=y[window],
-            sigma=yerr[window],
+        cosh_shift,
+        xdata=t[window] - T // 2,
+        ydata=y[window],
+        sigma=yerr[window],
     )
     return (popt, pcov, t0)
+
 
 def autocorrelation(chain):
     """Calculate the one-dimensional normalised autocorrelation function for a one-
@@ -70,28 +73,91 @@ def optimal_window(integrated, mult=2.0, eps=1e-6):
 
 
 # ------------------------------------------------------------------------------------- #
+#                                   Magnetization                                       #
+# ------------------------------------------------------------------------------------- #
+
+
+def magnetization(configs, bootstrap_sample_size, bootstrap_seed):
+    """Magnetization per config, bootstrapped. Dimensions (n_boot, n_configs)"""
+    return bootstrap_sample(
+        configs.mean(axis=1),
+        bootstrap_sample_size,
+        seed=bootstrap_seed,
+    )
+
+
+def abs_magnetization_squared(magnetization):
+    return np.abs(magnetization).mean(axis=-1) ** 2  # <|m|>^2
+
+
+def magnetic_susceptibility(magnetization, abs_magnetization_squared):
+    return (magnetization ** 2).mean(axis=-1) - abs_magnetization_squared
+
+
+def magnetization_series(configs):
+    return configs.sum(axis=1)
+
+
+def magnetization_autocorr(magnetization_series):
+    return autocorrelation(magnetization_series)
+
+
+def magnetization_integrated_autocorr(magnetization_autocorr):
+    return np.cumsum(magnetization_autocorr, axis=-1) - 0.5
+
+
+def magnetization_optimal_window(magnetization_integrated_autocorr):
+    return optimal_window(magnetization_integrated_autocorr)
+
+
+# ------------------------------------------------------------------------------------- #
 #                               Two point observables                                   #
 # ------------------------------------------------------------------------------------- #
 
-# HACK
-def tau_chain(field_ensemble):
-    return field_ensemble.tau_chain
+# Version without multiprocessing!
+def __two_point_correlator(
+    configs, training_geometry, bootstrap_sample_size, bootstrap_seed
+):
+    correlator = np.empty((training_geometry.volume, bootstrap_sample_size))
+    for i, shift in enumerate(training_geometry.two_point_iterator()):
+        correlator[i] = bootstrap_sample(
+            (configs[:, shift] * configs).mean(axis=1),  # volume average
+            bootstrap_sample_size,
+            seed=bootstrap_seed,
+        ).mean(
+            axis=-1  # sample average
+        )
 
-def acceptance(field_ensemble):
-    return field_ensemble.acceptance
+    return correlator.reshape((training_geometry.length, training_geometry.length, -1))
 
-def two_point_correlator(field_ensemble, connected_correlator, n_boot):
-    """Bootstrap sample of two point connected correlation functions for the
-    field ensemble."""
-    return field_ensemble.boot_two_point_correlator(
-        connected=connected_correlator,
-        bootstrap_sample_size=n_boot,
+
+def two_point_correlator(
+    configs, training_geometry, bootstrap_sample_size, bootstrap_seed
+):
+    # NOTE: bootstrap each shift seprately to reduce peak memory requirements
+    correlator_single_shift = lambda shift: bootstrap_sample(
+        (configs[:, shift] * configs).mean(axis=1),
+        bootstrap_sample_size,
+        bootstrap_seed,
+    ).mean(axis=-1)
+
+    mp_correlator = Multiprocessing(
+        func=correlator_single_shift, generator=training_geometry.two_point_iterator
     )
+    correlator_dict = mp_correlator()
+
+    correlator = np.array([correlator_dict[i] for i in range(training_geometry.volume)])
+
+    return correlator.reshape((training_geometry.length, training_geometry.length, -1))
+
+
+def two_point_connected_correlator(two_point_correlator, abs_magnetization_squared):
+    return two_point_correlator - abs_magnetization_squared.view(1, 1, -1)
 
 
 def zero_momentum_correlator(two_point_correlator):
     """Two point correlator at zero spatial momentum."""
-    return 0.5 * (two_point_correlator.mean(axis=0) + two_point_correlator.mean(axis=1))
+    return (two_point_correlator.mean(axis=0) + two_point_correlator.mean(axis=1)) / 2
 
 
 def effective_pole_mass(zero_momentum_correlator):
@@ -111,10 +177,6 @@ def effective_pole_mass(zero_momentum_correlator):
     )
 
 
-def exponential_correlation_length(effective_pole_mass):
-    """Exponential correlation length, defined as the inverse of the pole mass."""
-    return (1 / effective_pole_mass)
-
 def susceptibility(two_point_correlator):
     """Susceptibility defined as the first moment of the two point correlator."""
     return two_point_correlator.sum(axis=(0, 1))
@@ -124,6 +186,16 @@ def ising_energy(two_point_correlator):
     """Ising energy density, defined as the two point correlator at the minimum
     lattice spacing."""
     return (two_point_correlator[1, 0] + two_point_correlator[0, 1]) / 2
+
+
+def inverse_pole_mass(effective_pole_mass, training_geometry):
+    T = training_geometry.length
+    t0 = T // 4
+    window = slice(t0, T - t0 + 1)
+
+    xi = np.reciprocal(effective_pole_mass)[window]
+
+    return xi.mean(axis=0)  # average over "large" t points
 
 
 def second_moment_correlation_length(two_point_correlator, susceptibility):
@@ -151,112 +223,5 @@ def low_momentum_correlation_length(two_point_correlator, susceptibility):
     g_tilde_10 = (kernel * two_point_correlator).sum(axis=(0, 1))
 
     xi_sq = (g_tilde_00 / g_tilde_10 - 1) / (4 * sin(pi / L) ** 2)
-    
+
     return np.sqrt(xi_sq)
-
-
-def two_point_correlator_series(field_ensemble):
-    """The volume-averaged two point correlator for the lowest few shifts along
-    a single axes, with the ensemble dimension interpreted as a series."""
-    return field_ensemble.two_point_correlator_series
-
-
-def two_point_correlator_autocorr(two_point_correlator_series):
-    """The autocorrelation function calculated for each shift in the two point
-    correlator series."""
-    return np.array(
-        [
-            autocorrelation(two_point_correlator_series[i])
-            for i in range(two_point_correlator_series.shape[0])
-        ]
-    )
-
-
-def two_point_correlator_integrated_autocorr(two_point_correlator_autocorr):
-    r"""The integrated autocorrelation, as a function of summation window size,
-    for the two point correlator series, defined as
-
-        \tau(W) = 1/2 + \sum_{t=1}^W \Gamma(t)
-    """
-    return np.cumsum(two_point_correlator_autocorr, axis=-1) - 0.5
-
-
-def two_point_correlator_optimal_window(two_point_correlator_integrated_autocorr):
-    """The optimal value for the summation window for the two point correlator
-    integrated autocorrelation."""
-    return optimal_window(two_point_correlator_integrated_autocorr)
-
-
-def magnetisation_series(field_ensemble):
-    return field_ensemble.magnetisation_series
-
-
-def _magnetisation(magnetisation_series, n_boot):
-    return bootstrap_sample(magnetisation_series, n_boot)
-
-
-def magnetisation(_magnetisation, training_geometry):
-    return np.abs(_magnetisation).mean(axis=-1) / training_geometry.length ** 2
-
-
-def magnetic_susceptibility(_magnetisation, training_geometry):
-    return (
-        (_magnetisation ** 2).mean(axis=-1)
-        - np.abs(_magnetisation).mean(axis=-1) ** 2
-    ) / training_geometry.length ** 2
-
-
-def magnetisation_autocorr(magnetisation_series):
-    return autocorrelation(magnetisation_series)
-
-
-def magnetisation_integrated_autocorr(magnetisation_autocorr):
-    return np.cumsum(magnetisation_autocorr, axis=-1) - 0.5
-
-
-def magnetisation_optimal_window(magnetisation_integrated_autocorr):
-    return optimal_window(magnetisation_integrated_autocorr)
-
-
-# ------------------------------------------------------------------------------------- #
-#                             Topological observables                                   #
-# ------------------------------------------------------------------------------------- #
-
-
-def topological_charge_series(field_ensemble):
-    """The topological charge with the ensemble dimension interpreted as a series."""
-    return field_ensemble.topological_charge
-
-
-def _topological_charge(topological_charge_series, n_boot):
-    """A bootstrap sample of topological charges, with the ensemble dimension
-    not yet summed over."""
-    return bootstrap_sample(topological_charge_series, n_boot)
-
-
-def topological_charge(_topological_charge):
-    """The ensemble-averaged topological charge."""
-    return _topological_charge.mean(axis=-1)
-
-
-def topological_susceptibility(_topological_charge, training_geometry):
-    """Topological susceptibility, defined as the second moment of the topological
-    charge divided by the lattice volume."""
-    return _topological_charge.var(axis=-1) / training_geometry.length ** 2
-
-
-def topological_charge_autocorr(topological_charge_series):
-    """The autocorrelation function of the topological charge series."""
-    return autocorrelation(topological_charge_series)
-
-
-def topological_charge_integrated_autocorr(topological_charge_autocorr):
-    r"""The integrated autocorrelation, as a function of summation window size,
-    for the topological charge series."""
-    return np.cumsum(topological_charge_autocorr) - 0.5
-
-
-def topological_charge_optimal_window(topological_charge_integrated_autocorr):
-    """The optimal value for the summation window for the topological charge
-    integrated autocorrelation."""
-    return optimal_window(topological_charge_integrated_autocorr)

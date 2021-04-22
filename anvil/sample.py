@@ -351,10 +351,10 @@ def sample(
 
     return decorrelated_chain#, tau_chain, fraction
 
-_sample_training_output = collect("sample", ("training_context",))
+_configs = collect("sample", ("training_context",))
 
 
-def sample_training_output(_sample_training_output):
+def configs(_configs):
     """Returns a sample of the training_output"""
-    return _sample_training_output[0]#.transpose(0, 1).numpy()
+    return _configs[0]
 
