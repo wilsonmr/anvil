@@ -11,10 +11,11 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 from anvil.core import normalising_flow
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
-from anvil.train import OPTIMIZER_OPTIONS, SCHEDULER_OPTIONS
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 from anvil.fields import FIELD_OPTIONS
+
+import torch
 
 log = logging.getLogger(__name__)
 
@@ -156,26 +157,47 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    @explicit_node
-    def produce_loaded_optimizer(self, optimizer):
-        """Returns an action which itself returns a torch.optim.Optimizer object
-        that knows about the current state of the model."""
+    def parse_optimizer(self, optimizer):
         try:
-            return OPTIMIZER_OPTIONS[optimizer]
+            optim_class = getattr(torch.optim, optimizer)  # could make case-insensitive
         except KeyError:
-            raise ConfigError(
-                f"Invalid optimizer {optimizer}", optimizer, OPTIMIZER_OPTIONS.keys()
-            )
+            raise ConfigError(f"Invalid optimizer {optimizer}. Consult torch.optim.")
+        return optim_class
 
-    @explicit_node
-    def produce_loaded_scheduler(self, scheduler):
-        """Currently fixed to ReduceLROnPlateau"""
+    def parse_optimizer_params(self, params, optimizer):
         try:
-            return SCHEDULER_OPTIONS[scheduler]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid scheduler {scheduler}", scheduler, SCHEDULER_OPTIONS.keys()
+            test = optimizer(
+                [{"params": []}],
+                **params,
             )
+        except TypeError as error:
+            print(error)
+            raise ConfigError(
+                f"Invalid optimizer keyword argument dict. Consult documentation for {optimizer}."
+            )
+        return params
+
+    def parse_scheduler(self, scheduler):
+        try:
+            sched_class = getattr(
+                torch.optim.lr_scheduler, scheduler
+            )  # could make case-insensitive
+        except KeyError:
+            raise ConfigError(f"Invalid scheduler {scheduler}. Consult torch.optim.")
+        return sched_class
+
+    def parse_scheduler_params(self, params, scheduler):
+        try:
+            test = scheduler(
+                torch.optim.Optimizer([{"params": [], "lr": 1}], {}),
+                **params,
+            )
+        except TypeError as error:
+            print(error)
+            raise ConfigError(
+                f"Invalid scheduler keyword argument dict. Consult documentation for {scheduler}"
+            )
+        return params
 
     def parse_target_length(self, targ: int):
         """Target number of decorrelated field configurations to generate."""
