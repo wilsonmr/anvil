@@ -349,7 +349,7 @@ def sample(
     #with open("acceptance.txt", "a") as f:
     #    f.write(f"{fraction}\n")
 
-    return decorrelated_chain, tau_chain, fraction
+    return decorrelated_chain#, tau_chain, fraction
 
 _sample_training_output = collect("sample", ("training_context",))
 

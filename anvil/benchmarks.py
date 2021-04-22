@@ -26,10 +26,12 @@ from anvil.free_scalar import FreeScalarEigenmodes
 from anvil.checks import check_trained_with_free_theory
 
 
-def free_scalar_theory(m_sq, lattice_length):
+def free_scalar_theory(couplings, lattice_length):
     """Returns instance of FreeScalarEigenmodes class with specific
     mass and lattice size.
     """
+    # TODO: load target and extract m_sq from target.c2 - indep or parameterisation?
+    m_sq = couplings["m_sq"]
     return FreeScalarEigenmodes(m_sq=m_sq, lattice_length=lattice_length)
 
 
@@ -64,6 +66,7 @@ def fourier_transform(sample_training_output, training_geometry):
     phi = torch.empty_like(sample_training_output).view(-1, L, L)
     phi[:, x_split, y_split] = sample_training_output
 
+    # TODO: update to new PyTorch version with torch.fft.rfft2
     phi_tilde = torch.rfft(phi, signal_ndim=2, onesided=False).roll(
         (L // 2 - 1, L // 2 - 1), (1, 2)
     )  # so we have monotonically increasing momenta on each axis
@@ -86,7 +89,7 @@ def eigvals_from_sample(fourier_transform, training_geometry):
 free_theory_from_training_ = collect("free_scalar_theory", ("training_context",))
 
 # TODO: work out way to not have to do this.. However it allows us to use check
-@check_trained_with_free_theory
+#@check_trained_with_free_theory
 def free_theory_from_training(free_theory_from_training_, training_context):
     """Returns free_scalar_theory but with m_sq and lattice_length extracted
     from a training config.
