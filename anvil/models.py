@@ -29,38 +29,20 @@ def real_nvp(
     ],
     activation="tanh",
     symmetric_networks=True,
-    bnorm=False,
-    bn_scale=1.0,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
-    if bnorm == False:
-        affine_pairs = [
-            coupling_pair(
-                layers.AffineLayer,
-                size_half,
-                hidden_shape=hidden_shape,
-                activation=activation,
-                z2_equivar=symmetric_networks,
-            )
-            for i in range(n_affine)
-        ]
-        return Sequential(*affine_pairs)
-    else:
-        output = []
-        for i in range(n_affine):
-            output.append(
-                coupling_pair(
-                    layers.AffineLayer,
-                    size_half,
-                    hidden_shape=hidden_shape,
-                    activation=activation,
-                    z2_equivar=symmetric_networks,
-                )
-            )
-            if i < n_affine - 1:
-                output.append(layers.BatchNormLayer(bn_scale, learnable=False))
-        return Sequential(*output)
+    blocks = [
+        coupling_pair(
+            layers.AffineLayer,
+            size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            z2_equivar=symmetric_networks,
+        )
+        for i in range(n_affine)
+    ]
+    return Sequential(*blocks, layers.GlobalRescaling())
 
 
 def nice(
@@ -71,44 +53,25 @@ def nice(
     ],
     activation="tanh",
     symmetric=True,
-    bnorm=False,
-    bn_scale=1.0,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
-    if bnorm == False:
-        pairs = [
-            coupling_pair(
-                layers.AdditiveLayer,
-                size_half,
-                hidden_shape=hidden_shape,
-                activation=activation,
-                z2_equivar=symmetric,
-            )
-            for i in range(n_additive)
-        ]
-        return Sequential(*pairs)
-    else:
-        output = []
-        for i in range(n_additive):
-            output.append(
-                coupling_pair(
-                    layers.AdditiveLayer,
-                    size_half,
-                    hidden_shape=hidden_shape,
-                    activation=activation,
-                    z2_equivar=symmetric,
-                )
-            )
-            if i < n_additive - 1:
-                output.append(layers.BatchNormLayer(bn_scale, learnable=True))
-        return Sequential(*output)
+    blocks = [
+        coupling_pair(
+            layers.AdditiveLayer,
+            size_half,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            z2_equivar=symmetric,
+        )
+        for i in range(n_additive)
+    ]
+    return Sequential(*blocks, layers.GlobalRescaling())
 
 
 def rational_quadratic_spline(
     size_half,
-    interval,
-    gamma,
+    interval=5,
     n_pairs=1,
     n_segments=4,
     hidden_shape=[
@@ -120,7 +83,7 @@ def rational_quadratic_spline(
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
     return Sequential(
-        layers.BatchNormLayer(scale=gamma),
+        layers.BatchNormLayer(),
         *[
             coupling_pair(
                 layers.RationalQuadraticSplineLayer,
@@ -131,8 +94,9 @@ def rational_quadratic_spline(
                 activation=activation,
                 z2_equivar=symmetric_spline,
             )
-            for i in range(n_pairs)
+            for _ in range(n_pairs)
         ],
+        layers.GlobalRescaling(),
     )
 
 

@@ -11,21 +11,20 @@ couplings:
 
 # Model
 base: gaussian
-sigma: 1
+sigma: 1.0
 
-model: rational_quadratic_spline
+#model: rational_quadratic_spline
 #model: real_nvp
+model: nice
 model_params:
     n_affine: 2
+    n_additive: 2
     hidden_shape: [36]
     activation: tanh
 
-    interval: 2
-    gamma: 0.4
-
 # Training length
-n_batch: 1000
-epochs: 1000
+n_batch: 2000
+epochs: 2000
 save_interval: 1000
 
 # Optimizer
@@ -35,4 +34,4 @@ optimizer_params:
 
 scheduler: CosineAnnealingLR
 scheduler_params:
-    T_max: 1000
+    T_max: 2000

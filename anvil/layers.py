@@ -416,3 +416,15 @@ class BatchNormLayer(nn.Module):
             v_out,
             log_density,
         )  # don't need to update log dens - nothing to optimise
+
+class GlobalRescaling(nn.Module):
+    def __init__(self, initial=1):
+        super().__init__()
+        
+        self.scale = nn.Parameter(torch.Tensor([initial]))
+
+    def forward(self, v_in, log_density, *unused):
+        v_out = self.scale * v_in
+        log_density -= v_out.shape[-1] * torch.log(self.scale)
+        return v_out, log_density
+
