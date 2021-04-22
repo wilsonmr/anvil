@@ -24,11 +24,9 @@ def coupling_pair(coupling_layer, size_half, **layer_spec):
 def real_nvp(
     size_half,
     n_affine,
-    hidden_shape=[
-        24,
-    ],
+    hidden_shape,
     activation="tanh",
-    symmetric_networks=True,
+    z2_equivar=False,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
@@ -38,7 +36,7 @@ def real_nvp(
             size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            z2_equivar=symmetric_networks,
+            z2_equivar=z2_equivar,
         )
         for i in range(n_affine)
     ]
@@ -48,11 +46,9 @@ def real_nvp(
 def nice(
     size_half,
     n_additive,
-    hidden_shape=[
-        24,
-    ],
+    hidden_shape,
     activation="tanh",
-    symmetric=True,
+    z2_equivar=False,
 ):
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
@@ -62,7 +58,7 @@ def nice(
             size_half,
             hidden_shape=hidden_shape,
             activation=activation,
-            z2_equivar=symmetric,
+            z2_equivar=z2_equivar,
         )
         for i in range(n_additive)
     ]
@@ -71,100 +67,46 @@ def nice(
 
 def rational_quadratic_spline(
     size_half,
+    hidden_shape,
     interval=5,
-    n_pairs=1,
+    n_spline=1,
     n_segments=4,
-    hidden_shape=[
-        24,
-    ],
     activation="tanh",
-    symmetric_spline=False,
+    z2_equivar_spline=False,
 ):
     """Action that returns a callable object that performs a pair of circular spline
     transformations, one on each half of the input vector."""
+    blocks = [
+        coupling_pair(
+            layers.RationalQuadraticSplineLayer,
+            size_half,
+            interval=interval,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            z2_equivar=z2_equivar_spline,
+        )
+        for _ in range(n_spline)
+    ]
     return Sequential(
-        layers.BatchNormLayer(),
-        *[
-            coupling_pair(
-                layers.RationalQuadraticSplineLayer,
-                size_half,
-                interval=interval,
-                n_segments=n_segments,
-                hidden_shape=hidden_shape,
-                activation=activation,
-                z2_equivar=symmetric_spline,
-            )
-            for _ in range(n_pairs)
-        ],
+        #layers.BatchNormLayer(),
+        *blocks,
         layers.GlobalRescaling(),
     )
 
 
-def spline_affine(
-    real_nvp, rational_quadratic_spline, sigma, scale_sigma_before_spline=1
-):
-    return Sequential(
-        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
-        rational_quadratic_spline,
-        real_nvp,
-    )
+def spline_affine(real_nvp, rational_quadratic_spline):
+    return Sequential(rational_quadratic_spline, real_nvp)
 
 
-def affine_spline(
-    real_nvp, rational_quadratic_spline, sigma, scale_sigma_before_spline=1
-):
-    return Sequential(
-        real_nvp,
-        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
-        rational_quadratic_spline,
-    )
-
-
-def spline_sandwich(
-    rational_quadratic_spline,
-    sigma,
-    size_half,
-    n_affine,
-    hidden_shape=[
-        24,
-    ],
-    activation="tanh",
-    symmetric_networks=True,
-    scale_sigma_before_spline=1,
-):
-    affine_1 = [
-        coupling_pair(
-            layers.AffineLayer,
-            size_half,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            z2_equivar=symmetric_networks,
-        )
-        for i in range(n_affine)
-    ]
-    affine_2 = [
-        coupling_pair(
-            layers.AffineLayer,
-            size_half,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            z2_equivar=symmetric_networks,
-        )
-        for i in range(n_affine)
-    ]
-    return Sequential(
-        *affine_1,
-        layers.BatchNormLayer(scale=scale_sigma_before_spline * sigma),
-        rational_quadratic_spline,
-        *affine_2,
-    )
+def affine_spline(real_nvp, rational_quadratic_spline):
+    return Sequential(real_nvp, rational_quadratic_spline)
 
 
 MODEL_OPTIONS = {
+    "nice": nice,
     "real_nvp": real_nvp,
     "rational_quadratic_spline": rational_quadratic_spline,
     "spline_affine": spline_affine,
     "affine_spline": affine_spline,
-    "spline_sandwich": spline_sandwich,
-    "nice": nice,
 }

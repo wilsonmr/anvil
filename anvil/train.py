@@ -166,6 +166,7 @@ def train(
                 #    f.write(f"{float(current_loss)}\n")
 
     finally:  # executed after while loop, or if sys.exit is called
+        pbar.close()
         save_checkpoint(
             outpath,
             epoch=current_epoch,

@@ -10,37 +10,33 @@ couplings:
     lam: 6.975
 
 # Model
-base: normal
-sigma: 0.5
-model: spline_sandwich
-model_spec:
-    hidden_shape: [36,36]
+base: gaussian
+
+model: affine_spline
+model_params:
+    hidden_shape: [72]
     activation: tanh
     
-    n_affine: 1
-    symmetric_networks: true
-    bnorm: false
-    s_final_activation: null
+    n_affine: 2
+    z2_equivar: true
 
-    n_pairs: 1
-    symmetric_spline: false
+    n_spline: 1
     n_segments: 8
-    interval: 1.2
+    z2_equivar_spline: false
 
 
 # Training
 n_batch: 1000
-epochs: 12000
+epochs: 2000
 save_interval: 1000
 
 # Optimizer
-optimizer: adamw
-learning_rate: 0.001
+optimizer: Adam
+optimizer_params:
+    lr: 0.005
 
 # Scheduler
-scheduler: warm
-T_0: 4000
-T_mult: 2
-increase_batch: [9000, 1000]
-decrease_lr: false
+scheduler: CosineAnnealingLR
+scheduler_params:
+    T_max: 2000
 

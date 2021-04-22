@@ -77,7 +77,7 @@ class FullyConnectedNeuralNetwork(nn.Module):
 
 _normalising_flow = collect("model_action", ("model_params",))
 
-def normalising_flow(_normalising_flow):
+def model_to_load(_normalising_flow):
     return _normalising_flow[0]
 
 

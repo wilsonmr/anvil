@@ -8,7 +8,6 @@ import logging
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import normalising_flow
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import MODEL_OPTIONS
@@ -38,20 +37,14 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_config_size(self, lattice_size, target):
-        """Size of a single configuration or input vector for neural network."""
-        if target == "o3":
-            return 2 * lattice_size
-        return lattice_size
-
-    def produce_size_half(self, config_size):
+    def produce_size_half(self, lattice_size):
         """Given the number of nodes in a field configuration, return an integer
-        of config_size/2 which is the size of the input vector for each coupling layer.
+        of lattice_size/2 which is the size of the input vector for each coupling layer.
         """
         # NOTE: we may want to make this more flexible
-        if (config_size % 2) != 0:
-            raise ConfigError("Config size is expected to be an even number")
-        return int(config_size / 2)
+        if (lattice_size % 2) != 0:
+            raise ConfigError("Lattice size is expected to be an even number")
+        return int(lattice_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
@@ -106,12 +99,6 @@ class ConfigParser(Config):
             return MODEL_OPTIONS[model]
         except KeyError:
             raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
-
-    @explicit_node
-    def produce_model_to_load(self, n_mixture=1):
-        """Produce the generative model, whose parameters are to be loaded, which maps
-        the base to an approximate of the target distribution."""
-        return normalising_flow
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

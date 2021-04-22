@@ -39,10 +39,7 @@ class ScalarField:
 
         self.lattice = lattice  # must do this before setting coords!
 
-        # HACK
-        self.coords = input_coords[0].transpose(0, 1).numpy()
-        self.tau_chain = float(input_coords[1])
-        self.acceptance = float(input_coords[2])
+        self.coords = input_coords.transpose(0, 1).numpy()
 
         self.shift = self.lattice.get_shift().transpose(
             0, 1
@@ -184,148 +181,12 @@ class ScalarField:
         )
 
 
-class ClassicalSpinField(ScalarField):
-    """
-    Class for ensembles of classical spin fields.
-
-    Parameters
-    ----------
-    input_coords: numpy.ndarray
-        The coordinates of the spin configuration or ensemble.
-        Valid inputs may have dimensions:
-            - (lattice_volume, N, ensemble_size)
-            - (lattice_volume, N, *, ensemble_size)
-        where N is the Euclidean dimension of the spins.
-        The final dimension will always be treated as the ensemble dimension in the
-        context of calculating ensemble averages.
-    lattice: anvil.geometry.Geometry
-        Lattice object upon which the spins are defined. Must have the same number of
-        sites as the 0th dimension of `input_coords`.
-    """
-
-    minimum_dimensions = 3
-
-    def __init__(self, input_coords, lattice):
-        super().__init__(input_coords, lattice)
-
-        self.spins = self.coords  # alias
-
-    @classmethod
-    def from_spherical(cls, input_coords, lattice):
-        """Instantiate class with fields in the spherical representation, i.e.
-        parameterised by a set of angles. Input coordinates must have dimensions
-        (lattice_size * N-1, ensemble_size)."""
-        return cls(spher_to_eucl(input_coords), lattice)
-
-    @property
-    def spins(self):
-        """The configuration or ensemble of N-dimensional spin vectors (alias of coords).
-        numpy.ndarray, dimensions (lattice_volume, N, *, ensemble_size)"""
-        return self.coords
-
-    @unit_norm(dim=1)
-    @spins.setter
-    def spins(self, new):
-        """Updates the spin configuration or ensemble (by updating coords), also checking
-        that the spin vectors have unit norm."""
-        self.coords = new  # calls coords.__set__
-
-    @property
-    def magnetisation_series(self):
-        return np.sqrt((self.coords.sum(axis=0) ** 2).sum(axis=0))
-
-    @property
-    def hamiltonian(self):
-        """The spin Hamiltonian for each configuration in the ensemble.
-        numpy.ndarray, dimensions (*, ensemble_size)"""
-        return -np.sum(
-            self.spins[self.shift] * np.expand_dims(self.spins, axis=1),
-            axis=2,  # sum over vector components
-        ).sum(
-            axis=(0, 1)
-        )  # sum over dimensions and volume
-
-    @property
-    def magnetisation_sq(self):
-        """The squared magnetisation for each configuration in the ensemble.
-        numpy.ndarray, dimensions (*, ensemble_size)"""
-        return np.sum(
-            self.spins.sum(axis=0) ** 2, axis=0
-        )  # sum over volume, then vector components
-
-    def _vol_avg_two_point_correlator(self, shift):
-        """Helper function which calculates the volume-averaged two point correlation
-        function for a single shift, given in lexicographical form as an argument.
-        """
-        return np.sum(
-            self.spins[shift] * self.spins,
-            axis=1,  # sum over vector components
-        ).mean(
-            axis=0  # average over volume
-        )
-
-    def _spherical_triangle_area(self, a, b, c):
-        """Helper function which calculates the surface area of a unit sphere enclosed
-        by geodesics between three points on the surface. The parameters are the unit
-        vectors corresponding the three points on the unit sphere.
-        """
-        return 2 * np.arctan2(  # arctan2 since output needs to be (-2pi, 2pi)
-            np.sum(a * np.cross(b, c, axis=0), axis=0),  # numerator
-            1
-            + np.sum(a * b, axis=0)
-            + np.sum(b * c, axis=0)
-            + np.sum(c * a, axis=0),  # denominator
-        )
-
-    def _topological_charge_density(self, x0):
-        """Helper function which calculates the topological charge density at a given
-        lattice site for a configuration or ensemble of Heisenberg spins.
-        """
-        # Four points on the lattice forming a square
-        x1, x3 = self.shift[x0]
-        x2 = self.shift[x1, 1]
-        return (
-            self._spherical_triangle_area(*list(self.spins[[x0, x1, x2]]))
-            + self._spherical_triangle_area(*list(self.spins[[x0, x2, x3]]))
-        ) / (4 * pi)
-
-    @property
-    def topological_charge(self):
-        """Topological charge of a configuration or ensemble of Heisenberg spins,
-        according to the geometrical definition given in Berg and Luscher 1981.
-        Uses multiprocessing.
-        numpy.ndarray, dimensions (*, ensemble_size)"""
-        generator = lambda: range(self.lattice.volume)
-        mp_density = Multiprocessing(
-            func=self._topological_charge_density, generator=generator
-        )
-        charge = np.array([q for q in mp_density().values()]).sum(axis=0)
-        return charge
-
-
 def scalar_field(sample_training_output, training_geometry):
     return ScalarField(sample_training_output, training_geometry)
-
-
-def o2_field(sample_training_output, training_geometry):
-    return ClassicalSpinField.from_spherical(
-        sample_training_output.reshape(training_geometry.length ** 2, 1, -1),
-        training_geometry,
-    )
-
-
-def o3_field(sample_training_output, training_geometry):
-    return ClassicalSpinField.from_spherical(
-        sample_training_output.reshape(training_geometry.length ** 2, 2, -1),
-        training_geometry,
-    )
-
 
 FIELD_OPTIONS = {
     None: scalar_field,
     "phi_four": scalar_field,
-    "o2": o2_field,
-    "o3": o3_field,
 }
 
 _field_ensemble = collect("field", ("training_context",))

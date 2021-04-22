@@ -11,7 +11,6 @@ couplings:
 
 # Model
 base: gaussian
-sigma: 1.0
 
 #model: rational_quadratic_spline
 #model: real_nvp
@@ -21,6 +20,7 @@ model_params:
     n_additive: 2
     hidden_shape: [36]
     activation: tanh
+    z2_equivar: True
 
 # Training length
 n_batch: 2000
