@@ -10,7 +10,6 @@ import pandas as pd
 from reportengine.table import table
 
 
-# TODO: need actions for tau and acceptance
 @table
 def table_autocorrelation(
     magnetization_integrated_autocorr,

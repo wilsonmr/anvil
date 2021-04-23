@@ -1,4 +1,6 @@
 # Training report
+## Sampling
+{@table_autocorrelation@}
 ## Two point scalars
 {@table_two_point_scalars@}
 ## Two Point Correlator

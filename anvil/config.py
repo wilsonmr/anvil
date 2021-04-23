@@ -175,19 +175,19 @@ class ConfigParser(Config):
             )
         return params
 
-    def parse_target_length(self, targ: int):
-        """Target number of decorrelated field configurations to generate."""
-        return targ
+    def parse_sample_size(self, size: int):
+        """Number of configurations in output sample."""
+        return size
 
-    def parse_thermalisation(self, therm: (int, type(None))):
+    def parse_thermalization(self, therm: (int, type(None))):
         """Number of Markov chain steps to discard to allow the chain to
         reach an approximately stationary distribution."""
         if therm is None:
-            log.warning("Not Performing thermalisation")
+            log.warning("Not Performing thermalization")
             return therm
         if therm < 1:
             raise ConfigError(
-                "thermalisation must be greater than or equal to 1 or be None"
+                "thermalization must be greater than or equal to 1 or be None"
             )
         return therm
 

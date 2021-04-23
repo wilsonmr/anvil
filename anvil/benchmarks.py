@@ -35,12 +35,12 @@ def free_scalar_theory(couplings, lattice_length):
     return FreeScalarEigenmodes(m_sq=m_sq, lattice_length=lattice_length)
 
 
-def fourier_transform(sample_training_output, training_geometry):
+def fourier_transform(configs, training_geometry):
     """Takes the Fourier transform of a sample of field configurations.
 
     Inputs
     ------
-    sample_training_output: torch.tensor
+    configs: torch.tensor
         A (hopefully decorrelated) sample of field configurations in the
         split representation. Shape: (sample_size, lattice_size)
     training_geometry: geometry object
@@ -63,8 +63,8 @@ def fourier_transform(sample_training_output, training_geometry):
     )
 
     # Put the sample back in Cartesian form
-    phi = torch.empty_like(sample_training_output).view(-1, L, L)
-    phi[:, x_split, y_split] = sample_training_output
+    phi = torch.empty_like(configs).view(-1, L, L)
+    phi[:, x_split, y_split] = configs
 
     # TODO: update to new PyTorch version with torch.fft.rfft2
     phi_tilde = torch.rfft(phi, signal_ndim=2, onesided=False).roll(
@@ -100,7 +100,7 @@ def free_theory_from_training(free_theory_from_training_, training_context):
 
 
 @table
-def table_real_space_variance(sample_training_output, free_theory_from_training):
+def table_real_space_variance(configs, free_theory_from_training):
     """Compare the sample variance of the generated configurations with the
     theoretical prediction based on the free scalar theory.
 
@@ -109,7 +109,7 @@ def table_real_space_variance(sample_training_output, free_theory_from_training)
     sample variance with the theory prediction.
     """
     predic = np.reciprocal(free_theory_from_training.eigenvalues).mean()
-    sample_var = sample_training_output.var(dim=0)
+    sample_var = configs.var(dim=0)
     pc_diff = (sample_var.mean() - predic) / predic * 100
     data = [
         [
