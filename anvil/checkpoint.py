@@ -36,10 +36,11 @@ def loaded_optimizer(
     optimizer,
     optimizer_params,
 ):
-    instance = optimizer(loaded_model.parameters(), **optimizer_params)
+    optim_class = getattr(torch.optim, optimizer)
+    optim_instance = optim_class(loaded_model.parameters(), **optimizer_params)
     if loaded_checkpoint is not None:
-        instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return instance
+        optim_instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optim_instance
 
 
 def loaded_scheduler(
@@ -48,10 +49,11 @@ def loaded_scheduler(
     scheduler,
     scheduler_params,
 ):
-    instance = scheduler(loaded_optimizer, **scheduler_params)
+    sched_class = getattr(torch.optim.lr_scheduler, scheduler)
+    sched_instance = sched_class(loaded_optimizer, **scheduler_params)
     if loaded_checkpoint is not None:
-        instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
-    return instance
+        sched_instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return sched_instance
 
 
 def train_range(loaded_checkpoint, epochs):

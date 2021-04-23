@@ -13,7 +13,6 @@ from anvil.checkpoint import TrainingOutput
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
-import torch
 from random import randint
 from sys import maxsize
 
@@ -133,46 +132,16 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    def parse_optimizer(self, optimizer):
-        try:
-            optim_class = getattr(torch.optim, optimizer)  # could make case-insensitive
-        except KeyError:
-            raise ConfigError(f"Invalid optimizer {optimizer}. Consult torch.optim.")
-        return optim_class
+    def parse_optimizer(self, optimizer: str):
+        return optimizer
 
-    def parse_optimizer_params(self, params, optimizer):
-        try:
-            test = optimizer(
-                [{"params": []}],
-                **params,
-            )
-        except TypeError as error:
-            print(error)
-            raise ConfigError(
-                f"Invalid optimizer keyword argument dict. Consult documentation for {optimizer}."
-            )
+    def parse_optimizer_params(self, params: dict):
         return params
 
-    def parse_scheduler(self, scheduler):
-        try:
-            sched_class = getattr(
-                torch.optim.lr_scheduler, scheduler
-            )  # could make case-insensitive
-        except KeyError:
-            raise ConfigError(f"Invalid scheduler {scheduler}. Consult torch.optim.")
-        return sched_class
+    def parse_scheduler(self, scheduler: str):
+        return scheduler
 
-    def parse_scheduler_params(self, params, scheduler):
-        try:
-            test = scheduler(
-                torch.optim.Optimizer([{"params": [], "lr": 1}], {}),
-                **params,
-            )
-        except TypeError as error:
-            print(error)
-            raise ConfigError(
-                f"Invalid scheduler keyword argument dict. Consult documentation for {scheduler}"
-            )
+    def parse_scheduler_params(self, params: dict):
         return params
 
     def parse_sample_size(self, size: int):
