@@ -4,6 +4,7 @@ from itertools import islice
 from functools import wraps
 from math import ceil
 import torch
+import sys
 
 USE_MULTIPROCESSING = True
 
@@ -80,57 +81,6 @@ def bootstrap_sample(data, bootstrap_sample_size, seed=None):
     return np.stack(sample, axis=-2)
 
 
-def spher_to_eucl(coords):
-    """Converts a set (N-1) angles to a set of N-component euclidean unit vectors.
-
-    # TODO
-    The order of the (N-1) angles [\phi^0, ..., \phi^{N-1}] is taken to match some
-    convention.
-
-    Parameters
-    ----------
-    coords: numpy.ndarray
-        The spherical coordinates (angles). The (N-1) angles are expected on the 1st
-        dimension. Dimension (lattice.volume, (N-1), *).
-
-    Returns
-    -------
-    out: numpy.ndarray
-        The Euclidean representation of the angles, dimension (lattice.volume, N, *).
-
-    Notes
-    -----
-    See REF
-    """
-    output_shape = list(coords.shape)
-    output_shape[1] += 1
-
-    output = np.ones(output_shape)
-    output[:, :-1] = np.cos(coords)
-    output[:, 1:] *= np.cumprod(np.sin(coords), axis=1)
-    return output
-
-
-class unit_norm:
-    class UnitNormError(Exception):
-        pass
-
-    def __init__(self, dim=1, atol=1e-6):
-        self._dim = dim
-        self._atol = atol
-
-    def __call__(self, setter):
-        @wraps(setter)
-        def wrapper(instance, array_in):
-            if not np.allclose(
-                np.linalg.norm(array_in, axis=self._dim), 1, atol=self._atol
-            ):
-                raise self.UnitNormError(
-                    f"Array contains elements with a norm along dimension {self.dim} that deviates from unity by more than {self.atol}."
-                )
-
-            setter(instance, array_in)
-
 def get_num_parameters(model):
     """Return the number of trainable parameters in a model.
 
@@ -140,3 +90,11 @@ def get_num_parameters(model):
     for parameter in model.parameters():
         num += torch.numel(parameter)
     return num
+
+def handler(signum, frame):
+    """Handles keyboard interruptions and terminations and exits in such a way that,
+    if the program is currently inside a try-except-finally block, the finally clause
+    will be executed."""
+    sys.exit(1)
+
+

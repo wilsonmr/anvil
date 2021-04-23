@@ -47,7 +47,7 @@ class TrainConfig(ConfigParser):
         extra_input = {
             "training_output": str(kwargs["environment"].output_path),
             "cp_id": kwargs["environment"].extra_args["retrain"],
-            "outpath": str(kwargs["environment"].output_path / "checkpoints"),
+            "outpath": str(kwargs["environment"].output_path),
             "actions_": ["train"],
         }
         for key, value in extra_input.items():
