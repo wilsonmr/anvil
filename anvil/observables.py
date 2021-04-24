@@ -4,11 +4,13 @@ observables.py
 import numpy as np
 from scipy.signal import correlate
 from math import ceil, pi, sin
+import logging
 
 from anvil.utils import bootstrap_sample, Multiprocessing
 
 import scipy.optimize as optim
 
+log = logging.getLogger(__name__)
 
 def cosh_shift(x, xi, A, c):
     return A * np.cosh(-x / xi) + c
@@ -26,13 +28,17 @@ def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     y = zero_momentum_correlator.mean(axis=-1)
     yerr = zero_momentum_correlator.std(axis=-1)
 
-    popt, pcov = optim.curve_fit(
-        cosh_shift,
-        xdata=t[window] - T // 2,
-        ydata=y[window],
-        sigma=yerr[window],
-    )
-    return (popt, pcov, t0)
+    try:
+        popt, pcov = optim.curve_fit(
+            cosh_shift,
+            xdata=t[window] - T // 2,
+            ydata=y[window],
+            sigma=yerr[window],
+        )
+        return (popt, pcov, t0)
+    except RuntimeError:
+        log.warning("Failed to fit cosh to correlation function.")
+        return None
 
 
 def correlation_length_from_fit(fit_zero_momentum_correlator):

@@ -29,18 +29,19 @@ def table_autocorrelation(
 
 @table
 def table_fit(fit_zero_momentum_correlator, training_geometry):
-    popt, pcov, t0 = fit_zero_momentum_correlator
+    if fit_zero_momentum_correlator is not None:
+        popt, pcov, t0 = fit_zero_momentum_correlator
 
-    res = [
-        [popt[0], np.sqrt(pcov[0, 0])],
-        [popt[2], np.sqrt(pcov[2, 2])],
-    ]
-    df = pd.DataFrame(
-        res,
-        columns=["Mean", "Standard deviation"],
-        index=["xi_fit", "m_fit"],
-    )
-    return df
+        res = [
+            [popt[0], np.sqrt(pcov[0, 0])],
+            [popt[2], np.sqrt(pcov[2, 2])],
+        ]
+        df = pd.DataFrame(
+            res,
+            columns=["Mean", "Standard deviation"],
+            index=["xi_fit", "m_fit"],
+        )
+        return df
 
 
 @table
