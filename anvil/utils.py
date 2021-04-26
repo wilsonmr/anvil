@@ -6,7 +6,6 @@ from math import ceil
 import torch
 import sys
 
-USE_MULTIPROCESSING = True
 
 
 class Multiprocessing:
@@ -25,16 +24,21 @@ class Multiprocessing:
     -----
     Does not rely on multiprocessing.Pool since that does not work with
     instance methods without considerable extra effort (it cannot pickle them).
+    This means that the multiprocessing is not supported on Mac.
+
     """
 
-    def __init__(self, func, generator):
+    def __init__(self, func, generator, use_multiprocessing):
         self.func = func
         self.generator = generator
 
         self.n_iters = sum(1 for _ in generator())
-        self.n_cores = mp.cpu_count()
-        if not USE_MULTIPROCESSING:
+
+        if not use_multiprocessing:
             self.n_cores = 1
+        else:
+            self.n_cores = mp.cpu_count()
+
         self.max_chunk = ceil(self.n_iters / self.n_cores)
 
     def target(self, k, output_dict):
@@ -53,18 +57,23 @@ class Multiprocessing:
         """Returns a dictionary containing the function outputs for each
         set of parameters taken from the generator. The dictionary keys are
         integers which label the order of parameter sets in the generator."""
-        manager = mp.Manager()
-        output_dict = manager.dict()
+        # don't use mp if single core.
+        if self.n_cores == 1:
+            output_dict = dict()
+            self.target(0, output_dict)
+        else:
+            manager = mp.Manager()
+            output_dict = manager.dict()
 
-        procs = []
-        for k in range(self.n_cores):
-            p = mp.Process(target=self.target, args=(k, output_dict,),)
-            procs.append(p)
-            p.start()
+            procs = []
+            for k in range(self.n_cores):
+                p = mp.Process(target=self.target, args=(k, output_dict,),)
+                procs.append(p)
+                p.start()
 
-        # Kill the zombies
-        for p in procs:
-            p.join()
+            # Kill the zombies
+            for p in procs:
+                p.join()
 
         return output_dict
 

@@ -146,7 +146,11 @@ def __two_point_correlator(
 
 
 def two_point_correlator(
-    configs, training_geometry, bootstrap_sample_size, bootstrap_seed
+    configs,
+    training_geometry,
+    bootstrap_sample_size,
+    bootstrap_seed,
+    use_multiprocessing,
 ):
     # NOTE: bootstrap each shift seprately to reduce peak memory requirements
     correlator_single_shift = lambda shift: bootstrap_sample(
@@ -156,7 +160,9 @@ def two_point_correlator(
     ).mean(axis=-1)
 
     mp_correlator = Multiprocessing(
-        func=correlator_single_shift, generator=training_geometry.two_point_iterator
+        func=correlator_single_shift,
+        generator=training_geometry.two_point_iterator,
+        use_multiprocessing=use_multiprocessing,
     )
     correlator_dict = mp_correlator()
 

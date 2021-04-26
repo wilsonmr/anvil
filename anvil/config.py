@@ -4,6 +4,7 @@ config.py
 Module to parse runcards
 """
 import logging
+import platform
 
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
@@ -201,3 +202,9 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
+
+    def produce_use_multiprocessing(self):
+        """Don't use mp on MacOS"""
+        if platform.system() == "Darwin":
+            return False
+        return True
