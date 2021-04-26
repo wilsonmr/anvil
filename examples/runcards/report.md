@@ -1,28 +1,18 @@
 # Training report
-## Ising observables
-{@ising_observables_table@}
-## Zero momentum two point function
-### Plot
-{@plot_zero_momentum_two_point@}
-### Table
-{@table_zero_momentum_two_point@}
-## Effective pole mass
+## Sampling
+{@table_autocorrelation@}
+## Two point scalars
+{@table_two_point_scalars@}
+## Two Point Correlator
+{@plot_two_point_correlator@}
+## Zero momentum two point correlator
+{@table_fit@}
+{@plot_zero_momentum_correlator@}
+## Correlation length
 {@plot_effective_pole_mass@}
-### Table
-{@table_effective_pole_mass@}
-## Two Point Function
-### Plot
-{@plot_two_point_function@}
-### Table
-{@table_two_point_function@}
-## Autocorrelation
-### Plot
-{@plot_volume_averaged_two_point@}
-{@plot_autocorr_two_point@}
-{@plot_integrated_autocorr_two_point@}
-{@plot_exp_autocorr_two_point@}
-{@plot_automatic_windowing_function@}
-### Table
-{@table_autocorrelation_2pf@}
-## Field components
-{@plot_field_components@}
+{@table_correlation_length@}
+## Magnetisation
+{@table_magnetization@}
+{@plot_magnetization_series@}
+{@plot_magnetization_autocorr@}
+{@plot_magnetization_integrated_autocorr@}

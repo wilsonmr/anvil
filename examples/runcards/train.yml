@@ -4,34 +4,39 @@ lattice_dimension: 2
 
 # Target
 target: phi_four
-parameterisation: standard
+parameterisation: albergo2019
 couplings:
-    m_sq: 4
-    g: 0
+    m_sq: -4
+    lam: 6.975
 
 # Model
 base: gaussian
 
-#model: rational_quadratic_spline
-#model: real_nvp
-model: nice
+model: affine_spline
 model_params:
-    n_affine: 2
-    n_additive: 2
-    hidden_shape: [36]
+    hidden_shape: [72]
     activation: tanh
-    z2_equivar: True
+    
+    n_affine: 2
+    z2_equivar: true
 
-# Training length
-n_batch: 2000
+    n_spline: 1
+    n_segments: 8
+    z2_equivar_spline: false
+
+
+# Training
+n_batch: 1000
 epochs: 2000
 save_interval: 1000
 
 # Optimizer
 optimizer: Adam
 optimizer_params:
-    lr: 0.01
+    lr: 0.005
 
+# Scheduler
 scheduler: CosineAnnealingLR
 scheduler_params:
     T_max: 2000
+

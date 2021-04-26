@@ -1,83 +1,83 @@
+r"""
+coupling.py
 """
-core.py
-
-Module containing core objects specific to lattice projects
-"""
-from pathlib import Path
-from glob import glob
-
 import torch
+import torch.nn as nn
 
-from reportengine.compat import yaml
+from reportengine import collect
 
-
-class InvalidCheckpointError(Exception):
-    pass
-
-
-class InvalidTrainingOutputError(Exception):
-    pass
-
-
-class TrainingRuncardNotFound(InvalidTrainingOutputError):
-    pass
-
-class Checkpoint:
-    """Class which saves and loads checkpoints and allows checkpoints to be
-    sorted"""
-
-    def __init__(self, path: str):
-        self.path = Path(path)
-        try:
-            self.epoch = int(self.path.stem.split("_")[-1])  # should be an int
-        except ValueError:
-            raise InvalidCheckpointError(
-                f"{self.path} does not match expected "
-                "name checkpoint: `checkpoint_<epoch>.pt`"
-            )
-
-    def __lt__(self, other):
-        return self.epoch < other.epoch
-
-    def __repr__(self):
-        return str(self.path)
-
-    def load(self):
-        """Return checkpoint dictionary"""
-        return torch.load(self.path)
+ACTIVATION_LAYERS = {
+    "leaky_relu": nn.LeakyReLU,
+    "tanh": nn.Tanh,
+    None: nn.Identity,
+}
 
 
-class TrainingOutput:
-    """Class which acts as container for training output, which is a directory
-    containing training configuration, checkpoints and training logs
+class Sequential(nn.Sequential):
+    """Modify the nn.Sequential class so that it takes an input vector *and* a
+    value for the current logarithm of the model density, returning an output
+    vector and the updated log density."""
+
+    def forward(self, v, log_density, *args):
+        for module in self:
+            v, log_density = module(v, log_density, *args)
+        return v, log_density
+
+
+class FullyConnectedNeuralNetwork(nn.Module):
+    """Generic class for neural networks used in coupling layers.
+
+    Parameters
+    ----------
+    size_in: int
+        Number of nodes in the input layer
+    size_out: int
+        Number of nodes in the output layer
+    hidden_shape: list
+        List specifying the number of nodes in the intermediate layers
+    activation: (str, None)
+        Key representing the activation function used for each layer
+        except the final one.
+    no_final_activation: bool
+        If True, leave the network output unconstrained.
+    bias: bool
+        Whether to use biases in networks.
     """
 
-    _loaded_config = None
+    def __init__(
+        self,
+        size_in: int,
+        size_out: int,
+        hidden_shape: list,
+        activation: str,
+        bias: bool = True,
+    ):
+        super().__init__()
+        network_shape = [size_in, *hidden_shape, size_out]
 
-    def __init__(self, path: str):
-        self.path = Path(path)
-        self.config = self.path / "runcard.yml"
-        if not self.config.is_file():
-            raise TrainingRuncardNotFound(
-                f"Invalid training output, no runcard found at: {self.config}"
-            )
-        self.checkpoints = [
-            Checkpoint(cp_path) for cp_path in glob(f"{self.path}/checkpoints/*")
-        ]
-        self.cp_ids = [cp.epoch for cp in self.checkpoints]
-        self.name = self.path.name
+        activation = ACTIVATION_LAYERS[activation]
+        activations = [activation for _ in hidden_shape]
+        activations.append(nn.Identity)  # don't pass final output through activation
 
-    def get_config(self):
-        if self._loaded_config is None:
-            with open(self.config, "r") as f:
-                self._loaded_config = yaml.safe_load(f)
-        return self._loaded_config
+        # Construct network
+        layers = []
+        for f_in, f_out, act in zip(network_shape[:-1], network_shape[1:], activations):
+            layers.append(nn.Linear(f_in, f_out, bias=bias))
+            layers.append(act())
 
-    def as_input(self):
-        inp = dict(self.get_config())  # make copy
-        inp["checkpoints"] = self.checkpoints
-        inp["cp_ids"] = self.cp_ids
-        return inp
+        self.network = nn.Sequential(*layers)
 
-    def final_checkpoint(self):
-        return max(self.checkpoints)
+    def forward(self, v_in: torch.tensor):
+        """Forward pass of the network.
+
+        Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
+        shape (n_batch, size_out)
+        """
+        return self.network(v_in)
+
+_normalising_flow = collect("model_action", ("model_params",))
+
+def model_to_load(_normalising_flow):
+    return _normalising_flow[0]
+
+

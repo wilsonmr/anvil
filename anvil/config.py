@@ -4,15 +4,18 @@ config.py
 Module to parse runcards
 """
 import logging
+import platform
 
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
-from anvil.core import TrainingOutput
-from anvil.train import OPTIMIZER_OPTIONS, reduce_lr_on_plateau
-from anvil.models import MODEL_OPTIONS
 from anvil.geometry import Geometry2D
+from anvil.checkpoint import TrainingOutput
+from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
+
+from random import randint
+from sys import maxsize
 
 log = logging.getLogger(__name__)
 
@@ -35,34 +38,20 @@ class ConfigParser(Config):
         """returns the total number of nodes on lattice"""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_config_size(self, lattice_size, target):
-        """number of nodes in a single field configuration"""
-        if target == "o3":
-            return 2 * lattice_size
-        return lattice_size
-
-    def produce_size_half(self, config_size):
+    def produce_size_half(self, lattice_size):
         """Given the number of nodes in a field configuration, return an integer
-        of config_size/2 which is the size of the input vector for each coupling layer.
+        of lattice_size/2 which is the size of the input vector for each coupling layer.
         """
         # NOTE: we may want to make this more flexible
-        if (config_size % 2) != 0:
-            raise ConfigError("Config size is expected to be an even number")
-        return int(config_size / 2)
+        if (lattice_size % 2) != 0:
+            raise ConfigError("Lattice size is expected to be an even number")
+        return int(lattice_size / 2)
 
     def produce_geometry(self, lattice_length):
         return Geometry2D(lattice_length)
 
-    def parse_target(self, target: str):
-        """String specifying target distrbution."""
-        return target
-
-    def parse_base(self, base: str):
-        """String specifying base distribution."""
-        return base
-
     @explicit_node
-    def produce_target_dist(self, target: str):
+    def produce_target_dist(self, target):
         """Return the function which initialises the correct action"""
         try:
             return TARGET_OPTIONS[target]
@@ -81,74 +70,24 @@ class ConfigParser(Config):
                 f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
             )
 
-    def parse_mean(self, mean: (float, int)):
-        """Mean of normal or von Mises distribution."""
-        return mean
-
     def parse_sigma(self, sigma: (float, int)):
         """Standard deviation of normal distribution."""
         return sigma
 
-    def parse_support(self, supp: list):
-        """Support of uniform distrbution."""
-        return supp
+    def parse_couplings(self, couplings: dict):
+        """Couplings for field theory."""
+        return couplings  # TODO: obviously need to be more fool-proof about this
 
-    def parse_concentration(self, conc: float):
-        """Concentration parameter of von Mises distribution."""
-        return conc
-
-    def parse_radius(self, rad: (int, float, str)):
-        """Radius for semicircle distribution."""
-        return rad
-
-    def parse_m_sq(self, m: (float, int)):
-        """Bare mass squared in scalar theory."""
-        return m
-
-    def parse_lam(self, lam: (float, int)):
-        """Coefficient of quartic interaction in phi^4 theory."""
-        return lam
-
-    def parse_use_arxiv_version(self, do_use: bool):
-        """If true, use the conventional phi^4 action. If false,
-        there is an additional factor of 1/2 for the kinetic part
-        of the phi^4 action."""
-        return do_use
-
-    def parse_beta(self, beta: (float, int)):
-        """Inverse temperature."""
-        return beta
-
-    def parse_model(self, model: str):
-        """Label for normalising flow model."""
-        return model
+    def parse_parameterisation(self, param: str):
+        return param
 
     @explicit_node
-    def produce_flow_model(self, model):
-        """Return the action which instantiates the normalising flow model."""
+    def produce_model_action(self, model: str):
+        """Given a string, return the flow model action indexed by that string."""
         try:
             return MODEL_OPTIONS[model]
         except KeyError:
-            raise ConfigError(
-                f"invalid flow model {model}", model, MODEL_OPTIONS.keys()
-            )
-
-    def parse_standardise_inputs(self, do_stand: bool):
-        """Flag specifying whether to standardise input vectors before
-        passing them through a neural network."""
-        return do_stand
-
-    def parse_n_affine(self, n: int):
-        """Number of affine layers."""
-        return n
-
-    def produce_affine_layer_index(self, n_affine):
-        """Given n_affine, the number of affine layers, produces a list
-        with n_affine elements, the ith element is {i_affine: i}
-
-        we can use affine_layer_index to collect over when producing the model
-        """
-        return [{"i_affine": i} for i in range(n_affine)]
+            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""
@@ -194,35 +133,31 @@ class ConfigParser(Config):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    @explicit_node
-    def produce_loaded_optimizer(self, optimizer):
-        """Returns an action which itself returns a torch.optim.Optimizer object
-        that knows about the current state of the model."""
-        try:
-            return OPTIMIZER_OPTIONS[optimizer]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid optimizer {optimizer}", optimizer, OPTIMIZER_OPTIONS.keys()
-            )
+    def parse_optimizer(self, optimizer: str):
+        return optimizer
 
-    @explicit_node
-    def produce_scheduler(self):
-        """Currently fixed to ReduceLROnPlateau"""
-        return reduce_lr_on_plateau
+    def parse_optimizer_params(self, params: dict):
+        return params
 
-    def parse_target_length(self, targ: int):
-        """Target number of decorrelated field configurations to generate."""
-        return targ
+    def parse_scheduler(self, scheduler: str):
+        return scheduler
 
-    def parse_thermalisation(self, therm: (int, type(None))):
+    def parse_scheduler_params(self, params: dict):
+        return params
+
+    def parse_sample_size(self, size: int):
+        """Number of configurations in output sample."""
+        return size
+
+    def parse_thermalization(self, therm: (int, type(None))):
         """Number of Markov chain steps to discard to allow the chain to
         reach an approximately stationary distribution."""
         if therm is None:
-            log.warning("Not Performing thermalisation")
+            log.warning("Not Performing thermalization")
             return therm
         if therm < 1:
             raise ConfigError(
-                "thermalisation must be greater than or equal to 1 or be None"
+                "thermalization must be greater than or equal to 1 or be None"
             )
         return therm
 
@@ -241,12 +176,21 @@ class ConfigParser(Config):
         log.warning(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_n_boot(self, n_boot: int):
+    def parse_bootstrap_sample_size(self, n_boot: int):
         """Size of the bootstrap sample."""
         if n_boot < 2:
-            raise ConfigError("n_boot must be greater than 1")
-        log.warning(f"Using user specified n_boot: {n_boot}")
+            raise ConfigError("bootstrap sample size must be greater than 1")
+        log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
+
+    def produce_bootstrap_seed(
+        self, manual_bootstrap_seed: (int, type(None)) = None):
+        if manual_bootstrap_seed is None:
+            return randint(0, maxsize)
+        # numpy is actually this strict but let's keep it sensible.
+        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2**32):
+            raise ConfigError("Seed is outside of appropriate range: [0, 2 ** 32]")
+        return manual_bootstrap_seed
 
     @element_of("windows")
     def parse_window(self, window: float):
@@ -264,3 +208,9 @@ class ConfigParser(Config):
             raise ConfigError("window must be positive")
         log.warning(f"Using user specified window 'S': {window}")
         return window
+
+    def produce_use_multiprocessing(self):
+        """Don't use mp on MacOS"""
+        if platform.system() == "Darwin":
+            return False
+        return True
