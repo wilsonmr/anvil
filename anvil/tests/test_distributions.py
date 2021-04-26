@@ -5,7 +5,7 @@ Test distributions module
 from math import sqrt
 
 import numpy as np
-from anvil.distributions import NormalDist
+from anvil.distributions import Gaussian
 
 MEAN = 0
 SIGMA = 1
@@ -20,7 +20,7 @@ def test_normal_distribution():
 
     """
     lattice_size = 5
-    generator = NormalDist(lattice_size, sigma=SIGMA, mean=MEAN)
+    generator = Gaussian(lattice_size, sigma=SIGMA, mean=MEAN)
     sample_pt, _ = generator(N_SAMPLE)
     sample_np = sample_pt.detach().numpy()
     np.testing.assert_allclose(
