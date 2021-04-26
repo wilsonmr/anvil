@@ -1,0 +1,21 @@
+training_output: /tmp/del_me_anvil_benchmark
+cp_id: -1
+
+sample_size: 100000
+thermalization: 10
+sample_interval: null
+
+meta:
+  author: Author
+  title: Free Scalar test
+  keywords: [test]
+
+template_text: |
+ # Variance of real-space fields
+ {@table_real_space_variance@}
+ # Eigenvalues of kinetic operator
+ {@plot_kinetic_eigenvalues@}
+ {@table_kinetic_eigenvalues@}
+
+actions_:
+  - report
