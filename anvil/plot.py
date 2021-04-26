@@ -32,19 +32,28 @@ def plot_layerwise_weights(plot_layer_weights):
     yield from plot_layer_weights
 
 
-def plot_layer_histogram(layerwise_configs):
-    for v in layerwise_configs:
-        v = v.numpy()
-        v_pos = v[v.sum(axis=1) > 0].flatten()
-        v_neg = v[v.sum(axis=1) < 0].flatten()
-        fig, ax = plt.subplots()
-        ax.hist([v_pos, v_neg], bins=50, density=True, histtype="step")
-        yield fig
+@figure
+def plot_layer_histogram(configs):
+    v = configs.numpy()
+    v_pos = v[v.sum(axis=1) > 0].flatten()
+    v_neg = v[v.sum(axis=1) < 0].flatten()
+    fig, ax = plt.subplots()
+    ax.hist([v_pos, v_neg], bins=50, density=True, histtype="step")
+    return fig
 
 
-@figuregen
-def plot_layerwise_histograms(plot_layer_histogram):
-    yield from plot_layer_histogram
+@figure
+def plot_correlation_length(table_correlation_length):
+    fig, ax = plt.subplots()
+    ax.errorbar(
+        x=table_correlation_length.index,
+        y=table_correlation_length.value,
+        yerr=table_correlation_length.error,
+        linestyle="",
+        marker="o",
+    )
+    ax.set_xticklabels(table_correlation_length.index, rotation=45)
+    return fig
 
 
 @figure
@@ -63,14 +72,14 @@ def plot_zero_momentum_correlator(
 
     if fit_zero_momentum_correlator is not None:
         popt, pcov, t0 = fit_zero_momentum_correlator
-        shift = popt[2]
+        xi, A, shift = popt
 
         t = np.linspace(t0, T - t0, 100)
         ax.plot(
             t,
-            cosh_shift(t - T // 2, *popt) - popt[2],
+            cosh_shift(t - T // 2, *popt) - shift,
             "r--",
-            label=r"fit $A \cosh(-(t - T/2) / \xi) + c$",
+            label=r"fit $A \cosh(-(t - T/2) / \xi) + c$" + "\n" + fr"$\xi = ${xi:.2f}",
         )
     ax.errorbar(
         x=np.arange(T),

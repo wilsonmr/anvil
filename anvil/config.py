@@ -13,6 +13,7 @@ from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import MODEL_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
+import anvil.sample as sample
 
 from random import randint
 from sys import maxsize
@@ -121,6 +122,17 @@ class ConfigParser(Config):
         # get index from training_output class
         return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
 
+    @element_of("layer_ids")
+    def parse_layer_id(self, layer_id: int = -1):
+        return layer_id
+
+    @explicit_node
+    def produce_configs(self, layer_id):
+        if layer_id == -1:
+            return sample.configs_from_metropolis
+        else:
+            return sample.configs_from_model
+
     def produce_training_context(self, training_output):
         """Given a training output produce the context of that training"""
         # NOTE: This seems a bit hacky, exposing the entire training configuration
@@ -183,12 +195,11 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(
-        self, manual_bootstrap_seed: (int, type(None)) = None):
+    def produce_bootstrap_seed(self, manual_bootstrap_seed: (int, type(None)) = None):
         if manual_bootstrap_seed is None:
             return randint(0, maxsize)
         # numpy is actually this strict but let's keep it sensible.
-        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2**32):
+        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2 ** 32):
             raise ConfigError("Seed is outside of appropriate range: [0, 2 ** 32]")
         return manual_bootstrap_seed
 

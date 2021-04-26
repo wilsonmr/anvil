@@ -12,6 +12,7 @@ import scipy.optimize as optim
 
 log = logging.getLogger(__name__)
 
+
 def cosh_shift(x, xi, A, c):
     return A * np.cosh(-x / xi) + c
 
@@ -42,8 +43,11 @@ def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
 
 
 def correlation_length_from_fit(fit_zero_momentum_correlator):
-    popt, pcov, _ = fit_zero_momentum_correlator
-    return popt[0], np.sqrt(pcov[0, 0])
+    if fit_zero_momentum_correlator is not None:
+        popt, pcov, _ = fit_zero_momentum_correlator
+        return popt[0], np.sqrt(pcov[0, 0])
+    else:
+        return None, None
 
 
 def autocorrelation(chain):

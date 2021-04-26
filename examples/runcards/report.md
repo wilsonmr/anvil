@@ -10,12 +10,10 @@
 {@plot_zero_momentum_correlator@}
 ## Correlation length
 {@plot_effective_pole_mass@}
+{@plot_correlation_length@}
 {@table_correlation_length@}
 ## Magnetisation
 {@table_magnetization@}
 {@plot_magnetization_series@}
 {@plot_magnetization_autocorr@}
 {@plot_magnetization_integrated_autocorr@}
-## Layer-wise breakdown
-{@plot_layerwise_histograms@}
-{@plot_layerwise_weights@}
