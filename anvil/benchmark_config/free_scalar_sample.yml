@@ -16,6 +16,9 @@ template_text: |
  # Eigenvalues of kinetic operator
  {@plot_kinetic_eigenvalues@}
  {@table_kinetic_eigenvalues@}
+ # Layer-wise breakdown
+ {@plot_layerwise_histograms@}
+ {@plot_layerwise_weights@}
 
 actions_:
   - report(main=True)
