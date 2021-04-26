@@ -183,8 +183,13 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(self):
-        return randint(0, maxsize)
+    def produce_bootstrap_seed(self, manual_bootstrap_seed=None: (int, type(None))):
+        if manual_bootstrap_seed is None:
+            return randint(0, maxsize)
+        # numpy is actually this strict but let's keep it sensible.
+        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2**32):
+            raise ConfigError("Seed is outside of appropriate range: [0, 2 ** 32]")
+        return manual_bootstrap_seed
 
     @element_of("windows")
     def parse_window(self, window: float):
