@@ -66,8 +66,7 @@ def fourier_transform(configs, training_geometry):
     phi = torch.empty_like(configs).view(-1, L, L)
     phi[:, x_split, y_split] = configs
 
-    # TODO: update to new PyTorch version with torch.fft.rfft2
-    phi_tilde = torch.rfft(phi, signal_ndim=2, onesided=False).roll(
+    phi_tilde = torch.fft.fft2(phi).roll(
         (L // 2 - 1, L // 2 - 1), (1, 2)
     )  # so we have monotonically increasing momenta on each axis
 
@@ -81,7 +80,7 @@ def eigvals_from_sample(fourier_transform, training_geometry):
 
     The output is converted to an (L x L) numpy.ndarray.
     """
-    variance = torch.var(fourier_transform, dim=0).sum(dim=-1)  # sum real + imag
+    variance = fourier_transform.real.var(dim=0) + fourier_transform.imag.var(dim=0)
     eigvals = training_geometry.length ** 2 * torch.reciprocal(variance)
     return eigvals.numpy()
 
@@ -89,7 +88,7 @@ def eigvals_from_sample(fourier_transform, training_geometry):
 free_theory_from_training_ = collect("free_scalar_theory", ("training_context",))
 
 # TODO: work out way to not have to do this.. However it allows us to use check
-#@check_trained_with_free_theory
+# @check_trained_with_free_theory
 def free_theory_from_training(free_theory_from_training_, training_context):
     """Returns free_scalar_theory but with m_sq and lattice_length extracted
     from a training config.
@@ -127,7 +126,7 @@ def table_real_space_variance(configs, free_theory_from_training):
 @table
 def table_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
     """Compare the eigenvalues of the kinetic operator inferrered from the
-    sample of generated configurations with the theoretical predictions based 
+    sample of generated configurations with the theoretical predictions based
     on the free scalar theory.
     """
     pc_diff = (
