@@ -30,7 +30,6 @@ and returns two torch.tensor objects:
 """
 import torch
 import torch.nn as nn
-from torchsearchsorted import searchsorted
 
 from anvil.core import FullyConnectedNeuralNetwork
 
@@ -311,11 +310,10 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             )
             - self.B
         )
-
         k_this_segment = (
-            searchsorted(
-                knots_xcoords.contiguous(),
-                v_in_b_inside_interval.contiguous().view(-1, 1),
+            torch.searchsorted(
+                knots_xcoords,
+                v_in_b_inside_interval.view(-1, 1),
             )
             - 1
         ).clamp(0, self.n_segments - 1)
