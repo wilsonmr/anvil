@@ -2,11 +2,10 @@ training_output: train
 cp_id: -1
 
 sample_size: 10000
-thermalization: 1000
+thermalization: 10
 sample_interval: 1
 
-bootstrap_sample_size: 1000
-connected_correlator: true
+bootstrap_sample_size: 100
 
 meta:
   author: Author

@@ -120,9 +120,10 @@ def metropolis_hastings(
                 history.append(0)
 
         tau = calc_tau_chain(history)
+        log.info(f"Integrated autocorrelation time from preliminary sampling phase: {tau:.2g}")
         sample_interval = ceil(2 * tau)  # update sample interval
 
-    log.info(f"Using sampling interval: {sample_interval}.")
+    log.info(f"Using sampling interval: {sample_interval}")
 
     # Generate representative sample
     configs_out = torch.empty((sample_size, base_dist.size_out), dtype=torch.float32)
@@ -158,7 +159,7 @@ def metropolis_hastings(
     pbar.close()
 
     tau = calc_tau_chain(history)
-    log.info(f"Integrated autocorrelation time of output sample: {tau:.2g}.")
+    log.info(f"Integrated autocorrelation time of output sample: {tau:.2g}")
 
     acceptance = sum(history) / len(history)
     log.info(f"Fraction of proposals accepted: {acceptance:.2g}")

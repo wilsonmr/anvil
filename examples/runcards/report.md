@@ -16,6 +16,3 @@
 {@plot_magnetization_series@}
 {@plot_magnetization_autocorr@}
 {@plot_magnetization_integrated_autocorr@}
-## Field components
-{@plot_field_components@}
-{@plot_example_configs@}
