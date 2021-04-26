@@ -183,7 +183,8 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(self, manual_bootstrap_seed=None: (int, type(None))):
+    def produce_bootstrap_seed(
+        self, manual_bootstrap_seed: (int, type(None)) = None):
         if manual_bootstrap_seed is None:
             return randint(0, maxsize)
         # numpy is actually this strict but let's keep it sensible.
