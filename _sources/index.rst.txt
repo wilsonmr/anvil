@@ -2,7 +2,7 @@ anvil documentation
 ===================
 
 Welcome to the ``anvil`` docs. You can navigate back to this page at any point
-using the links at the top.
+using the links at the top. See getting started to install the code.
 
 Contents
 ========
