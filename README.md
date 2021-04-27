@@ -3,6 +3,9 @@
 Framework for training and analysing a normalising flow which is used to generate
 lattice configurations.
 
+For information on installation and usage please refer to the
+[documentation](https://wilsonmr.github.io/anvil/).
+
 ### Using and Citing our code
 
 We hope to provide a DOI for this code soon, and would really appreciate it
