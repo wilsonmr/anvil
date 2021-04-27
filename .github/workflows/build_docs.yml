@@ -15,10 +15,14 @@ jobs:
       - name: Install and Build 🔧
         run: |
           sudo apt-get install -y python3-sphinx
+          # install pip
+          python -m pip install --upgrade pip
+          # install anvil
+          python -m pip install .
           cd docs/sphinx
           make html
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.1
         with:
           branch: gh-pages # The branch the action should deploy to.
-          folder: docs/sphinx/build # The folder the action should deploy.
+          folder: docs/sphinx/build/html # The folder the action should deploy.
