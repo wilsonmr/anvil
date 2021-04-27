@@ -20,7 +20,8 @@ jobs:
         run: |
           # install anvil
           conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda
-          conda install sphinx
+          # manually install sphinx
+          sudo apt-get install -y python3-sphinx
           cd docs/sphinx
           make html
       - name: Deploy 🚀
