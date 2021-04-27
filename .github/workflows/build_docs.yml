@@ -17,11 +17,12 @@ jobs:
           auto-update-conda: true
           python-version: "3.8"
       - name: Install and Build 🔧
+        shell: bash -l {0}
         run: |
           # install anvil
-          conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda
-          # manually install sphinx
-          sudo apt-get install -y python3-sphinx
+          conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda --yes
+          # install sphinx
+          conda install sphinx --yes
           cd docs/sphinx
           make html
       - name: Deploy 🚀
