@@ -1,0 +1,37 @@
+anvil.tests package
+===================
+
+Submodules
+----------
+
+anvil.tests.test\_benchmark module
+----------------------------------
+
+.. automodule:: anvil.tests.test_benchmark
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.tests.test\_distributions module
+--------------------------------------
+
+.. automodule:: anvil.tests.test_distributions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.tests.test\_geometry module
+---------------------------------
+
+.. automodule:: anvil.tests.test_geometry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: anvil.tests
+   :members:
+   :undoc-members:
+   :show-inheritance:
