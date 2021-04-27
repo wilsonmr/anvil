@@ -12,13 +12,15 @@ jobs:
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v2.3.1
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: "3.8"
       - name: Install and Build 🔧
         run: |
-          sudo apt-get install -y python3-sphinx
-          # install pip
-          python -m pip install --upgrade pip
           # install anvil
-          python -m pip install .
+          conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda
+          conda install sphinx
           cd docs/sphinx
           make html
       - name: Deploy 🚀
