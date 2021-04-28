@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
-r"""
-coupling.py
+"""
+core.py
+
+Module containing project specific extensions to pytorch base classes.
+
 """
 import torch
 import torch.nn as nn

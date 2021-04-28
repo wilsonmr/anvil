@@ -1,0 +1,46 @@
+# Example of how to specify a custom sequential model explicitly.
+
+# Lattice
+lattice_length: 6
+lattice_dimension: 2
+
+# Target
+target: phi_four
+parameterisation: albergo2019
+couplings:
+    m_sq: -4
+    lam: 6.975
+
+# Model
+base: gaussian
+
+model: sequential_model
+
+model_params:
+ - model: real_nvp
+   n_affine: 2
+   z2_equivar: true
+   activation: tanh
+   hidden_shape: [72]
+ - model: rational_quadratic_spline
+   n_spline: 1
+   n_segments: 8
+   z2_equivar_spline: false
+   activation: tanh
+   hidden_shape: [72]
+
+# Training
+n_batch: 1000
+epochs: 2000
+save_interval: 1000
+
+# Optimizer
+optimizer: Adam
+optimizer_params:
+    lr: 0.005
+
+# Scheduler
+scheduler: CosineAnnealingLR
+scheduler_params:
+    T_max: 2000
+

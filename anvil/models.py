@@ -108,9 +108,17 @@ def affine_spline(real_nvp, rational_quadratic_spline):
 
 _normalising_flow = collect("model_action", ("model_params",))
 
-def model_to_load(_normalising_flow):
+def preset_model(_normalising_flow):
     return _normalising_flow[0]
 
+
+def sequential_model(_normalising_flow):
+    """action which wraps a list of affine models in
+    :py:class:`anvil.core.Sequential`. This allows the user to specify an
+    arbitrary combination of layers as the model
+
+    """
+    return Sequential(*_normalising_flow)
 
 MODEL_OPTIONS = {
     "nice": nice,
@@ -118,4 +126,10 @@ MODEL_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "spline_affine": spline_affine,
     "affine_spline": affine_spline,
+}
+
+
+LOADED_MODEL_OPTIONS = {
+    "preset_model": preset_model,
+    "sequential_model": sequential_model
 }
