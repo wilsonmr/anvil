@@ -8,8 +8,9 @@ normalising flows constructed from multiple layers via function composition.
 """
 from functools import partial
 
-from anvil.core import Sequential
+from reportengine import collect
 
+from anvil.core import Sequential
 import anvil.layers as layers
 
 
@@ -103,6 +104,12 @@ def spline_affine(real_nvp, rational_quadratic_spline):
 
 def affine_spline(real_nvp, rational_quadratic_spline):
     return Sequential(real_nvp, rational_quadratic_spline)
+
+
+_normalising_flow = collect("model_action", ("model_params",))
+
+def model_to_load(_normalising_flow):
+    return _normalising_flow[0]
 
 
 MODEL_OPTIONS = {

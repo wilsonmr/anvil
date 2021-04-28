@@ -12,7 +12,7 @@ from anvil.config import ConfigParser, ConfigError
 
 log = logging.getLogger(__name__)
 
-PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.core", "anvil.models"]
+PROVIDERS = ["anvil.train", "anvil.checkpoint", "anvil.models"]
 
 TRAINING_ACTIONS = ["train"]
 

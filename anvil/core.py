@@ -6,7 +6,6 @@ coupling.py
 import torch
 import torch.nn as nn
 
-from reportengine import collect
 
 ACTIVATION_LAYERS = {
     "leaky_relu": nn.LeakyReLU,
@@ -76,10 +75,3 @@ class FullyConnectedNeuralNetwork(nn.Module):
         shape (n_batch, size_out)
         """
         return self.network(v_in)
-
-_normalising_flow = collect("model_action", ("model_params",))
-
-def model_to_load(_normalising_flow):
-    return _normalising_flow[0]
-
-
