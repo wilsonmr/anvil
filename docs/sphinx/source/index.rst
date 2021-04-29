@@ -19,3 +19,11 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+Code of Conduct
+===============
+.. toctree::
+   :maxdepth: 2
+   :caption: Code of conduct:
+
+   code_of_conduct

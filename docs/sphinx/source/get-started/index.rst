@@ -9,3 +9,4 @@ This section includes an introduction to installing and using the anvil code.
 
    ./conda-installation
    ./development-installation
+   ./basic-usage
