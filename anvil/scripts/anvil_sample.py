@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 PROVIDERS = [
     "anvil.models",
     "anvil.sample",
-    "anvil.models",
     "anvil.observables",
     "anvil.plot",
     "anvil.table",
