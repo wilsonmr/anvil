@@ -3,6 +3,31 @@
 Framework for training and analysing a normalising flow which is used to generate
 lattice configurations.
 
+### Using and Citing our code
+
+We hope to provide a DOI for this code soon, and would really appreciate it
+if you'd cite that DOI if you use this code.
+
+`anvil` was developed by Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio
+to provide a framework for training and analysing normalising flows used to
+generate lattice configurations
+
+Copyright (C) 2021  Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+A full copy of the license can be found in [`LICENSE`](./LICENSE).
+For more information,
+see [https://www.gnu.org/licenses/](https://www.gnu.org/licenses/).
+
 ## Installation
 
 The supported installation method is via `conda`. At present a `conda` package
