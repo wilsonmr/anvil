@@ -186,7 +186,7 @@ class AffineLayer(CouplingLayer):
         s_out = self.s_network(v_for_net)
         t_out = self.t_network(v_for_net)
 
-        # If enforcing s(-v) = -s(v), we want to use |s(v)| in affine transf.
+        # If enforcing s(-v) = s(v), we want to use |s(v)| in affine transf.
         if self.z2_equivar:
             s_out = torch.abs(s_out)
 
@@ -259,9 +259,9 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             v_in_passive - v_in_passive.mean()
         ) / v_in_passive.std()  # reduce numerical instability
 
-        # Naively enforce C(-v) = -C(v)
+        # Naively enforce C(-v) = C(v)
         if self.z2_equivar:
-            v_in_passive_stand[negative_mag] = -v_in_passive_stand[negative_mag]
+            v_for_net[negative_mag] = -v_for_net[negative_mag]
 
         v_out_b = torch.zeros_like(v_in_active)
         gradient = torch.ones_like(v_in_active).unsqueeze(dim=-1)

@@ -13,7 +13,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
-from anvil.models import MODEL_OPTIONS, LOADED_MODEL_OPTIONS
+from anvil.models import LAYER_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 from random import randint
@@ -84,30 +84,12 @@ class ConfigParser(Config):
         return param
 
     @explicit_node
-    def produce_model_action(self, model: str):
+    def produce_layer_action(self, layer: str):
         """Given a string, return the flow model action indexed by that string."""
         try:
-            return MODEL_OPTIONS[model]
+            return LAYER_OPTIONS[layer]
         except KeyError:
-            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
-
-    @explicit_node
-    def produce_model_to_load(self, model: str, model_params):
-        """Decides whether to load sequential model or a preset combination"""
-        if isinstance(model_params, list):
-            inner_models = {inner.get("model") for inner in model_params}
-            if ("sequential_model" in inner_models) or (None in inner_models):
-                raise ConfigError(
-                    "Inner models cannot be undefined or `sequential_model`",
-                    inner_models,
-                    MODEL_OPTIONS.keys()
-                )
-            if model != "sequential_model":
-                raise ConfigError(
-                    "model_params can only be a list when the model is `sequential_model`"
-                )
-            return LOADED_MODEL_OPTIONS["sequential_model"]
-        return LOADED_MODEL_OPTIONS["preset_model"]
+            raise ConfigError(f"Invalid model {layer}", layer, LAYER_OPTIONS.keys())
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

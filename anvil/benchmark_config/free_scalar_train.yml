@@ -12,12 +12,9 @@ couplings:
 # Model
 base: gaussian
 
-#model: rational_quadratic_spline
-#model: real_nvp
-model: nice
 model_params:
-    n_affine: 2
-    n_additive: 2
+    layer: nice
+    n_blocks: 2
     hidden_shape: [36]
     activation: tanh
     z2_equivar: True

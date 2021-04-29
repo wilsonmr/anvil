@@ -1,3 +1,5 @@
+# Example of how to specify a custom sequential model explicitly.
+
 # Lattice
 lattice_length: 6
 lattice_dimension: 2
@@ -12,18 +14,18 @@ couplings:
 # Model
 base: gaussian
 
-model: affine_spline
 model_params:
-    hidden_shape: [72]
-    activation: tanh
-    
-    n_affine: 2
-    z2_equivar: true
-
-    n_spline: 1
-    n_segments: 8
-    z2_equivar_spline: false
-
+ - layer: real_nvp
+   n_blocks: 2
+   z2_equivar: true
+   activation: tanh
+   hidden_shape: [72]
+ - layer: rational_quadratic_spline
+   n_blocks: 1
+   n_segments: 8
+   z2_equivar: false
+   activation: tanh
+   hidden_shape: [72]
 
 # Training
 n_batch: 1000
