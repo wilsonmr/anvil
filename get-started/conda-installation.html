@@ -26,9 +26,6 @@
           <a href="../genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
-          <a href="../py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="development-installation.html" title="Development install"
              accesskey="N">next</a> |</li>
         <li class="right" >
@@ -48,20 +45,26 @@
   <div class="section" id="conda-installation">
 <span id="condainstall"></span><h1>Conda installation<a class="headerlink" href="#conda-installation" title="Permalink to this headline">¶</a></h1>
 <p>The supported method for installing the code and its dependencies is using
-<code class="docutils literal notranslate"><span class="pre">conda</span></code>, a package manager supplied with either miniconda or anaconda.</p>
+<code class="docutils literal notranslate"><span class="pre">conda</span></code>, a package manager supplied with either miniconda or anaconda. For
+more information, check out
+<a class="reference external" href="https://docs.conda.io/en/latest/">https://docs.conda.io/en/latest/</a>.</p>
 <p>We highly recommend setting up a separate <code class="docutils literal notranslate"><span class="pre">conda</span></code> environment for use with
-anvil:</p>
+<code class="docutils literal notranslate"><span class="pre">anvil</span></code>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ conda create -n anvil python-3.8
 </pre></div>
 </div>
 <p>This will create a new environment with the supported version of <code class="docutils literal notranslate"><span class="pre">python</span></code>.
-Then installing the code and all of its dependencies can be achieved by simply
-running</p>
+In order to install the code and all of its dependencies simply run:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ conda activate anvil # activate the environment
 $ conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/conda
 </pre></div>
 </div>
-<p>Congratulations, you have installed <code class="docutils literal notranslate"><span class="pre">anvil</span></code>.</p>
+<p>In the second line we specified that we wanted to search custom channels for
+some of the packages (<code class="docutils literal notranslate"><span class="pre">anvil</span></code> itself, <code class="docutils literal notranslate"><span class="pre">pytorch</span></code> and <code class="docutils literal notranslate"><span class="pre">reportengine</span></code>).
+Congratulations, you have installed <code class="docutils literal notranslate"><span class="pre">anvil</span></code>.</p>
+<p>If you wish to develop <code class="docutils literal notranslate"><span class="pre">anvil</span></code>, then check out how to turn your installation
+into a <a class="reference internal" href="development-installation.html#devinstall"><span class="std std-ref">Development install</span></a>. Alternatively, if you’re eager to start using
+<code class="docutils literal notranslate"><span class="pre">anvil</span></code> then check out some <a class="reference internal" href="basic-usage.html#basicusage"><span class="std std-ref">Basic usage</span></a></p>
 </div>
 
 
@@ -104,9 +107,6 @@ $ conda install anvil -c wilsonmr -c pytorch -c https://packages.nnpdf.science/c
         <li class="right" style="margin-right: 10px">
           <a href="../genindex.html" title="General Index"
              >index</a></li>
-        <li class="right" >
-          <a href="../py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
         <li class="right" >
           <a href="development-installation.html" title="Development install"
              >next</a> |</li>

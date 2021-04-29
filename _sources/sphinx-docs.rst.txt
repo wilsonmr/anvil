@@ -18,4 +18,6 @@ Once you have installed ``sphinx``, navigate to ``docs/sphinx`` and then run
 
 and the documentation should be built. The landing page for the docs will be
 found (starting from the root of the git repo) at
-``docs/sphinx/build/html/index.html``.
+``docs/sphinx/build/html/index.html``. You will also need to have ``anvil``
+installed in the same environment, in order to automatically build the
+module documentation.

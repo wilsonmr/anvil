@@ -1,0 +1,229 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Basic usage &#8212; anvil  documentation</title>
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Building the documentation" href="../sphinx-docs.html" />
+    <link rel="prev" title="Development install" href="development-installation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../sphinx-docs.html" title="Building the documentation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="development-installation.html" title="Development install"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">anvil  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Getting started</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Basic usage</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="basic-usage">
+<span id="basicusage"></span><h1>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h1>
+<p>The purpose of <code class="docutils literal notranslate"><span class="pre">anvil</span></code> is twofold, it can be used as a <code class="docutils literal notranslate"><span class="pre">python</span></code>
+library for implementing your own normalising flow models, or can be used
+as a commandline application which allows you to train and sample models
+for various sizes of 2-D scalar lattice field theories with <span class="math notranslate nohighlight">\(\phi^4\)</span>
+interactions.</p>
+<div class="section" id="running-anvil">
+<h2>Running <code class="docutils literal notranslate"><span class="pre">anvil</span></code><a class="headerlink" href="#running-anvil" title="Permalink to this headline">¶</a></h2>
+<p>We provide a pair of complementary <code class="docutils literal notranslate"><span class="pre">reportengine</span></code>
+applications: <code class="docutils literal notranslate"><span class="pre">anvil-train</span></code> and <code class="docutils literal notranslate"><span class="pre">anvil-sample</span></code>. The idea of these
+commandline applications is to allow the user to train and sample from models
+using the declarative programming framework that reportengine provides. Some
+more information on reportengine can be found
+<a class="reference external" href="https://github.com/NNPDF/reportengine/">here</a>.</p>
+<p>For the basic user who simply
+wishes to reproduce our results we recommend using the template runcards
+found in <code class="docutils literal notranslate"><span class="pre">examples/runcards</span></code>. In order to train a basic model on a 2-D
+lattice, size <span class="math notranslate nohighlight">\(6 \times 6\)</span>, on a scalar field theory with <span class="math notranslate nohighlight">\(\phi^4\)</span>
+interaction, take the <code class="docutils literal notranslate"><span class="pre">train.yml</span></code> runcard from <code class="docutils literal notranslate"><span class="pre">examples/runcards</span></code>. Then
+after performing a <a class="reference internal" href="conda-installation.html#condainstall"><span class="std std-ref">Conda installation</span></a>, simply run (whilst in the same
+directory as <code class="docutils literal notranslate"><span class="pre">train.yml</span></code>):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ anvil-train train.yml
+</pre></div>
+</div>
+<p>You should see the following output which indicates the model is training,
+it should also indicate an estimated training time:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>[INFO]: All requirements processed and checked successfully. Executing actions.
+[INFO]: Model has 83918 trainable parameters.
+Checkpoint saved at epoch 0
+loss: -6.502186298370361:  38%|█████▎        | 765/2000 [00:55&lt;01:24, 14.54it/s]
+</pre></div>
+</div>
+<p>The output of the training (saved models) will be found, by default, in a directory
+with the same name as the stem of the runcard, in this case <code class="docutils literal notranslate"><span class="pre">train</span></code>. You can
+change the name of your model to be something more sensible either by
+changing the name of the runcard or using the <code class="docutils literal notranslate"><span class="pre">--output</span></code> commandline
+flag. For more information on options when running <code class="docutils literal notranslate"><span class="pre">anvil-train</span></code>, run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ anvil-train --help
+</pre></div>
+</div>
+<p>Each new model requires its own, uniquely named, output directory, however
+existing models can
+be trained further instead by giving an existing fit output directory as
+input as well as telling the fit which epoch to start the retrain from</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">anvil</span><span class="o">-</span><span class="n">train</span> <span class="o">&lt;</span><span class="n">existing</span> <span class="n">output</span> <span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">r</span> <span class="mi">1000</span>
+</pre></div>
+</div>
+<p>this will recommence training at epoch 1000 using a checkpoint in
+<code class="docutils literal notranslate"><span class="pre">&lt;existing</span> <span class="pre">output</span> <span class="pre">name&gt;</span></code>, provided it exists. Note that you can just start from
+the last checkpoint in the output directory by specifying <code class="docutils literal notranslate"><span class="pre">-r</span> <span class="pre">-1</span></code> which uses
+the standard python syntax for indexing the final element.</p>
+<p>Once the training has finished we can generate a report with some plots
+which are generated from our trained model. <code class="docutils literal notranslate"><span class="pre">examples/runcards/report.yml</span></code>
+acts as the driving runcard for the analysis, the main thing here is to check
+that <code class="docutils literal notranslate"><span class="pre">training_output</span></code> is the relative path to your trained model output.</p>
+<p>For now, let’s continue with the model output called <code class="docutils literal notranslate"><span class="pre">train</span></code>. If you ran
+the training example in <code class="docutils literal notranslate"><span class="pre">examples/runcards</span></code> then the report runcard is already
+pointing at the correct location.</p>
+<p>You might have noticed there is also a <code class="docutils literal notranslate"><span class="pre">report.md</span></code> file in <code class="docutils literal notranslate"><span class="pre">examples/runcards</span></code>.
+This acts as the report template, and is written largely in standard markdown.
+The reportengine specific syntax is <code class="docutils literal notranslate"><span class="pre">{&#64;&lt;action&gt;&#64;}</span></code> which allows you to place
+“actions” into the report. Typically these actions will be plots or tables,
+most of which can be found in:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.table</span></code></p></li>
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.plot</span></code></p></li>
+</ul>
+</div></blockquote>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For more detailed discussion on reportengine reports, see
+<a class="reference external" href="https://data.nnpdf.science/validphys-docs/guide.html#reports">https://data.nnpdf.science/validphys-docs/guide.html#reports</a>, although
+note the actions discussed in that documentation relate to a different
+<code class="docutils literal notranslate"><span class="pre">reportengine</span></code> project.</p>
+</div>
+<p>In the driving runcard for the report, you will notice there are other parameters
+which control how the model is sampled, feel free to experiment with these.
+In order to generate the report, in the same directory as the report runcard:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ anvil-sample report.yml
+</pre></div>
+</div>
+<p>you should see some indication that the analysis code is running, once it
+has finished you can find the report in <code class="docutils literal notranslate"><span class="pre">output/index.html</span></code>. As with the
+training you can change the name of the output file with <code class="docutils literal notranslate"><span class="pre">--output</span></code>. To
+see the full range of options when running reports run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ anvil-sample --help
+</pre></div>
+</div>
+<p>You can also use that command to find out about specific actions, or modules
+which are part of <code class="docutils literal notranslate"><span class="pre">anvil-sample</span></code>, this is explained by the output of the
+help.</p>
+</div>
+<div class="section" id="anvil-as-a-library">
+<h2><code class="docutils literal notranslate"><span class="pre">anvil</span></code> as a library<a class="headerlink" href="#anvil-as-a-library" title="Permalink to this headline">¶</a></h2>
+<p>We supply some basic
+machinery to build your own normalising flow models. The relevant modules for
+this purpose are</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.core</span></code>: containing some basic extensions to <code class="docutils literal notranslate"><span class="pre">pytorch</span></code> modules relevant for this project.</p></li>
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.layers</span></code>: a collection of transformation layer classes</p></li>
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.geometry</span></code>: classes which transform the output of the transformations into meaningful geometries. These dictate which sites in your lattice get alternated between active and passive partitions.</p></li>
+<li><p><code class="xref py py-mod docutils literal notranslate"><span class="pre">anvil.distributions</span></code>: a collection of distributions which can be used as base distributions (for latent variables) or target distributions.</p></li>
+</ul>
+</div></blockquote>
+<p>For an example of how to incorporate these objects into an external project,
+see <code class="docutils literal notranslate"><span class="pre">examples/train_example.py</span></code>. You can run the example script:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ./train_example.py
+</pre></div>
+</div>
+<p>Which should produce some example plots in <code class="docutils literal notranslate"><span class="pre">examples/example_output</span></code>,
+for example:</p>
+<a class="reference internal image-reference" href="../_images/ratio.png"><img alt="ratio plot of sampled covariance matrix vs. target covariance matrix. The covariance is reproduced within a few percent." src="../_images/ratio.png" style="width: 400px;" /></a>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Basic usage</a><ul>
+<li><a class="reference internal" href="#running-anvil">Running <code class="docutils literal notranslate"><span class="pre">anvil</span></code></a></li>
+<li><a class="reference internal" href="#anvil-as-a-library"><code class="docutils literal notranslate"><span class="pre">anvil</span></code> as a library</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="development-installation.html"
+                        title="previous chapter">Development install</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../sphinx-docs.html"
+                        title="next chapter">Building the documentation</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/get-started/basic-usage.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../sphinx-docs.html" title="Building the documentation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="development-installation.html" title="Development install"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">anvil  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Getting started</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Basic usage</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2021, Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.5.4.
+    </div>
+  </body>
+</html>

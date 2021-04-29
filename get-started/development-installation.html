@@ -16,7 +16,7 @@
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Building the documentation" href="../sphinx-docs.html" />
+    <link rel="next" title="Basic usage" href="basic-usage.html" />
     <link rel="prev" title="Conda installation" href="conda-installation.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -26,10 +26,7 @@
           <a href="../genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
-          <a href="../py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="../sphinx-docs.html" title="Building the documentation"
+          <a href="basic-usage.html" title="Basic usage"
              accesskey="N">next</a> |</li>
         <li class="right" >
           <a href="conda-installation.html" title="Conda installation"
@@ -51,7 +48,7 @@
 <a class="reference internal" href="conda-installation.html#condainstall"><span class="std std-ref">Conda installation</span></a>. Then you can clone the
 <a class="reference external" href="https://github.com/wilsonmr/anvil">git repo</a>, following the instructions
 on Github.</p>
-<p>Navigate to the root of the git repo and then run the following in the anvil
+<p>Navigate to the root of the git repo and then run the following in your <code class="docutils literal notranslate"><span class="pre">anvil</span></code>
 <code class="docutils literal notranslate"><span class="pre">conda</span></code> environment to replace the <code class="docutils literal notranslate"><span class="pre">anvil</span></code> package you downloaded with
 a development installation of the code:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python -m pip install -e .
@@ -59,6 +56,38 @@ a development installation of the code:</p>
 </div>
 <p>Any changes you make in the git repo should be automatically reflected in
 the <code class="docutils literal notranslate"><span class="pre">anvil</span></code> installation in your environment.</p>
+<div class="section" id="developing-and-testing">
+<h2>Developing and testing<a class="headerlink" href="#developing-and-testing" title="Permalink to this headline">¶</a></h2>
+<p>If you plan on developing the code, then we highly recommend also installing the following packages:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://jupyter.org/">Jupyter</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/black/">black</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/pylint/">pylint</a></p></li>
+</ul>
+</div></blockquote>
+<p>Those packages can be installed using <code class="docutils literal notranslate"><span class="pre">conda</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">jupyter</span> <span class="n">black</span> <span class="n">pylint</span>
+</pre></div>
+</div>
+<p>Where possible we try to follow the guidelines on formatting set out by
+<code class="docutils literal notranslate"><span class="pre">black</span></code>, we also try to make good commit messages. We ask that if you
+add any code, you document it properly and where appropriate add some tests.</p>
+<p>We also ask that you ensure that none of the existing tests have failed as a
+result of your changes. If you wish to run the tests, then the test dependencies
+can be found in
+<code class="docutils literal notranslate"><span class="pre">conda-recipe/meta.yaml</span></code> under <code class="docutils literal notranslate"><span class="pre">test::requires</span></code>. Simply install the
+dependencies via <code class="docutils literal notranslate"><span class="pre">conda</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pytest --pyargs anvil
+</pre></div>
+</div>
+<p>The core aim of this project is to provide a valuable resource for researching
+physics and ML.
+This is only true as long as our code is easy to understand and free
+from bugs.</p>
+<p>Finally, we also ask that you read our <a class="reference internal" href="../code_of_conduct.html#codeofconduct"><span class="std std-ref">Contributor Covenant Code of Conduct</span></a>. We hope you enjoy
+using our code!</p>
+</div>
 </div>
 
 
@@ -68,12 +97,20 @@ the <code class="docutils literal notranslate"><span class="pre">anvil</span></c
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Development install</a><ul>
+<li><a class="reference internal" href="#developing-and-testing">Developing and testing</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Previous topic</h4>
   <p class="topless"><a href="conda-installation.html"
                         title="previous chapter">Conda installation</a></p>
   <h4>Next topic</h4>
-  <p class="topless"><a href="../sphinx-docs.html"
-                        title="next chapter">Building the documentation</a></p>
+  <p class="topless"><a href="basic-usage.html"
+                        title="next chapter">Basic usage</a></p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -102,10 +139,7 @@ the <code class="docutils literal notranslate"><span class="pre">anvil</span></c
           <a href="../genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
-          <a href="../py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="../sphinx-docs.html" title="Building the documentation"
+          <a href="basic-usage.html" title="Basic usage"
              >next</a> |</li>
         <li class="right" >
           <a href="conda-installation.html" title="Conda installation"
