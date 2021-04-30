@@ -135,7 +135,7 @@ class AdditiveLayer(CouplingLayer):
             bias=not z2_equivar,
         )
 
-    def forward(self, v_in, log_density, *unused) -> torch.Tensor:
+    def forward(self, v_in, log_density, *args) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -191,7 +191,7 @@ class AffineLayer(CouplingLayer):
         )
         self.z2_equivar = z2_equivar
 
-    def forward(self, v_in, log_density, *unused) -> torch.Tensor:
+    def forward(self, v_in, log_density, *args) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -424,7 +424,7 @@ class BatchNormLayer(nn.Module):
         super().__init__()
         self.gamma = scale
 
-    def forward(self, v_in, log_density, *unused):
+    def forward(self, v_in, log_density, *args):
         """Forward pass of the batch normalisation transformation."""
         mult = self.gamma / torch.std(v_in)
         v_out = mult * (v_in - v_in.mean())
@@ -438,7 +438,7 @@ class GlobalRescaling(nn.Module):
 
         self.scale = nn.Parameter(torch.Tensor([initial]))
 
-    def forward(self, v_in, log_density, *unused):
+    def forward(self, v_in, log_density, *args):
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
         return v_out, log_density
