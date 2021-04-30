@@ -18,7 +18,7 @@ import anvil.layers as layers
 def _coupling_pair(coupling_layer, **kwargs):
     """Helper function which wraps a pair of coupling layers from
     :py:mod:`anvil.layers` in the module container
-    :py:class`layers.Sequential`. The first transformation layer acts on
+    :py:class`anvil.layers.Sequential`. The first transformation layer acts on
     the even sites and the second transformation acts on the odd sites, so one
     of these blocks ensures all sites are transformed as part of an
     active partition.
@@ -41,7 +41,7 @@ def real_nvp(
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, followed by a single
     :py:class:`anvil.layers.GlobalRescaling` all wrapped in the module container
-    :py:class`layers.Sequential`.
+    :py:class`anvil.layers.Sequential`.
 
     The first ``n_blocks`` elements of the outer ``Sequential``
     are ``Sequential`` s containing a pair of ``AffineLayer`` s which
@@ -71,13 +71,13 @@ def real_nvp(
 
     Returns
     -------
-    real_nvp: layers.Sequential
+    real_nvp: anvil.layers.Sequential
         A sequence of affine transformations, which we refer to as a real NVP
         (Non-volume preserving) flow.
 
     See Also
     --------
-    :py:mod:`anvil.core` contains the fully connected neural network class
+    :py:mod:`anvil.neural_network` contains the fully connected neural network class
     as well as valid choices for activation functions.
 
     """
@@ -102,8 +102,8 @@ def nice(
     z2_equivar=True,
 ):
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
-    :py:class:`layers.AdditiveLayer` s followed by a single
-    :py:class:`layers.GlobalRescaling`. The pairs of ``AdditiveLayer`` s
+    :py:class:`anvil.layers.AdditiveLayer` s followed by a single
+    :py:class:`anvil.layers.GlobalRescaling`. The pairs of ``AdditiveLayer`` s
     act on the even and odd sites respectively.
 
     Parameters
@@ -127,7 +127,7 @@ def nice(
 
     Returns
     -------
-    nice: layers.Sequential
+    nice: anvil.layers.Sequential
         A sequence of additive transformations, which we refer to as a
         nice flow.
 
@@ -155,8 +155,8 @@ def rational_quadratic_spline(
     z2_equivar=False,
 ):
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
-    :py:class:`layers.RationalQuadraticSplineLayer` s followed by a single
-    :py:class:`layers.GlobalRescaling`. The pairs of RQS's
+    :py:class:`anvil.layers.RationalQuadraticSplineLayer` s followed by a single
+    :py:class:`anvil.layers.GlobalRescaling`. The pairs of RQS's
     act on the even and odd sites respectively.
 
     Parameters
@@ -206,17 +206,51 @@ _normalising_flow = collect("layer_action", ("model_params",))
 
 def model_to_load(_normalising_flow):
     """action which wraps a list of layers in
-    :py:class:`layers.Sequential`. This allows the user to specify an
+    :py:class:`anvil.layers.Sequential`. This allows the user to specify an
     arbitrary combination of layers as the model.
 
-    For more information
-    on valid choices for layers, see :py:var:`LAYER_OPTIONS` or the various
+    For more information on valid choices for layers, see
+    ``anvil.models.LAYER_OPTIONS`` or the various
     functions in :py:mod:`anvil.models` which produce sequences of the layers
     found in :py:mod:`anvil.layers`.
+
+    At present, available transformations are:
+
+        - ``nice``
+        - ``real_nvp``
+        - ``rational_quadratic_spline``
+
+    You can see their dependencies using the ``anvil`` provider help, e.g.
+    for ``real_nvp``:
+
+    .. code::
+
+        $ anvil-sample --help real_nvp
+        ...
+        < action docstring - poorly formatted>
+        ...
+        The following resources are read from the configuration:
+
+            lattice_length(int):
+        [Used by lattice_size]
+
+            lattice_dimension(int): Parse lattice dimension from runcard
+        [Used by lattice_size]
+
+        The following additionl arguments can be used to control the
+        behaviour. They are set by default to sensible values:
+
+        n_blocks
+        hidden_shape
+        activation = tanh
+        z2_equivar = True
+
+    ``anvil-train`` will also provide the same information.
 
     """
     return layers.Sequential(*_normalising_flow)
 
+# Update docstring above if you add to this!
 LAYER_OPTIONS = {
     "nice": nice,
     "real_nvp": real_nvp,

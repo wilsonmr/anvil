@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 """
-core.py
+neural_network.py
 
-Module containing project specific extensions to pytorch base classes.
+Module containing neural networks which are used as part of transformation
+layers, found in :py:mod:`anvil.layers`.
 
 """
 import torch
@@ -17,8 +18,8 @@ ACTIVATION_LAYERS = {
 }
 
 
-class FullyConnectedNeuralNetwork(nn.Module):
-    """Generic class for neural networks used in coupling layers.
+class DenseNeuralNetwork(nn.Module):
+    """Dense neural networks used in coupling layers.
 
     Parameters
     ----------
@@ -30,11 +31,11 @@ class FullyConnectedNeuralNetwork(nn.Module):
         List specifying the number of nodes in the intermediate layers
     activation: (str, None)
         Key representing the activation function used for each layer
-        except the final one.
-    no_final_activation: bool
-        If True, leave the network output unconstrained.
-    bias: bool
+        except the final one. Valid options can be found in
+        ``ACTIVATION_LAYERS``.
+    bias: bool, default=True
         Whether to use biases in networks.
+
     """
 
     def __init__(

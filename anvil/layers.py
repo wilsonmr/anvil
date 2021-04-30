@@ -33,7 +33,7 @@ function composition:
 
 .. math::
 
-        f(z) = g_{N_layers}( \ldots ( g_2( g_1( z ) ) ) \ldots )
+        f(z) = g_{N_{\rm layers}}( \ldots ( g_2( g_1( z ) ) ) \ldots )
 
 As a matter of convenience we provide a subclass of
 :py:class:`torch.nn.Sequential`, which is initialised by passing multiple layers
@@ -47,7 +47,7 @@ full normalising flow transformation :math:`f(z)`.
 import torch
 import torch.nn as nn
 
-from anvil.core import FullyConnectedNeuralNetwork
+from anvil.neural_network import DenseNeuralNetwork
 
 
 class CouplingLayer(nn.Module):
@@ -127,7 +127,7 @@ class AdditiveLayer(CouplingLayer):
     ):
         super().__init__(size_half, even_sites)
 
-        self.t_network = FullyConnectedNeuralNetwork(
+        self.t_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
@@ -175,14 +175,14 @@ class AffineLayer(CouplingLayer):
     ):
         super().__init__(size_half, even_sites)
 
-        self.s_network = FullyConnectedNeuralNetwork(
+        self.s_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
             bias=not z2_equivar,
         )
-        self.t_network = FullyConnectedNeuralNetwork(
+        self.t_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
@@ -250,7 +250,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         self.size_half = size_half
         self.n_segments = n_segments
 
-        self.network = FullyConnectedNeuralNetwork(
+        self.network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half * (3 * n_segments - 1),
             hidden_shape=hidden_shape,
@@ -447,10 +447,11 @@ class GlobalRescaling(nn.Module):
 class Sequential(nn.Sequential):
     """Similar to :py:class:`torch.nn.Sequential` except conforms to our
     ``forward`` convention.
-
     """
-
     def forward(self, v, log_density, *args):
+        """overrides the base class ``forward`` method to conform to our
+        conventioned for expected inputs/outputs of ``forward`` methods.
+        """
         for module in self:
             v, log_density = module(v, log_density, *args)
         return v, log_density

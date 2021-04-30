@@ -14,8 +14,8 @@ class Gaussian:
     """
     Class which handles the generation of a sample of latent Gaussian variables.
 
-    Inputs:
-    -------
+    Parameters
+    ----------
     lattice_size: int
         Number of nodes on the lattice.
     sigma: float
@@ -59,6 +59,18 @@ class PhiFourScalar:
     The forward pass returns the corresponding log density (unnormalised) which
     is equal to -S
 
+    The parameters required differ depending on the parameterisation you're
+    using:
+
+    ================  =============
+    parameterisation  couplings
+    ================  =============
+    standard          m_sq, g
+    albergo2019       m_sq, lam
+    nicoli2020        kappa, lam
+    bosetti2015       beta, lam
+    ================  =============
+
     Parameters
     ----------
     geometry:
@@ -69,14 +81,6 @@ class PhiFourScalar:
     couplings: dict
         dictionary with two entries that are the couplings of the theory.
         See below.
-
-
-        parameterisation            couplings
-        -------------------------------------
-        standard                    m_sq, g
-        albergo2019                 m_sq, lam
-        nicoli2020                  kappa, lam
-        bosetti2015                 beta, lam
 
     Notes
     -----
