@@ -44,6 +44,9 @@ def table_fit(fit_zero_momentum_correlator, training_geometry):
             index=["xi_fit", "m_fit"],
         )
         return df
+    else:
+        # TODO should fail better than this
+        return pd.DataFrame([])
 
 
 @table
@@ -102,7 +105,7 @@ def table_correlation_length(
 
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation"],
+        columns=["value", "error"],
         index=[
             "Estimate from fit",
             "Estimate using arcosh",
@@ -110,7 +113,7 @@ def table_correlation_length(
             "Low momentum estimate",
         ],
     )
-    df["No. correlation lengths"] = training_geometry.length / df["Mean"]
+    df["No. correlation lengths"] = training_geometry.length / df["value"]
     return df
 
 

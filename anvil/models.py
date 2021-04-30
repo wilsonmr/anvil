@@ -6,14 +6,15 @@ models.py
 Module containing reportengine actions which return callable objects that execute
 normalising flows constructed from multiple layers via function composition.
 """
+import torch
 from functools import partial
+from reportengine import collect
 
 from anvil.core import Sequential
-
 import anvil.layers as layers
 
 
-def coupling_pair(coupling_layer, size_half, **layer_spec):
+def coupling_block(coupling_layer, size_half, **layer_spec):
     """Helper function which returns a callable object that performs a coupling
     transformation on both even and odd lattice sites."""
     coupling_transformation = partial(coupling_layer, size_half, **layer_spec)
@@ -33,7 +34,7 @@ def real_nvp(
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
     blocks = [
-        coupling_pair(
+        coupling_block(
             layers.AffineLayer,
             size_half,
             hidden_shape=hidden_shape,
@@ -55,7 +56,7 @@ def nice(
     """Action that returns a callable object that performs a sequence of `n_affine`
     affine coupling transformations on both partitions of the input vector."""
     blocks = [
-        coupling_pair(
+        coupling_block(
             layers.AdditiveLayer,
             size_half,
             hidden_shape=hidden_shape,
@@ -76,10 +77,10 @@ def rational_quadratic_spline(
     activation="tanh",
     z2_equivar_spline=False,
 ):
-    """Action that returns a callable object that performs a pair of circular spline
+    """Action that returns a callable object that performs a block of circular spline
     transformations, one on each half of the input vector."""
     blocks = [
-        coupling_pair(
+        coupling_block(
             layers.RationalQuadraticSplineLayer,
             size_half,
             interval=interval,
@@ -98,12 +99,25 @@ def rational_quadratic_spline(
 
 
 def spline_affine(real_nvp, rational_quadratic_spline):
-    return Sequential(rational_quadratic_spline, real_nvp)
+    return Sequential(*rational_quadratic_spline, *real_nvp)
 
 
 def affine_spline(real_nvp, rational_quadratic_spline):
-    return Sequential(real_nvp, rational_quadratic_spline)
+    return Sequential(*real_nvp, *rational_quadratic_spline)
 
+# TODO replace this
+_loaded_model = collect("loaded_model", ("training_context",))
+
+
+def model_weights(_loaded_model):
+    model = _loaded_model[0]
+
+    for block in model:
+        params = {
+            key: tensor.flatten().numpy() for key, tensor in block.state_dict().items()
+        }
+        if len(params) > 1:  # only want coupling layers
+            yield params
 
 MODEL_OPTIONS = {
     "nice": nice,

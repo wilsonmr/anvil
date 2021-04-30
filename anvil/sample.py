@@ -122,7 +122,9 @@ def metropolis_hastings(
                 history.append(0)
 
         tau = calc_tau_chain(history)
-        log.info(f"Integrated autocorrelation time from preliminary sampling phase: {tau:.2g}")
+        log.info(
+            f"Integrated autocorrelation time from preliminary sampling phase: {tau:.2g}"
+        )
         sample_interval = ceil(2 * tau)  # update sample interval
 
     log.info(f"Using sampling interval: {sample_interval}")
@@ -172,7 +174,7 @@ def metropolis_hastings(
 _metropolis_hastings = collect("metropolis_hastings", ("training_context",))
 
 
-def configs(_metropolis_hastings):
+def configs_from_metropolis(_metropolis_hastings):
     return _metropolis_hastings[0][0]
 
 
@@ -182,3 +184,30 @@ def tau_chain(_metropolis_hastings):
 
 def acceptance(_metropolis_hastings):
     return _metropolis_hastings[0][2]
+
+
+# TODO: figure out how to name each coupling block
+@torch.no_grad()
+def yield_configs_layerwise(loaded_model, base_dist, sample_size, layer_id):
+    v, _ = base_dist(sample_size)
+    if layer_id == 0:
+        return v
+
+    negative_mag = (v.sum(dim=1).sign() < 0).nonzero().squeeze()
+
+    i = 1
+    for block in loaded_model:
+        v, _ = block(v, 0, negative_mag)
+        # only want coupling layers
+        if len([tensor for tensor in block.state_dict().values()]) > 1:
+            if i == layer_id:
+                return v
+            else:
+                i += 1
+
+
+_configs_from_model = collect("yield_configs_layerwise", ("training_context",))
+
+
+def configs_from_model(_configs_from_model):
+    return _configs_from_model[0]

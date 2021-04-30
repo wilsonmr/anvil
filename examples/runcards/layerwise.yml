@@ -1,19 +1,19 @@
 training_output: train
 cp_id: -1
-layer_id: -1
+layer_ids: [1, 2, 3, -1]
 
 sample_size: 10000
-thermalization: 10
+thermalization: 1000
 sample_interval: 1
 
-bootstrap_sample_size: 1000
+bootstrap_sample_size: 100
 
 meta:
   author: Author
   title: Training Report
   keywords: [example]
 
-template: report.md
+template: layerwise.md
 
 actions_:
-  - report(main=True)
+    - report(main=True)

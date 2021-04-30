@@ -9,6 +9,7 @@ module containing all actions for plotting observables
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator
 
 from reportengine.figure import figure, figuregen
@@ -17,93 +18,44 @@ from reportengine import collect
 from anvil.observables import cosh_shift
 
 
-def field_component(i, x_base, phi_model, base_neg, model_neg):
-    fig, ax = plt.subplots()
-
-    ax.hist(x_base, bins=50, density=True, histtype="step", label="base")
-    ax.hist(phi_model, bins=50, density=True, histtype="step", label="model, full")
-    ax.hist(
-        base_neg, bins=50, density=True, histtype="step", label="model, $M_{base} < 0$"
-    )
-    ax.hist(
-        model_neg, bins=50, density=True, histtype="step", label="model, $M_{mod} < 0$"
-    )
-    ax.set_title(f"Coordinate {i}")
-    ax.legend()
-    fig.tight_layout()
-    return fig
-
-
-def field_components(loaded_model, base_dist, lattice_size):
-    """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
-    if known, plot the pdf of the target distribution."""
-    sample_size = 10000
-
-    # Generate a large sample from the base distribution and pass it through the trained model
-    with torch.no_grad():
-        x_base, _ = base_dist(sample_size)
-        sign = x_base.sum(dim=1).sign()
-        neg = (sign < 0).nonzero().squeeze()
-        phi_model, model_log_density = loaded_model(x_base, 0, neg)
-
-    base_neg = phi_model[neg]
-
-    sign = phi_model.sum(dim=1).sign()
-    neg = (sign < 0).nonzero().squeeze()
-    model_neg = phi_model[neg]
-
-    # Convert to shape (n_coords, sample_size * lattice_size)
-    # NOTE: this is all pointless for the 1-component scalar
-    x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
-    phi_model = phi_model.reshape(sample_size * lattice_size, -1).transpose(0, 1)
-
-    base_neg = base_neg.reshape(1, -1)
-    model_neg = model_neg.reshape(1, -1)
-
-    for i in range(x_base.shape[0]):
-        yield field_component(i, x_base[i], phi_model[i], base_neg[i], model_neg[i])
-
-
-_plot_field_components = collect("field_components", ("training_context",))
-
-
-def example_configs(loaded_model, base_dist, training_geometry):
-    sample_size = 10
-
-    # Generate a large sample from the base distribution and pass it through the trained model
-    with torch.no_grad():
-        x_base, _ = base_dist(sample_size)
-        sign = x_base.sum(dim=1).sign()
-        neg = (sign < 0).nonzero().squeeze()
-        phi_model, model_log_density = loaded_model(x_base, 0, neg)
-
-    L = int(np.sqrt(phi_model.shape[1]))
-
-    phi_true = np.zeros((4, L, L))
-    phi_true[:, training_geometry.checkerboard] = phi_model[:4, : L ** 2 // 2]
-    phi_true[:, ~training_geometry.checkerboard] = phi_model[:4, L ** 2 // 2 :]
-
-    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)
-    for i, ax in enumerate(axes.flatten()):
-        conf = ax.imshow(phi_true[i])
-        fig.colorbar(conf, ax=ax)
-
-    fig.suptitle("Example configurations")
-
-    return fig
-
-
-_plot_example_configs = collect("example_configs", ("training_context",))
-
-
-@figure
-def plot_example_configs(_plot_example_configs):
-    return _plot_example_configs[0]
+# TODO: subplots for different neural networks
+def plot_layer_weights(model_weights):
+    for weights in model_weights:
+        fig, ax = plt.subplots()
+        labels = list(weights.keys())
+        data = weights.values()
+        ax.hist(data, bins=50, stacked=True, label=labels)
+        fig.legend()
+        yield fig
 
 
 @figuregen
-def plot_field_components(_plot_field_components):
-    yield from _plot_field_components[0]
+def plot_layerwise_weights(plot_layer_weights):
+    yield from plot_layer_weights
+
+
+@figure
+def plot_layer_histogram(configs):
+    v = configs.numpy()
+    v_pos = v[v.sum(axis=1) > 0].flatten()
+    v_neg = v[v.sum(axis=1) < 0].flatten()
+    fig, ax = plt.subplots()
+    ax.hist([v_pos, v_neg], bins=50, density=True, histtype="step")
+    return fig
+
+
+@figure
+def plot_correlation_length(table_correlation_length):
+    fig, ax = plt.subplots()
+    ax.errorbar(
+        x=table_correlation_length.index,
+        y=table_correlation_length.value,
+        yerr=table_correlation_length.error,
+        linestyle="",
+        marker="o",
+    )
+    ax.set_xticklabels(table_correlation_length.index, rotation=45)
+    return fig
 
 
 @figure
@@ -122,14 +74,14 @@ def plot_zero_momentum_correlator(
 
     if fit_zero_momentum_correlator is not None:
         popt, pcov, t0 = fit_zero_momentum_correlator
-        shift = popt[2]
+        xi, A, shift = popt
 
         t = np.linspace(t0, T - t0, 100)
         ax.plot(
             t,
-            cosh_shift(t - T // 2, *popt) - popt[2],
+            cosh_shift(t - T // 2, *popt) - shift,
             "r--",
-            label=r"fit $A \cosh(-(t - T/2) / \xi) + c$",
+            label=r"fit $A \cosh(-(t - T/2) / \xi) + c$" + "\n" + fr"$\xi = ${xi:.2f}",
         )
     ax.errorbar(
         x=np.arange(T),
@@ -174,9 +126,12 @@ def plot_two_point_correlator(two_point_correlator):
 
     """
     corr = two_point_correlator.mean(axis=-1)
-    std = two_point_correlator.std(axis=-1)
+    error = two_point_correlator.std(axis=-1)
+    fractional_error = np.abs(error / corr)
+    L = corr.shape[0]
 
-    fractional_std = std / abs(corr)
+    corr = np.roll(corr, (-L // 2 - 1, -L // 2 - 1), (0, 1))
+    fractional_error = np.roll(fractional_error, (-L // 2 - 1, -L // 2 - 1), (0, 1))
 
     fig, (ax_mean, ax_std) = plt.subplots(1, 2, figsize=(13, 6), sharey=True)
     ax_std.set_title(r"$\sigma_G / G$")
@@ -184,9 +139,10 @@ def plot_two_point_correlator(two_point_correlator):
     ax_mean.set_xlabel("$x$")
     ax_std.set_xlabel("$x$")
     ax_mean.set_ylabel("$t$")
+    norm = mpl.colors.LogNorm()
 
-    im1 = ax_mean.imshow(corr)
-    im2 = ax_std.imshow(fractional_std)
+    im1 = ax_mean.imshow(corr, norm=norm)
+    im2 = ax_std.imshow(fractional_error, norm=norm)
 
     ax_mean.yaxis.set_major_locator(MaxNLocator(integer=True))
     ax_mean.xaxis.set_major_locator(MaxNLocator(integer=True))
