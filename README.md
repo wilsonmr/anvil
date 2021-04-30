@@ -6,6 +6,12 @@ lattice configurations.
 For information on installation and usage please refer to the
 [documentation](https://wilsonmr.github.io/anvil/).
 
+## Builds
+
+Conda Package: [![Build conda package](https://github.com/wilsonmr/anvil/actions/workflows/build_conda.yml/badge.svg)](https://github.com/wilsonmr/anvil/actions/workflows/build_conda.yml)
+
+Documentation: [![Documentation - Build and Deploy](https://github.com/wilsonmr/anvil/actions/workflows/build_docs.yml/badge.svg)](https://github.com/wilsonmr/anvil/actions/workflows/build_docs.yml)
+
 # Using and Citing our code
 
 We hope to provide a DOI for this code soon, and would really appreciate it
