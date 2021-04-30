@@ -1,5 +1,3 @@
-# Example of how to specify a custom sequential model explicitly.
-
 # Lattice
 lattice_length: 6
 lattice_dimension: 2
