@@ -248,7 +248,12 @@ def model_to_load(_normalising_flow):
     ``anvil-train`` will also provide the same information.
 
     """
-    return layers.Sequential(*_normalising_flow)
+    # assume that _normalising_flow is a list of layers, each layer
+    # is a sequential of blocks, each block is a pair of transformations
+    # which transforms the entire input state - flatten this out, so output
+    # is Sequential of blocks
+    flow_flat = [block for layer in _normalising_flow for block in layer]
+    return layers.Sequential(*flow_flat)
 
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
