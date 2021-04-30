@@ -3,32 +3,46 @@
 r"""
 layers.py
 
-Contains nn.Modules which implement transformations of input configurations whilst computing
-the Jacobian determinant of the transformation.
+Contains the transformations or "layers" which are the building blocks of
+normalising flows. The layers are implemented using the PyTorch library, which
+in practice means they subclass :py:class:`torch.nn.Module`. For more
+information, check out the PyTorch
+`Module docs <https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module>`_.
 
-Each transformation layers may contain several neural networks or learnable parameters.
+The basic idea is of a flow is to generate a latent variable, in our framework
+this would be using a class in :py:mod:`anvil.distributions`. The latent
+variables are then transformed by sequentially applying the transformation
+layers. The key feature of the transformations is the ability to easily calculate
+the Jacobian determinant. If the base density function is known, then we can
+evaluate the model density exactly.
 
-A normalising flow, f, can be constructed from multiple layers using function composition:
+The bottom line is that we enforce a convention to the ``forward`` method
+of each layer (a special method of :py:class:`torch.nn.Module` subclasses).
+All layers in this module should contain a ``forward`` method which takes two
+:py:class:`torch.Tensor` objects as inputs:
 
-        f(z) = g_n( ... ( g_2( g_1( z ) ) ) ... )
-
-which is implemented using the architecture provided by torch.nn
-
-All layers in this module contain a `forward` method which takes two torch.tensor objects
-as inputs:
-
-    - a batch of input configurations, dimensions (batch size, lattice size).
-
-    - a batch of scalars, dimensions (batch size, 1), that are the logarithm of the
+    - a batch of input configurations, dimensions ``(batch size, lattice size)``.
+    - a batch of scalars, dimensions ``(batch size, 1)``, that are the logarithm of the
       'current' probability density, at this stage in the normalising flow.
 
-and returns two torch.tensor objects:
+Each transformation layers may contain several neural networks or learnable
+parameters.
 
-    - a batch of configurations \phi which have been transformed according to the 
-      transformation, with the same dimensions as the input configurations.
+A full normalising flow, f, can be constructed from multiple layers using
+function composition:
 
-    - the updated logarithm of the probability density, including the contribution from
-      the Jacobian determinant of this transformation.
+.. math::
+
+        f(z) = g_{N_layers}( \ldots ( g_2( g_1( z ) ) ) \ldots )
+
+As a matter of convenience we provide a subclass of
+:py:class:`torch.nn.Sequential`, which is initialised by passing multiple layers
+as arguments (in the order in which the layers are applied). The main feature
+of our version, :py:class:`Sequential`, is that it conforms to our ``forward``
+convention. From the perspective of the user :py:class:`Sequential` appears
+as a single subclass of :py:class:`torch.nn.Module` which performs the
+full normalising flow transformation :math:`f(z)`.
+
 """
 import torch
 import torch.nn as nn
@@ -428,3 +442,15 @@ class GlobalRescaling(nn.Module):
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
         return v_out, log_density
+
+
+class Sequential(nn.Sequential):
+    """Similar to :py:class:`torch.nn.Sequential` except conforms to our
+    ``forward`` convention.
+
+    """
+
+    def forward(self, v, log_density, *args):
+        for module in self:
+            v, log_density = module(v, log_density, *args)
+        return v, log_density

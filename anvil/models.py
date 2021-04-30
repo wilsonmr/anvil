@@ -5,34 +5,33 @@ models.py
 
 Module containing reportengine actions which return normalising flow models.
 Generally this involves piecing together components from :py:mod:`anvil.layers`
-and :py:mod:`anvil.core` to produce sequences of transformations.
+to produce sequences of transformations.
 
 """
 from functools import partial
 
 from reportengine import collect
 
-from anvil.core import Sequential
 import anvil.layers as layers
 
 
 def _coupling_pair(coupling_layer, **kwargs):
     """Helper function which wraps a pair of coupling layers from
     :py:mod:`anvil.layers` in the module container
-    :py:class`anvil.core.Sequential`. The first transformation layer acts on
+    :py:class`layers.Sequential`. The first transformation layer acts on
     the even sites and the second transformation acts on the odd sites, so one
     of these blocks ensures all sites are transformed as part of an
     active partition.
 
     """
     coupling_transformation = partial(coupling_layer, **kwargs)
-    return Sequential(
+    return layers.Sequential(
         coupling_transformation(even_sites=True),
         coupling_transformation(even_sites=False),
     )
 
 
-def _real_nvp(
+def real_nvp(
     size_half,
     n_blocks,
     hidden_shape,
@@ -42,7 +41,7 @@ def _real_nvp(
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, followed by a single
     :py:class:`anvil.layers.GlobalRescaling` all wrapped in the module container
-    :py:class`anvil.core.Sequential`.
+    :py:class`layers.Sequential`.
 
     The first ``n_blocks`` elements of the outer ``Sequential``
     are ``Sequential`` s containing a pair of ``AffineLayer`` s which
@@ -72,7 +71,7 @@ def _real_nvp(
 
     Returns
     -------
-    real_nvp: anvil.core.Sequential
+    real_nvp: layers.Sequential
         A sequence of affine transformations, which we refer to as a real NVP
         (Non-volume preserving) flow.
 
@@ -92,17 +91,17 @@ def _real_nvp(
         )
         for i in range(n_blocks)
     ]
-    return Sequential(*blocks, layers.GlobalRescaling())
+    return layers.Sequential(*blocks, layers.GlobalRescaling())
 
 
-def _nice(
+def nice(
     size_half,
     n_blocks,
     hidden_shape,
     activation="tanh",
     z2_equivar=True,
 ):
-    """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
+    r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`layers.AdditiveLayer` s followed by a single
     :py:class:`layers.GlobalRescaling`. The pairs of ``AdditiveLayer`` s
     act on the even and odd sites respectively.
@@ -128,7 +127,7 @@ def _nice(
 
     Returns
     -------
-    nice: anvil.core.Sequential
+    nice: layers.Sequential
         A sequence of additive transformations, which we refer to as a
         nice flow.
 
@@ -143,10 +142,10 @@ def _nice(
         )
         for i in range(n_blocks)
     ]
-    return Sequential(*blocks, layers.GlobalRescaling())
+    return layers.Sequential(*blocks, layers.GlobalRescaling())
 
 
-def _rational_quadratic_spline(
+def rational_quadratic_spline(
     size_half,
     hidden_shape,
     interval=5,
@@ -198,8 +197,7 @@ def _rational_quadratic_spline(
         )
         for _ in range(n_blocks)
     ]
-    return Sequential(
-        #layers.BatchNormLayer(),
+    return layers.Sequential(
         *blocks,
         layers.GlobalRescaling(),
     )
@@ -208,7 +206,7 @@ _normalising_flow = collect("layer_action", ("model_params",))
 
 def model_to_load(_normalising_flow):
     """action which wraps a list of layers in
-    :py:class:`anvil.core.Sequential`. This allows the user to specify an
+    :py:class:`layers.Sequential`. This allows the user to specify an
     arbitrary combination of layers as the model.
 
     For more information
@@ -217,10 +215,10 @@ def model_to_load(_normalising_flow):
     found in :py:mod:`anvil.layers`.
 
     """
-    return Sequential(*_normalising_flow)
+    return layers.Sequential(*_normalising_flow)
 
 LAYER_OPTIONS = {
-    "nice": _nice,
-    "real_nvp": _real_nvp,
-    "rational_quadratic_spline": _rational_quadratic_spline,
+    "nice": nice,
+    "real_nvp": real_nvp,
+    "rational_quadratic_spline": rational_quadratic_spline,
 }

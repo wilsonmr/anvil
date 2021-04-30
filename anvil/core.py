@@ -17,17 +17,6 @@ ACTIVATION_LAYERS = {
 }
 
 
-class Sequential(nn.Sequential):
-    """Modify the nn.Sequential class so that it takes an input vector *and* a
-    value for the current logarithm of the model density, returning an output
-    vector and the updated log density."""
-
-    def forward(self, v, log_density, *args):
-        for module in self:
-            v, log_density = module(v, log_density, *args)
-        return v, log_density
-
-
 class FullyConnectedNeuralNetwork(nn.Module):
     """Generic class for neural networks used in coupling layers.
 
