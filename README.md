@@ -8,9 +8,9 @@ For information on installation and usage please refer to the
 
 ## Builds
 
-Conda Package: [![Build conda package](https://github.com/wilsonmr/anvil/actions/workflows/build_conda.yml/badge.svg)](https://github.com/wilsonmr/anvil/actions/workflows/build_conda.yml)
+Conda Package: [![Build conda package](https://github.com/wilsonmr/anvil/actions/workflows/build_conda.yml/badge.svg)](https://anaconda.org/wilsonmr/anvil)
 
-Documentation: [![Documentation - Build and Deploy](https://github.com/wilsonmr/anvil/actions/workflows/build_docs.yml/badge.svg)](https://github.com/wilsonmr/anvil/actions/workflows/build_docs.yml)
+Documentation: [![Documentation - Build and Deploy](https://github.com/wilsonmr/anvil/actions/workflows/build_docs.yml/badge.svg)](https://wilsonmr.github.io/anvil/)
 
 # Using and Citing our code
 
