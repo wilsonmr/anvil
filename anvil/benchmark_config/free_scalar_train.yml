@@ -12,7 +12,7 @@ couplings:
 # Model
 base: gaussian
 
-model_params:
+model:
     layer: nice
     n_blocks: 2
     hidden_shape: [36]

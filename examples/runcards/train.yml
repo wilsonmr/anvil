@@ -12,7 +12,7 @@ couplings:
 # Model
 base: gaussian
 
-model_params:
+model:
  - layer: real_nvp
    n_blocks: 2
    z2_equivar: true

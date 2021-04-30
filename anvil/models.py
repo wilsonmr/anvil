@@ -202,7 +202,7 @@ def rational_quadratic_spline(
         layers.GlobalRescaling(),
     )
 
-_normalising_flow = collect("layer_action", ("model_params",))
+_normalising_flow = collect("layer_action", ("model",))
 
 def model_to_load(_normalising_flow):
     """action which wraps a list of layers in
