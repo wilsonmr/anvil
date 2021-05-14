@@ -145,10 +145,10 @@ def nice(
 
 def rational_quadratic_spline(
     size_half,
+    n_blocks,
     hidden_shape,
+    n_segments,
     interval=5,
-    n_blocks=1,
-    n_segments=4,
     activation="tanh",
     z2_equivar=False,
 ):
@@ -161,18 +161,18 @@ def rational_quadratic_spline(
     size_half: int
         inferred from ``lattice_size``, the size of the active/passive
         partitions (which are equal size, `lattice_size / 2`).
+    n_blocks: int
+        The number of pairs of :py:class:`anvil.layers.AffineLayer`
+        transformations. For RQS this is set to 1.
     hidden_shape: list[int]
         the shape of the neural networks used in the each layer. The visible
         layers are defined by the ``lattice_size``.
+    n_segments: int
+        The number of segments to use in the RQS transformation.
     interval: int, default=5
         the interval within which the RQS applies the transformation, at present
         if a field variable is outside of this region it is mapped to itself
         (i.e the gradient of the transformation is 1 outside of the interval).
-    n_blocks: int, default=1
-        The number of pairs of :py:class:`anvil.layers.AffineLayer`
-        transformations. For RQS this is set to 1.
-    n_segments: int, default=4
-        The number of segments to use in the RQS transformation.
     activation: str, default="tanh"
         The activation function to use for each hidden layer. The output layer
         of the network is linear (has no activation function).
@@ -197,18 +197,18 @@ def rational_quadratic_spline(
     return layers.Sequential(*blocks)
 
 
-def batch_norm(scale=1):
+def batch_norm(scale=1.0):
     r"""Action which returns an instance of :py:class:`anvil.layers.BatchNormLayer`.
 
     Parameters
     ----------
-    scale: float
+    scale: float, default=1.0
         The multiplicative factor applied to the standardised data.
     """
     return layers.Sequential(layers.BatchNormLayer(scale=scale))
 
 
-def global_rescaling(scale=1, learnable=True):
+def global_rescaling(scale, learnable=True):
     r"""Action which returns and instance of :py:class:`anvil.layers.GlobalRescaling`.
 
     Parameters
