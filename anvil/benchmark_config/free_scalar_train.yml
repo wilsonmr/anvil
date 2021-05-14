@@ -13,11 +13,14 @@ couplings:
 base: gaussian
 
 model:
-    layer: nice
+  - layer: nice
     n_blocks: 2
     hidden_shape: [36]
     activation: tanh
     z2_equivar: True
+  - layer: global_rescaling
+    scale: 1
+    learnable: True
 
 # Training length
 n_batch: 2000
