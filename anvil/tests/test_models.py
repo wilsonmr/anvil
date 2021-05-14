@@ -12,10 +12,6 @@ from anvil.api import API
 from anvil.models import LAYER_OPTIONS
 
 
-class LayersNotIndependentError(Exception):
-    pass
-
-
 LAYERS = list(LAYER_OPTIONS.keys())
 
 PARAMS = {
@@ -83,10 +79,9 @@ def layer_independence_test(model_spec):
     # NOTE: may be safer to iterate over shared keys
     for layer, layer_copy in zip(model, model_copy):
         for original, copy in zip(layer.parameters(), layer_copy.parameters()):
-            if not torch.allclose(original, copy):
-                raise LayersNotIndependentError(
-                    "Parameters are being shared amongst layers that should be independent."
-                )
+            assert torch.allclose(
+                original, copy
+            ), "Parameters are being shared amongst layers that should be independent."
 
 
 @torch.no_grad()
@@ -107,7 +102,7 @@ def test_layer_independence_global_rescaling():
         ],
         "scale": 1.0,
     }
-    with pytest.raises(LayersNotIndependentError):
+    with pytest.raises(AssertionError):
         layer_independence_test(breaking_example)
 
 
@@ -127,7 +122,7 @@ def test_layer_independence_additive():
         ]
     }
     layer_independence_test(working_example)
-    
+
     breaking_example = {
         "model": [
             {"layer": "nice"},
@@ -135,5 +130,5 @@ def test_layer_independence_additive():
         ],
         **params,
     }
-    with pytest.raises(LayersNotIndependentError):
+    with pytest.raises(AssertionError):
         layer_independence_test(breaking_example)
