@@ -15,7 +15,7 @@ from reportengine import collect
 import anvil.layers as layers
 
 
-def _coupling_pair(coupling_layer, **kwargs):
+def _coupling_block(coupling_layer, **kwargs):
     """Helper function which wraps a pair of coupling layers from
     :py:mod:`anvil.layers` in the module container
     :py:class`anvil.layers.Sequential`. The first transformation layer acts on
@@ -82,7 +82,7 @@ def real_nvp(
 
     """
     blocks = [
-        _coupling_pair(
+        _coupling_block(
             layers.AffineLayer,
             size_half=size_half,
             hidden_shape=hidden_shape,
@@ -133,7 +133,7 @@ def nice(
 
     """
     blocks = [
-        _coupling_pair(
+        _coupling_block(
             layers.AdditiveLayer,
             size_half=size_half,
             hidden_shape=hidden_shape,
@@ -186,7 +186,7 @@ def rational_quadratic_spline(
 
     """
     blocks = [
-        _coupling_pair(
+        _coupling_block(
             layers.RationalQuadraticSplineLayer,
             size_half=size_half,
             interval=interval,
