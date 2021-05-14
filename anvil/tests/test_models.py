@@ -11,6 +11,11 @@ from copy import deepcopy
 from anvil.api import API
 from anvil.models import LAYER_OPTIONS
 
+
+class LayersNotIndependentError(Exception):
+    pass
+
+
 LAYERS = list(LAYER_OPTIONS.keys())
 
 PARAMS = {
@@ -59,25 +64,31 @@ def test_model_construction(layer_idx, n_blocks, lattice_length_half, hidden_sha
 
 def layer_independence_test(model_spec):
     """Check that each layer's parameters are updated independently."""
-
-    # Collect over these layers
-    model = API.model_to_load(**model_spec)
-    layer1, layer2 = [layer for layer in model]
-
-    layer2_copy = deepcopy(layer2)
+    model = iter(API.model_to_load(**model_spec))
+    model_copy = deepcopy(model)
 
     # Update parameters in first layer
-    valid_key, valid_tensor = next(iter(layer1.state_dict().items()))
-    update = {valid_key: torch.rand_like(valid_tensor)}
+    layer1 = next(model)
+    update = {}
+    for valid_key, valid_tensor in layer1.state_dict().items():
+        update[valid_key] = torch.rand_like(valid_tensor)
     layer1.load_state_dict(update, strict=False)
 
-    # Check that second layer is unchanged
+    # Check that this is different from the copy
+    layer1_copy = next(model_copy)
+    for original, copy in zip(layer1.parameters(), layer1_copy.parameters()):
+        assert not torch.allclose(original, copy)
+
+    # Now check that the other layers are unchanged
     # NOTE: may be safer to iterate over shared keys
-    for original, copy in zip(layer2.parameters(), layer2_copy.parameters()):
-        assert torch.allclose(original, copy)
+    for layer, layer_copy in zip(model, model_copy):
+        for original, copy in zip(layer.parameters(), layer_copy.parameters()):
+            if not torch.allclose(original, copy):
+                raise LayersNotIndependentError(
+                    "Parameters are being shared amongst layers that should be independent."
+                )
 
 
-# TODO: extend to other layers... @pytest.mark.parametrize("layer_action", LAYERS)
 @torch.no_grad()
 def test_layer_independence_global_rescaling():
     # Build a model with two identical sets of layers
@@ -96,4 +107,33 @@ def test_layer_independence_global_rescaling():
         ],
         "scale": 1.0,
     }
-    layer_independence_test(breaking_example)
+    with pytest.raises(LayersNotIndependentError):
+        layer_independence_test(breaking_example)
+
+
+# TODO: could extend to all layers quite easily
+@torch.no_grad()
+def test_layer_independence_additive():
+    params = {
+        "hidden_shape": (32,),
+        "n_blocks": 1,
+        "lattice_length": 6,
+        "lattice_dimension": 2,
+    }
+    working_example = {
+        "model": [
+            {"layer": "nice", **params},
+            {"layer": "nice", **params},
+        ]
+    }
+    layer_independence_test(working_example)
+    
+    breaking_example = {
+        "model": [
+            {"layer": "nice"},
+            {"layer": "nice"},
+        ],
+        **params,
+    }
+    with pytest.raises(LayersNotIndependentError):
+        layer_independence_test(breaking_example)
