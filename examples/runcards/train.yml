@@ -24,6 +24,8 @@ model:
    z2_equivar: false
    activation: tanh
    hidden_shape: [72]
+ - layer: global_rescaling
+   learnable: true
 
 # Training
 n_batch: 1000

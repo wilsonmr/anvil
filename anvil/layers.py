@@ -410,14 +410,32 @@ class GlobalAffineLayer(nn.Module):
         return self.scale * v_in + self.shift, log_density
 
 
-# TODO not necessary to define a nn.module for this now I've taken out learnable gamma
+# NOTE: not necessary to define a nn.module for this now gamma is no longer learnable
 class BatchNormLayer(nn.Module):
-    """Performs batch normalisation on the input vector.
+    r"""Performs batch normalisation on the inputs, conforming to our ``forward``
+    convention.
+
+    Inputs are standardised over all tensor dimensions such that the resulting sample
+    has null mean and unit variance, after which a rescaling factor is applied.
+
+    .. math::
+
+            v_{\rm out} = \gamma
+                \frac{v_{\rm in} - \mathbb{E}[ v_{\rm in} ]}
+                {\sqrt{\var( v_{\rm in} ) + \epsilon}}
 
     Parameters
     ----------
-    scale: int
-        An additional scale factor to be applied after batch normalisation.
+    scale: float
+        The multiplicative factor, :math:`\gamma`, applied to the standardised data.
+
+    Notes
+    -----
+    Applying batch normalisation before the first spline layer can be helpful for
+    ensuring that the inputs remain within the transformation interval. However,
+    this layer adds undesirable stochasticity which can impede optimisation. One
+    might consider replacing it with :py:class:`anvil.layers.GlobalRescaling` using
+    a static scale parameter.
     """
 
     def __init__(self, scale=1):
@@ -426,17 +444,40 @@ class BatchNormLayer(nn.Module):
 
     def forward(self, v_in, log_density, *args):
         """Forward pass of the batch normalisation transformation."""
-        mult = self.gamma / torch.std(v_in)
+        mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
-        log_density -= mult * v_out.shape[1]
+        log_density -= torch.log(mult) * v_out.shape[1]
         return (v_out, log_density)
 
 
 class GlobalRescaling(nn.Module):
-    def __init__(self, initial=1):
+    r"""Performs a global rescaling of the inputs via a (potentially learnable)
+    multiplicative factor, conforming to our ``forward`` convention.
+
+    Parameters
+    ----------
+    scale: float
+        The multiplicative factor applied to the inputs.
+    learnable: bool, default=True
+        If True, ``scale`` will be optimised during the training.
+
+    Notes
+    -----
+    Applying a rescaling layer with a learnable ``scale`` to the final layer of a
+    normalizing flow can be useful since it avoids the need to tune earlier layers
+    to match the width of the target density. However, for best performance one
+    should generally use a static ``scale`` to reduce stochasticity in the
+    optimisation.
+
+    """
+
+    def __init__(self, scale=1, learnable=True):
         super().__init__()
 
-        self.scale = nn.Parameter(torch.Tensor([initial]))
+        if learnable:
+            self.scale = nn.Parameter(torch.Tensor([scale]))
+        else:
+            self.scale = scale
 
     def forward(self, v_in, log_density, *args):
         v_out = self.scale * v_in
@@ -448,6 +489,7 @@ class Sequential(nn.Sequential):
     """Similar to :py:class:`torch.nn.Sequential` except conforms to our
     ``forward`` convention.
     """
+
     def forward(self, v, log_density, *args):
         """overrides the base class ``forward`` method to conform to our
         conventioned for expected inputs/outputs of ``forward`` methods.

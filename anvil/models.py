@@ -39,8 +39,7 @@ def real_nvp(
     z2_equivar=True,
 ):
     r"""Action which returns a sequence of ``n_blocks`` pairs of
-    :py:class:`anvil.layers.AffineLayer` s, followed by a single
-    :py:class:`anvil.layers.GlobalRescaling` all wrapped in the module container
+    :py:class:`anvil.layers.AffineLayer` s, wrapped in the module container
     :py:class`anvil.layers.Sequential`.
 
     The first ``n_blocks`` elements of the outer ``Sequential``
@@ -89,9 +88,9 @@ def real_nvp(
             activation=activation,
             z2_equivar=z2_equivar,
         )
-        for i in range(n_blocks)
+        for _ in range(n_blocks)
     ]
-    return layers.Sequential(*blocks, layers.GlobalRescaling())
+    return layers.Sequential(*blocks)
 
 
 def nice(
@@ -102,9 +101,8 @@ def nice(
     z2_equivar=True,
 ):
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
-    :py:class:`anvil.layers.AdditiveLayer` s followed by a single
-    :py:class:`anvil.layers.GlobalRescaling`. The pairs of ``AdditiveLayer`` s
-    act on the even and odd sites respectively.
+    :py:class:`anvil.layers.AdditiveLayer`.
+    The pairs of ``AdditiveLayer`` s act on the even and odd sites respectively.
 
     Parameters
     ----------
@@ -140,9 +138,9 @@ def nice(
             activation=activation,
             z2_equivar=z2_equivar,
         )
-        for i in range(n_blocks)
+        for _ in range(n_blocks)
     ]
-    return layers.Sequential(*blocks, layers.GlobalRescaling())
+    return layers.Sequential(*blocks)
 
 
 def rational_quadratic_spline(
@@ -156,8 +154,7 @@ def rational_quadratic_spline(
 ):
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.RationalQuadraticSplineLayer` s followed by a single
-    :py:class:`anvil.layers.GlobalRescaling`. The pairs of RQS's
-    act on the even and odd sites respectively.
+    The pairs of RQS's act on the even and odd sites respectively.
 
     Parameters
     ----------
@@ -183,8 +180,8 @@ def rational_quadratic_spline(
         Whether or not to impose z2 equivariance. This is only done crudely
         by splitting the sites according to the sign of the sum across lattice
         sites.
-
     """
+
     blocks = [
         _coupling_block(
             layers.RationalQuadraticSplineLayer,
@@ -197,12 +194,35 @@ def rational_quadratic_spline(
         )
         for _ in range(n_blocks)
     ]
-    return layers.Sequential(
-        *blocks,
-        layers.GlobalRescaling(),
-    )
+    return layers.Sequential(*blocks)
+
+
+def batch_norm(scale=1):
+    r"""Action which returns an instance of :py:class:`anvil.layers.BatchNormLayer`.
+
+    Parameters
+    ----------
+    scale: float
+        The multiplicative factor applied to the standardised data.
+    """
+    return layers.Sequential(layers.BatchNormLayer(scale=scale))
+
+
+def global_rescaling(scale=1, learnable=True):
+    r"""Action which returns and instance of :py:class:`anvil.layers.GlobalRescaling`.
+
+    Parameters
+    ----------
+    scale: float
+        The multiplicative factor applied to the inputs.
+    learnable: bool, default=True
+        If True, ``scale`` will be optimised during the training.
+    """
+    return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
+
 
 _normalising_flow = collect("layer_action", ("model",))
+
 
 def model_to_load(_normalising_flow):
     """action which wraps a list of layers in
@@ -219,6 +239,8 @@ def model_to_load(_normalising_flow):
         - ``nice``
         - ``real_nvp``
         - ``rational_quadratic_spline``
+        - ``batch_norm``
+        - ``global_rescaling``
 
     You can see their dependencies using the ``anvil`` provider help, e.g.
     for ``real_nvp``:
@@ -255,9 +277,12 @@ def model_to_load(_normalising_flow):
     flow_flat = [block for layer in _normalising_flow for block in layer]
     return layers.Sequential(*flow_flat)
 
+
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
     "nice": nice,
     "real_nvp": real_nvp,
     "rational_quadratic_spline": rational_quadratic_spline,
+    "batch_norm": batch_norm,
+    "global_rescaling": global_rescaling,
 }
