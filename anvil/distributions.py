@@ -16,14 +16,14 @@ class Gaussian(Normal):
     -------
     lattice_size: int
         Number of nodes on the lattice.
-    sigma: float
-        Standard deviation for the distribution.
-    mean: float
+    loc: float, default=0
         Mean for the distribution.
+    scale: float, default=1
+        Standard deviation for the distribution.
     """
 
-    def __init__(self, size_out, *, mean=0, sigma=1):
-        super().__init__(mean, sigma)
+    def __init__(self, size_out, *, loc=0, scale=1):
+        super().__init__(loc, scale)
         self.size_out = size_out
 
 
@@ -108,12 +108,12 @@ class PhiFourScalar:
     >>> from anvil.distributions import PhiFourScalar
     >>> import torch
     >>> geom = Geometry2D(2)
-    >>> action = PhiFourScalar.from_standard(geom, **{"m_sq": 4, "g": 0})
+    >>> target = PhiFourScalar.from_standard(geom, **{"m_sq": 4, "g": 0})
     >>> state = torch.rand((1, 2*2)) # 2-D so lattice cardinality is 4
-    >>> action.log_density(state)
+    >>> target.log_density(state)
     tensor([[-2.3838]])
     >>> state = torch.rand((5, 2*2))
-    >>> action.log_density(state)
+    >>> target.log_density(state)
     tensor([[-3.9087],
             [-2.2697],
             [-2.3940],
@@ -163,8 +163,8 @@ class PhiFourScalar:
         for a sample of field configurations."""
         return -self.action(phi)
 
-def gaussian(lattice_size, sigma=1):
-    return Gaussian(lattice_size, sigma=sigma)
+def gaussian(lattice_size, loc=0, sigma=1):
+    return Gaussian(lattice_size, loc=loc, scale=sigma)
 
 def phi_four(geometry, parameterisation, couplings):
     constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
