@@ -23,10 +23,9 @@ def test_coupling_init(size_half, even_sites):
     layers.CouplingLayer(size_half, even_sites)
 
 
-@pytest.mark.skip(reason="batch norm in layers requires epsilon to avoid NaNs.")
 def test_additive_layers():
     equivar_additive = layers.AdditiveLayer(
-        SIZE_HALF,
+        size_half=SIZE_HALF,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=True,
@@ -81,7 +80,7 @@ def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, even_sites):
 
     """
     layer = layer_class(
-        SIZE_HALF,
+        size_half=SIZE_HALF,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=z2_equivar,
@@ -97,7 +96,7 @@ def test_rqs_basic(gaussian_input, z2_equivar, even_sites):
     :py:class:`anvil.layers.RationalQuadraticSplineLayer`.
     """
     layer = layers.RationalQuadraticSplineLayer(
-        SIZE_HALF,
+        size_half=SIZE_HALF,
         interval=5,
         n_segments=4,
         hidden_shape=HIDDEN_SHAPE,
@@ -116,6 +115,8 @@ def test_rqs_basic(gaussian_input, z2_equivar, even_sites):
 def test_scaling_layer_basic(gaussian_input, layer_class):
     if layer_class is layers.GlobalAffineLayer:
         layer = layer_class(1, 0)
+    elif layer_class is layers.GlobalRescaling:
+        layer = layer_class(scale=1.0, learnable=False)
     else:
         layer = layer_class()
     basic_layer_test(layer, *gaussian_input)
@@ -124,7 +125,7 @@ def test_scaling_layer_basic(gaussian_input, layer_class):
 def test_sequential_basic(gaussian_input):
     inner_layers = [
         layers.AffineLayer(
-            SIZE_HALF,
+            size_half=SIZE_HALF,
             hidden_shape=HIDDEN_SHAPE,
             activation=ACTIVATION,
             z2_equivar=False,

@@ -15,8 +15,10 @@ LAYERS = list(LAYER_OPTIONS.keys())
 PARAMS = {
     "hidden_shape": (32,),
     "n_blocks": 3,
+    "n_segments": 4,
     "lattice_length": 6,
     "lattice_dimension": 2,
+    "scale": 1.0,
 }
 
 @pytest.mark.parametrize("layer_action", LAYERS)
