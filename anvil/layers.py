@@ -139,10 +139,9 @@ class AdditiveLayer(CouplingLayer):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
-        t_out = self.t_network(
-            (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
-        )
+        t_out = self.t_network(v_for_net)
 
         v_out = self._join_func([v_in_passive, v_in_active - t_out], dim=1)
 
@@ -195,7 +194,7 @@ class AffineLayer(CouplingLayer):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
-        v_for_net = (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
         s_out = self.s_network(v_for_net)
         t_out = self.t_network(v_for_net)
@@ -269,9 +268,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         """Forward pass of the rational quadratic spline layer."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
-        v_for_net = (
-            v_in_passive - v_in_passive.mean()
-        ) / v_in_passive.std()  # reduce numerical instability
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
         # Naively enforce C(-v) = -C(v)
         if self.z2_equivar:
@@ -474,10 +471,9 @@ class GlobalRescaling(nn.Module):
     def __init__(self, scale=1, learnable=True):
         super().__init__()
 
+        self.scale = torch.Tensor([scale])
         if learnable:
-            self.scale = nn.Parameter(torch.Tensor([scale]))
-        else:
-            self.scale = scale
+            self.scale = nn.Parameter(self.scale)
 
     def forward(self, v_in, log_density, *args):
         v_out = self.scale * v_in
