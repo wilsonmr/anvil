@@ -14,6 +14,7 @@ import scipy.optimize as optim
 
 log = logging.getLogger(__name__)
 
+
 def cosh_shift(x, xi, A, c):
     return A * np.cosh(-x / xi) + c
 
@@ -111,7 +112,7 @@ def magnetic_susceptibility(magnetization, abs_magnetization_squared):
 
 
 def magnetization_series(configs):
-    return configs.sum(axis=1)
+    return configs.sum(axis=1).numpy()
 
 
 def magnetization_autocorr(magnetization_series):
@@ -144,7 +145,9 @@ def __two_point_correlator(
             axis=-1  # sample average
         )
 
-    return correlator.reshape((training_geometry.length, training_geometry.length, -1))
+    return correlator.reshape(
+        (training_geometry.length, training_geometry.length, -1)
+    ).numpy()
 
 
 def two_point_correlator(

@@ -218,23 +218,31 @@ def plot_magnetization(magnetization_series):
     ax.set_title("Magnetization")
     ax.set_ylabel("Frequency")
     ax.set_xlabel("$M(t)$")
-    ax.hist(magnetization_series.numpy(), histtype="stepfilled", edgecolor="black")
+    ax.hist(magnetization_series, histtype="stepfilled", edgecolor="black")
     return fig
 
 
 @figure
 def plot_magnetization_series(magnetization_series, sample_interval):
-    chain_indices = np.arange(magnetization_series.shape[-1]) * sample_interval
-    fig, ax = plt.subplots()
-    ax.set_title("Magnetization")
-    ax.set_ylabel("$M(t)$")
-    ax.set_xlabel("$t$")
-    ax.plot(
-        chain_indices,
-        magnetization_series,
-        linestyle="-",
-        marker="",
-    )
+    n_rows = 5
+    if magnetization_series.size % n_rows != 0:
+        magnetization_series = np.pad(
+            magnetization_series,
+            (0, magnetization_series.size % n_rows),
+            "empty",
+        )
+    magnetization_series = magnetization_series.reshape(n_rows, -1)
+    t = (np.arange(magnetization_series.size) * sample_interval).reshape(n_rows, -1)
+
+    fig, axes = plt.subplots(n_rows, 1, sharey=True)
+    for ax, x, y in zip(axes, t, magnetization_series):
+        ax.plot(x, y, linestyle="-", marker="")
+        ax.margins(0, 0)
+
+    axes[0].set_title("Magnetization")
+    axes[n_rows // 2].set_ylabel("$M(t)$")
+    axes[-1].set_xlabel("$t$")
+    fig.tight_layout()
     return fig
 
 
