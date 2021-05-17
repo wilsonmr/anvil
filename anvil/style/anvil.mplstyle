@@ -1,0 +1,32 @@
+font.family: STIXGeneral
+mathtext.fontset: stix
+text.usetex: True
+
+figure.figsize: 8, 6
+figure.titlesize: large
+figure.dpi: 100
+axes.titlesize: xx-large
+axes.labelsize: xx-large
+xtick.labelsize: x-large
+ytick.labelsize: x-large
+legend.fontsize: x-large
+
+axes.linewidth: 1.2
+xtick.major.width: 1.2
+ytick.major.width: 1.2
+ytick.minor.width: 0.6
+xtick.minor.width: 0.6
+
+lines.linewidth: 1.0
+lines.linestyle: --
+lines.marker: o
+lines.markersize: 5
+lines.markeredgecolor: k
+lines.markeredgewidth: 0.7
+hist.bins: 30
+errorbar.capsize: 3
+scatter.marker: o
+scatter.edgecolors: k
+image.cmap: viridis
+
+savefig.dpi: 100

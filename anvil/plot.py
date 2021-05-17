@@ -9,7 +9,9 @@ module containing all actions for plotting observables
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+from matplotlib.font_manager import FontProperties
 
 from reportengine.figure import figure, figuregen
 from reportengine import collect
@@ -115,39 +117,39 @@ def plot_zero_momentum_correlator(
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
     sample and errorbars are standard deviations across boostrap samples
     """
-    T = training_geometry.length
-    shift = 0
+    L = training_geometry.length
 
     fig, ax = plt.subplots()
 
-    if fit_zero_momentum_correlator is not None:
-        popt, pcov, t0 = fit_zero_momentum_correlator
-        shift = popt[2]
-
-        t = np.linspace(t0, T - t0, 100)
-        ax.plot(
-            t,
-            cosh_shift(t - T // 2, *popt) - popt[2],
-            "r--",
-            label=r"fit $A \cosh(-(t - T/2) / \xi) + c$",
-        )
     ax.errorbar(
-        x=np.arange(T),
-        y=zero_momentum_correlator.mean(axis=-1) - shift,
+        x=np.arange(L),
+        y=zero_momentum_correlator.mean(axis=-1),
         yerr=zero_momentum_correlator.std(axis=-1),
-        fmt="bo",
+        linestyle="",
+        label="sample statistics",
     )
+
+    if fit_zero_momentum_correlator is not None:
+        popt, pcov, x0 = fit_zero_momentum_correlator
+
+        x_2 = np.linspace(x0, L - x0, 100)
+        ax.plot(
+            x_2,
+            cosh_shift(x_2 - L // 2, *popt),
+            marker="",
+            label=r"fit: $A \cosh(-(x_2 - L/2) / \xi) + c$",
+        )
     ax.set_yscale("log")
-    ax.set_ylabel(r"$\hat{G}(0, t)$")
-    ax.set_xlabel("$t$")
-    ax.set_title("Zero momentum two point function")
+    ax.set_ylabel(r"$\sum_{x_1=0}^{L-1} G(x_1, x_2)$")
+    ax.set_xlabel("$x_2$")
+    ax.set_title("Correlation of 1-dimensional slices")
     ax.legend()
     return fig
 
 
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
-    """Plot effective pole mass as a function of t. The points are means
+    """Plot effective pole mass as a function of x_2. The points are means
     across bootstrap samples and the errorbars are standard deviation across
     bootstrap.
     """
@@ -156,11 +158,9 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
         x=range(1, training_geometry.length - 1),
         y=effective_pole_mass.mean(axis=-1),
         yerr=effective_pole_mass.std(axis=-1),
-        fmt="-b",
-        label=f"L = {training_geometry.length}",
     )
-    ax.set_ylabel("$m_p$")
-    ax.set_xlabel("$t$")
+    ax.set_ylabel("$m_p^\mathrm{eff}$")
+    ax.set_xlabel("$x_2$")
     ax.set_title("Effective pole mass")
     return fig
 
@@ -174,29 +174,51 @@ def plot_two_point_correlator(two_point_correlator):
 
     """
     corr = two_point_correlator.mean(axis=-1)
-    std = two_point_correlator.std(axis=-1)
+    error = two_point_correlator.std(axis=-1)
+    norm = corr[0, 0]
 
-    fractional_std = std / abs(corr)
+    L = corr.shape[0]
+    corr = np.roll(corr, (-L // 2 - 1, -L // 2 - 1), (0, 1))
+    error = np.roll(error, (-L // 2 - 1, -L // 2 - 1), (0, 1))
 
-    fig, (ax_mean, ax_std) = plt.subplots(1, 2, figsize=(13, 6), sharey=True)
-    ax_std.set_title(r"$\sigma_G / G$")
-    ax_mean.set_title("$G(x, t)$")
-    ax_mean.set_xlabel("$x$")
-    ax_std.set_xlabel("$x$")
-    ax_mean.set_ylabel("$t$")
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
+    ax1.set_title("$G(x, t)$")
+    ax2.set_title(r"$| \sigma_G / G |$")
+    ax1.set_xlabel("$x_1$")
+    ax2.set_xlabel("$x_1$")
+    ax1.set_ylabel("$x_2$")
 
-    im1 = ax_mean.imshow(corr)
-    im2 = ax_std.imshow(fractional_std)
+    tick_positions = [0, L // 2 - 1, L - 1]
+    tick_labels = [r"$-\frac{L + 1}{2}$", 0, r"$\frac{L}{2}$"]
+    ax1.set_xticks(tick_positions)
+    ax1.set_yticks(tick_positions)
+    ax1.set_xticklabels(tick_labels)
+    ax1.set_yticklabels(tick_labels)
+    ax2.tick_params(axis="y", width=0)
 
-    ax_mean.yaxis.set_major_locator(MaxNLocator(integer=True))
-    ax_mean.xaxis.set_major_locator(MaxNLocator(integer=True))
+    im1 = ax1.imshow(corr / norm)
+    im2 = ax2.imshow(np.abs(error / corr))
 
-    ax_std.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax_std.yaxis.set_major_locator(MaxNLocator(integer=True))
+    div1 = make_axes_locatable(ax1)
+    cax1 = div1.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im1, cax=cax1)
 
-    fig.colorbar(im1, ax=ax_mean)
-    fig.colorbar(im2, ax=ax_std)
+    div2 = make_axes_locatable(ax2)
+    cax2 = div2.append_axes("right", size="7%", pad=0.05)
+    fig.colorbar(im2, cax=cax2)
 
+    fig.tight_layout()
+
+    return fig
+
+
+@figure
+def plot_magnetization(magnetization_series):
+    fig, ax = plt.subplots()
+    ax.set_title("Magnetization")
+    ax.set_ylabel("Frequency")
+    ax.set_xlabel("$M(t)$")
+    ax.hist(magnetization_series.numpy(), histtype="stepfilled", edgecolor="black")
     return fig
 
 
@@ -205,13 +227,13 @@ def plot_magnetization_series(magnetization_series, sample_interval):
     chain_indices = np.arange(magnetization_series.shape[-1]) * sample_interval
     fig, ax = plt.subplots()
     ax.set_title("Magnetization")
-    ax.set_ylabel("$m(t)$")
+    ax.set_ylabel("$M(t)$")
     ax.set_xlabel("$t$")
     ax.plot(
         chain_indices,
         magnetization_series,
         linestyle="-",
-        linewidth=0.5,
+        marker="",
     )
     return fig
 
@@ -228,19 +250,29 @@ def plot_magnetization_autocorr(
     ax.set_ylabel(r"$\Gamma_M(\delta t)$")
     ax.set_xlabel("$\delta t$")
 
-    ax.plot(
-        chain_indices,
-        magnetization_autocorr[:cut],
-        linestyle="--",
-        linewidth=0.5,
-    )
+    ax.plot(chain_indices, magnetization_autocorr[:cut])
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(top=1)
+
     ax.axvline(
         magnetization_optimal_window * sample_interval,
         linestyle="-",
-        color="r",
+        marker="",
+        color="k",
+        label="Optimal window size",
+        zorder=1,
     )
-    ax.set_xlim(left=0)
-    ax.set_ylim(top=1)
+    ax.fill_betweenx(
+        ax.get_ylim(),
+        magnetization_optimal_window * sample_interval,
+        ax.get_xlim()[1],
+        color="grey",
+        alpha=0.5,
+        label="Truncated",
+        zorder=0,
+    )
+    ax.legend()
     return fig
 
 
@@ -256,27 +288,52 @@ def plot_magnetization_integrated_autocorr(
 
     fig, ax = plt.subplots()
     ax.set_title("Integrated autocorrelation of magnetization")
-    ax.set_ylabel(r"$\sum \Gamma_M(\delta t)$")
-    ax.set_xlabel("$\delta t$")
+    ax.set_ylabel(r"$\tau_\mathrm{int,M}(W)$")
+    ax.set_xlabel("$W$")
 
-    ax.plot(
-        chain_indices,
-        magnetization_integrated_autocorr[:cut],
-        linestyle="--",
-        linewidth=0.5,
+    ax.plot(chain_indices, magnetization_integrated_autocorr[:cut], zorder=2)
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0.5)
+
+    scalebar = AnchoredSizeBar(
+        ax.transData,
+        sample_interval,
+        f"sample interval: {sample_interval}",
+        "upper left",
+        pad=0.6,
+        frameon=False,
+        sep=4,
+        label_top=True,
+        fontproperties=FontProperties(size="x-large"),
+    )
+    ax.add_artist(scalebar)
+    ax.axhline(
+        tau,
+        linestyle="-",
+        marker="",
+        color="r",
+        label=r"$\tau_\mathrm{int,M}(W_\mathrm{opt})$",
+        zorder=1,
     )
     ax.axvline(
         magnetization_optimal_window * sample_interval,
         linestyle="-",
-        color="r",
+        marker="",
+        color="k",
+        label="Optimal window size",
+        zorder=1,
     )
-    ax.annotate(
-        fr"$\tau_M$ / {sample_interval} = {tau:.2g}",
-        xy=(0.05, 0.05),
-        xycoords="axes fraction",
+    ax.fill_betweenx(
+        ax.get_ylim(),
+        magnetization_optimal_window * sample_interval,
+        ax.get_xlim()[1],
+        color="grey",
+        alpha=0.5,
+        label="Truncated",
+        zorder=0,
     )
-    ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0.5)
+    ax.legend()
     return fig
 
 
@@ -287,7 +344,6 @@ def plot_bootstrap_single_number(observable, label):
     fig, ax = plt.subplots()
     ax.hist(
         observable,
-        bins=30,
         label=f"mean: {observable.mean()}, std dev.: {observable.std()}",
     )
     title = "Bootstrap distribution: " + label
@@ -305,14 +361,6 @@ def plot_bootstrap_multiple_numbers(observable, labels):
     """
     for i in range(observable.shape[0]):
         yield plot_bootstrap_single_number(observable[i], labels[i])
-
-
-@figure
-def plot_bootstrap_two_point(two_point_correlator):
-    """Plot the distribution of G(0, 0)"""
-    x = t = 0
-    data_to_plot = two_point_correlator(x, t)
-    return plot_bootstrap_single_number(data_to_plot, rf"$G$({x},{t})")
 
 
 @figure
