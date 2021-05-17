@@ -20,7 +20,7 @@ def cosh_shift(x, xi, A, c):
 
 
 def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
-    # TODO should I bootstrap this whole process...?
+    # Bootstrap this whole process
 
     T = training_geometry.length
     # TODO: would be good to specify this in runcard
@@ -211,16 +211,6 @@ def ising_energy(two_point_correlator):
     """Ising energy density, defined as the two point correlator at the minimum
     lattice spacing."""
     return (two_point_correlator[1, 0] + two_point_correlator[0, 1]) / 2
-
-
-def inverse_pole_mass(effective_pole_mass, training_geometry):
-    T = training_geometry.length
-    t0 = T // 4
-    window = slice(t0, T - t0 + 1)
-
-    xi = np.reciprocal(effective_pole_mass)[window]
-
-    return np.nanmean(xi, axis=0)  # average over "large" t points
 
 
 def second_moment_correlation_length(two_point_correlator, susceptibility):

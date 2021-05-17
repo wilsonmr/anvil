@@ -166,6 +166,65 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
 
 
 @figure
+def plot_correlation_length(
+    effective_pole_mass,
+    low_momentum_correlation_length,
+    correlation_length_from_fit,
+):
+    """Plots three estimates of correlation length on the same figure.
+
+    These are:
+        1. Estimate from fitting a cosh function to the correlation between
+            1-dimensional slices, using py:func:`correlation_length_from_fit`
+        2. Reciprocal of the effective pole mass estimator, using
+            :py:func:`effective_pole_mass`
+        3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
+
+    2. is evaluated at a specific value of the separation, x_2.
+    """
+    xi_arcosh = np.reciprocal(effective_pole_mass)
+
+    fig, ax = plt.subplots()
+
+    arcosh_points = ax.errorbar(
+        x=range(1, xi_arcosh.shape[0] + 1),
+        y=xi_arcosh.mean(axis=-1),
+        yerr=xi_arcosh.std(axis=-1),
+        zorder=3,
+    )
+
+    xi_lm = low_momentum_correlation_length.mean()
+    e_lm = low_momentum_correlation_length.std()
+    lm_hline = ax.axhline(xi_lm, linestyle="-", marker="", color="grey", zorder=2)
+    lm_fill = ax.fill_between(
+        ax.get_xlim(),
+        xi_lm + e_lm,
+        xi_lm - e_lm,
+        color="grey",
+        alpha=0.3,
+        zorder=1,
+    )
+
+    xi_fit = correlation_length_from_fit[0]  # .mean(  # TODO: update when bootstrapped)
+    e_fit = correlation_length_from_fit[1]  # .std()
+    fit_hline = ax.axhline(xi_fit, linestyle="-", marker="", color="orange", zorder=2)
+    fit_fill = ax.fill_between(
+        ax.get_xlim(),
+        xi_fit + e_fit,
+        xi_fit - e_fit,
+        color="orange",
+        alpha=0.3,
+        zorder=1,
+    )
+
+    ax.legend(
+        handles=[arcosh_points, (lm_fill, lm_hline), (fit_fill, fit_hline)],
+        labels=["Estimate using arcosh", "Low momentum estimate", "Estimate from fit"],
+    )
+    return fig
+
+
+@figure
 def plot_two_point_correlator(two_point_correlator):
     """Represent the two point correlator as a heatmap. The data shown is the mean
     of the bootstrap sample of correlation functions, and is normalised so that

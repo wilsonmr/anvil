@@ -79,20 +79,26 @@ def table_magnetization(abs_magnetization_squared, magnetic_susceptibility):
 
 @table
 def table_correlation_length(
-    inverse_pole_mass,
+    effective_pole_mass,
     second_moment_correlation_length,
     low_momentum_correlation_length,
     correlation_length_from_fit,
     training_geometry,
 ):
-    """Tabulate four estimators of correlation length, with values and errors
+    """Tabulate four estimates of correlation length, with values and errors
     taken as the mean and standard deviation of the bootstrap sample.
     """
-    # TODO could add column with inverse (i.e. effective pole mass)
+    # Take the mean of the arcosh estimator over "large" separations
+    x0 = training_geometry.length // 4
+    window = slice(x0, training_geometry.length - x0 + 1)
+    xi_arcosh = np.nanmean(
+        np.reciprocal(effective_pole_mass)[window],
+        axis=0,
+    )
 
     res = [
         list(correlation_length_from_fit),
-        [inverse_pole_mass.mean(), inverse_pole_mass.std()],
+        [xi_arcosh.mean(), xi_arcosh.std()],
         [
             second_moment_correlation_length.mean(),
             second_moment_correlation_length.std(),
