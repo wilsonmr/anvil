@@ -9,7 +9,7 @@ module containing all actions for plotting observables
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib as mpl
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from matplotlib.font_manager import FontProperties
 
@@ -167,47 +167,64 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
 
 @figure
 def plot_two_point_correlator(two_point_correlator):
-    """Represent the two point function and it's error in x and t as heatmaps
-    of the respective matrices. Returns a figure with two plots, the left plot
-    is the mean two point function across bootstrap and the right plot is the
-    standard deviation divide by the mean (fractional error)
+    """Represent the two point correlator as a heatmap. The data shown is the mean
+    of the bootstrap sample of correlation functions, and is normalised so that
+    G(0, 0) = 1. The colour axis is scaled using a symmetric log scale, with a linear
+    region spanning [-0.01, 0.01].
+    """
+    corr = two_point_correlator.mean(axis=-1)
+    corr /= corr[0, 0]
 
+    L = corr.shape[0]
+    corr = np.roll(corr, (-L // 2 - 1, -L // 2 - 1), (0, 1))
+
+    fig, ax = plt.subplots()
+    ax.set_title("$G(x)$")
+    ax.set_xlabel("$x_1$")
+    ax.set_ylabel("$x_2$")
+
+    tick_positions = [0, L // 2 - 1, L - 1]
+    tick_labels = [r"$-\frac{L + 1}{2}$", 0, r"$\frac{L}{2}$"]
+    ax.set_xticks(tick_positions)
+    ax.set_yticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.set_yticklabels(tick_labels)
+
+    norm = mpl.colors.SymLogNorm(linthresh=0.01, base=10)
+    im = ax.imshow(corr, norm=norm)
+    fig.colorbar(im, ax=ax, pad=0.01)
+
+    return fig
+
+
+@figure
+def plot_two_point_correlator_error(two_point_correlator):
+    """Heatmap of the error in the two point correlator for each separation (x_1, x_2).
+    The error is computed as the standard deviation over the bootstrap sample. The data
+    shown is this error divided by the mean of the bootstrap sample, i.e. the
+    fractional error.
     """
     corr = two_point_correlator.mean(axis=-1)
     error = two_point_correlator.std(axis=-1)
-    norm = corr[0, 0]
 
     L = corr.shape[0]
     corr = np.roll(corr, (-L // 2 - 1, -L // 2 - 1), (0, 1))
     error = np.roll(error, (-L // 2 - 1, -L // 2 - 1), (0, 1))
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
-    ax1.set_title("$G(x, t)$")
-    ax2.set_title(r"$| \sigma_G / G |$")
-    ax1.set_xlabel("$x_1$")
-    ax2.set_xlabel("$x_1$")
-    ax1.set_ylabel("$x_2$")
+    fig, ax = plt.subplots()
+    ax.set_title(r"$| \sigma_G(x) / G(x) |$")
+    ax.set_xlabel("$x_1$")
+    ax.set_ylabel("$x_2$")
 
     tick_positions = [0, L // 2 - 1, L - 1]
     tick_labels = [r"$-\frac{L + 1}{2}$", 0, r"$\frac{L}{2}$"]
-    ax1.set_xticks(tick_positions)
-    ax1.set_yticks(tick_positions)
-    ax1.set_xticklabels(tick_labels)
-    ax1.set_yticklabels(tick_labels)
-    ax2.tick_params(axis="y", width=0)
+    ax.set_xticks(tick_positions)
+    ax.set_yticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.set_yticklabels(tick_labels)
 
-    im1 = ax1.imshow(corr / norm)
-    im2 = ax2.imshow(np.abs(error / corr))
-
-    div1 = make_axes_locatable(ax1)
-    cax1 = div1.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im1, cax=cax1)
-
-    div2 = make_axes_locatable(ax2)
-    cax2 = div2.append_axes("right", size="7%", pad=0.05)
-    fig.colorbar(im2, cax=cax2)
-
-    fig.tight_layout()
+    im = ax.imshow(np.abs(error / corr))
+    fig.colorbar(im, ax=ax, pad=0.01)
 
     return fig
 
