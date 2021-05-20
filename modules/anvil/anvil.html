@@ -60,6 +60,8 @@
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_benchmark">anvil.tests.test_benchmark module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_distributions">anvil.tests.test_distributions module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_geometry">anvil.tests.test_geometry module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-layers-module">anvil.tests.test_layers module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-models-module">anvil.tests.test_models module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests">Module contents</a></li>
 </ul>
 </li>
@@ -478,78 +480,6 @@ of lattice_size/2 which is the size of the input vector for each coupling layer.
 </dd></dl>
 
 </dd></dl>
-
-</section>
-<section id="module-anvil.core">
-<span id="anvil-core-module"></span><h2>anvil.core module<a class="headerlink" href="#module-anvil.core" title="Permalink to this headline">¶</a></h2>
-<p>coupling.py</p>
-<dl class="py class">
-<dt class="sig sig-object py" id="anvil.core.FullyConnectedNeuralNetwork">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.core.</span></span><span class="sig-name descname"><span class="pre">FullyConnectedNeuralNetwork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_in</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size_out</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.core.FullyConnectedNeuralNetwork" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
-<p>Generic class for neural networks used in coupling layers.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>size_in</strong> (<em>int</em>) – Number of nodes in the input layer</p></li>
-<li><p><strong>size_out</strong> (<em>int</em>) – Number of nodes in the output layer</p></li>
-<li><p><strong>hidden_shape</strong> (<em>list</em>) – List specifying the number of nodes in the intermediate layers</p></li>
-<li><p><strong>activation</strong> (<em>(</em><em>str</em><em>, </em><em>None</em><em>)</em>) – Key representing the activation function used for each layer
-except the final one.</p></li>
-<li><p><strong>no_final_activation</strong> (<em>bool</em>) – If True, leave the network output unconstrained.</p></li>
-<li><p><strong>bias</strong> (<em>bool</em>) – Whether to use biases in networks.</p></li>
-</ul>
-</dd>
-</dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="anvil.core.FullyConnectedNeuralNetwork.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">None._VariableFunctionsClass.tensor</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.core.FullyConnectedNeuralNetwork.forward" title="Permalink to this definition">¶</a></dt>
-<dd><p>Forward pass of the network.</p>
-<p>Takes a tensor of shape (n_batch, size_in) and returns a new tensor of
-shape (n_batch, size_out)</p>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="anvil.core.FullyConnectedNeuralNetwork.training">
-<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="pre">:</span> <span class="pre">bool</span></em><a class="headerlink" href="#anvil.core.FullyConnectedNeuralNetwork.training" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="anvil.core.Sequential">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.core.</span></span><span class="sig-name descname"><span class="pre">Sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">torch.nn.modules.module.Module</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.core.Sequential" title="Permalink to this definition">¶</a></dt>
-<dt class="sig sig-object py">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.core.</span></span><span class="sig-name descname"><span class="pre">Sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arg</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.container.Sequential</span></code></p>
-<p>Modify the nn.Sequential class so that it takes an input vector <em>and</em> a
-value for the current logarithm of the model density, returning an output
-vector and the updated log density.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="anvil.core.Sequential.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.core.Sequential.forward" title="Permalink to this definition">¶</a></dt>
-<dd><p>Defines the computation performed at every call.</p>
-<p>Should be overridden by all subclasses.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Although the recipe for forward pass needs to be defined within
-this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
-instead of this since the former takes care of running the
-registered hooks while the latter silently ignores them.</p>
-</div>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="anvil.core.Sequential.training">
-<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="pre">:</span> <span class="pre">bool</span></em><a class="headerlink" href="#anvil.core.Sequential.training" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="anvil.core.model_to_load">
-<span class="sig-prename descclassname"><span class="pre">anvil.core.</span></span><span class="sig-name descname"><span class="pre">model_to_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_normalising_flow</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.core.model_to_load" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
 
 </section>
 <section id="module-anvil.distributions">
@@ -1194,6 +1124,9 @@ affine coupling transformations on both partitions of the input vector.</p>
 <dd></dd></dl>
 
 </section>
+<section id="anvil-neural-network-module">
+<h2>anvil.neural_network module<a class="headerlink" href="#anvil-neural-network-module" title="Permalink to this headline">¶</a></h2>
+</section>
 <section id="module-anvil.observables">
 <span id="anvil-observables-module"></span><h2>anvil.observables module<a class="headerlink" href="#module-anvil.observables" title="Permalink to this headline">¶</a></h2>
 <p>observables.py</p>
@@ -1671,12 +1604,12 @@ will be executed.</p>
 <li><a class="reference internal" href="#module-anvil.checkpoint">anvil.checkpoint module</a></li>
 <li><a class="reference internal" href="#module-anvil.checks">anvil.checks module</a></li>
 <li><a class="reference internal" href="#module-anvil.config">anvil.config module</a></li>
-<li><a class="reference internal" href="#module-anvil.core">anvil.core module</a></li>
 <li><a class="reference internal" href="#module-anvil.distributions">anvil.distributions module</a></li>
 <li><a class="reference internal" href="#module-anvil.free_scalar">anvil.free_scalar module</a></li>
 <li><a class="reference internal" href="#module-anvil.geometry">anvil.geometry module</a></li>
 <li><a class="reference internal" href="#module-anvil.layers">anvil.layers module</a></li>
 <li><a class="reference internal" href="#module-anvil.models">anvil.models module</a></li>
+<li><a class="reference internal" href="#anvil-neural-network-module">anvil.neural_network module</a></li>
 <li><a class="reference internal" href="#module-anvil.observables">anvil.observables module</a></li>
 <li><a class="reference internal" href="#module-anvil.plot">anvil.plot module</a></li>
 <li><a class="reference internal" href="#module-anvil.sample">anvil.sample module</a></li>

@@ -28,6 +28,22 @@ anvil.tests.test\_geometry module
    :undoc-members:
    :show-inheritance:
 
+anvil.tests.test\_layers module
+-------------------------------
+
+.. automodule:: anvil.tests.test_layers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.tests.test\_models module
+-------------------------------
+
+.. automodule:: anvil.tests.test_models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

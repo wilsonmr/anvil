@@ -54,14 +54,6 @@ anvil.config module
    :undoc-members:
    :show-inheritance:
 
-anvil.core module
------------------
-
-.. automodule:: anvil.core
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 anvil.distributions module
 --------------------------
 
@@ -98,6 +90,14 @@ anvil.models module
 -------------------
 
 .. automodule:: anvil.models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.neural\_network module
+----------------------------
+
+.. automodule:: anvil.neural_network
    :members:
    :undoc-members:
    :show-inheritance:
