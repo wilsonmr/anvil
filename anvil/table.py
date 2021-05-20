@@ -23,7 +23,7 @@ def table_autocorrelation(
 
     df = pd.DataFrame(
         [acceptance, tau_mag, tau_chain],
-        index=["acceptance", "tau_mag", "tau_chain"],
+        index=["acceptance", "tau_from_magnetization", "tau_from_chain"],
         columns=["value"],
     )
     return df
@@ -40,8 +40,8 @@ def table_fit(fit_zero_momentum_correlator, training_geometry):
         ]
         df = pd.DataFrame(
             res,
-            columns=["Mean", "Standard deviation"],
-            index=["xi_fit", "m_fit"],
+            columns=["mean", "error"],
+            index=["xi_from_fit", "magnetization_from_fit"],
         )
         return df
 
@@ -57,8 +57,8 @@ def table_two_point_scalars(ising_energy, susceptibility):
     ]
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation"],
-        index=["Ising energy", "susceptibility"],
+        columns=["mean", "error"],
+        index=["ising_energy", "susceptibility"],
     )
     return df
 
@@ -71,8 +71,8 @@ def table_magnetization(abs_magnetization_squared, magnetic_susceptibility):
     ]
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation"],
-        index=["<|m|>^2", "<m^2> - <|m|>^2"],
+        columns=["mean", "error"],
+        index=["abs_magnetization_squared", "magnetic_susceptibility"],
     )
     return df
 
@@ -108,15 +108,15 @@ def table_correlation_length(
 
     df = pd.DataFrame(
         res,
-        columns=["Mean", "Standard deviation"],
+        columns=["mean", "error"],
         index=[
-            "Estimate from fit",
-            "Estimate using arcosh",
-            "Second moment estimate",
-            "Low momentum estimate",
+            "xi_from_fit",
+            "xi_from_arcosh",
+            "xi_from_second_moment",
+            "xi_from_low_momentum",
         ],
     )
-    df["No. correlation lengths"] = training_geometry.length / df["Mean"]
+    df["n_correlation_lengths"] = training_geometry.length / df["mean"]
     return df
 
 
@@ -132,7 +132,7 @@ def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
 
     df = pd.DataFrame(
         data,
-        columns=["Mean", "Standard deviation"],
+        columns=["mean", "error"],
         index=range(training_geometry.length),
     )
     return df
@@ -149,7 +149,7 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry):
     data = np.concatenate((means, stds), axis=1)
     df = pd.DataFrame(
         data,
-        columns=["Mean", "Standard deviation"],
+        columns=["mean", "error"],
         index=range(1, training_geometry.length - 1),
     )
     return df
@@ -169,5 +169,5 @@ def table_two_point_correlator(training_geometry, two_point_correlator):
         for j in range(training_geometry.length):
             corr.append([float(means[i, j]), float(stds[i, j])])
             index.append((i, j))
-    df = pd.DataFrame(corr, columns=["Mean", "Standard deviation"], index=index)
+    df = pd.DataFrame(corr, columns=["mean", "error"], index=index)
     return df
