@@ -9,6 +9,7 @@ Subpackages
 
    anvil.benchmark_config
    anvil.scripts
+   anvil.style
    anvil.tests
 
 Submodules
