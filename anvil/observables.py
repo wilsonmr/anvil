@@ -38,14 +38,13 @@ def fit_zero_momentum_correlator(
             pass
 
     n_boot = zero_momentum_correlator.shape[-1]
-    failures = n_boot - len(optimised_parameters)
-    if failures > 0:
-        log.warning(
-            f"Failed to fit cosh to correlation function for {failures}/{n_boot} members of the bootstrap ensemble."
-        )
-        if failures >= n_boot - 1:
-            log.warning("Too many failures: no fit parameters will be returned.")
-            return None
+    n_fits = len(optimised_parameters)
+    log.info(
+        f"Cosh fit succeeded for {n_fits}/{n_boot} members of the bootstrap ensemble."
+    )
+    if n_fits < 2:
+        log.warning("Too few successful fits: no fit parameters will be returned.")
+        return None
 
     xi, A, c = np.array(optimised_parameters).transpose()
     return xi, A, c
