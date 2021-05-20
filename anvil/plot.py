@@ -19,95 +19,6 @@ from reportengine import collect
 from anvil.observables import cosh_shift
 
 
-def field_component(i, x_base, phi_model, base_neg, model_neg):
-    fig, ax = plt.subplots()
-
-    ax.hist(x_base, bins=50, density=True, histtype="step", label="base")
-    ax.hist(phi_model, bins=50, density=True, histtype="step", label="model, full")
-    ax.hist(
-        base_neg, bins=50, density=True, histtype="step", label="model, $M_{base} < 0$"
-    )
-    ax.hist(
-        model_neg, bins=50, density=True, histtype="step", label="model, $M_{mod} < 0$"
-    )
-    ax.set_title(f"Coordinate {i}")
-    ax.legend()
-    fig.tight_layout()
-    return fig
-
-
-def field_components(loaded_model, base_dist, lattice_size):
-    """Plot the distributions of base coordinates 'x' and output coordinates 'phi' and,
-    if known, plot the pdf of the target distribution."""
-    sample_size = 10000
-
-    # Generate a large sample from the base distribution and pass it through the trained model
-    with torch.no_grad():
-        x_base, _ = base_dist(sample_size)
-        sign = x_base.sum(dim=1).sign()
-        neg = (sign < 0).nonzero().squeeze()
-        phi_model, model_log_density = loaded_model(x_base, 0, neg)
-
-    base_neg = phi_model[neg]
-
-    sign = phi_model.sum(dim=1).sign()
-    neg = (sign < 0).nonzero().squeeze()
-    model_neg = phi_model[neg]
-
-    # Convert to shape (n_coords, sample_size * lattice_size)
-    # NOTE: this is all pointless for the 1-component scalar
-    x_base = x_base.reshape(sample_size * lattice_size, -1).transpose(0, 1)
-    phi_model = phi_model.reshape(sample_size * lattice_size, -1).transpose(0, 1)
-
-    base_neg = base_neg.reshape(1, -1)
-    model_neg = model_neg.reshape(1, -1)
-
-    for i in range(x_base.shape[0]):
-        yield field_component(i, x_base[i], phi_model[i], base_neg[i], model_neg[i])
-
-
-_plot_field_components = collect("field_components", ("training_context",))
-
-
-def example_configs(loaded_model, base_dist, training_geometry):
-    sample_size = 10
-
-    # Generate a large sample from the base distribution and pass it through the trained model
-    with torch.no_grad():
-        x_base, _ = base_dist(sample_size)
-        sign = x_base.sum(dim=1).sign()
-        neg = (sign < 0).nonzero().squeeze()
-        phi_model, model_log_density = loaded_model(x_base, 0, neg)
-
-    L = int(np.sqrt(phi_model.shape[1]))
-
-    phi_true = np.zeros((4, L, L))
-    phi_true[:, training_geometry.checkerboard] = phi_model[:4, : L ** 2 // 2]
-    phi_true[:, ~training_geometry.checkerboard] = phi_model[:4, L ** 2 // 2 :]
-
-    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)
-    for i, ax in enumerate(axes.flatten()):
-        conf = ax.imshow(phi_true[i])
-        fig.colorbar(conf, ax=ax)
-
-    fig.suptitle("Example configurations")
-
-    return fig
-
-
-_plot_example_configs = collect("example_configs", ("training_context",))
-
-
-@figure
-def plot_example_configs(_plot_example_configs):
-    return _plot_example_configs[0]
-
-
-@figuregen
-def plot_field_components(_plot_field_components):
-    yield from _plot_field_components[0]
-
-
 @figure
 def plot_zero_momentum_correlator(
     zero_momentum_correlator,
@@ -115,8 +26,14 @@ def plot_zero_momentum_correlator(
     fit_zero_momentum_correlator,
     cosh_fit_window,
 ):
-    """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
-    sample and errorbars are standard deviations across boostrap samples
+    """Plots the correlation function for pairs of one-dimensional 'slices', otherwise
+    referred to as the two point correlator at zero spatial momentum, as a function of
+    time. Points and errorbars are means and standard deviations across a boostrap
+    sample.
+
+    Also plots the :math:`1\sigma` confidence interval for a pure-exponential (cosh)
+    fit performed for each member of the bootstrap sample in
+    :py:func:`fit_zero_momentum_correlator`.
     """
     fig, ax = plt.subplots()
 
@@ -160,9 +77,8 @@ def plot_zero_momentum_correlator(
 
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
-    """Plot effective pole mass as a function of x_2. The points are means
-    across bootstrap samples and the errorbars are standard deviation across
-    bootstrap.
+    """Plots the (effective) pole mass as a function of 'time' separation. Points and
+    error bars are means and standard deviations across a bootstrap sample.
     """
     fig, ax = plt.subplots()
     ax.errorbar(
@@ -182,7 +98,7 @@ def plot_correlation_length(
     low_momentum_correlation_length,
     correlation_length_from_fit,
 ):
-    """Plots three estimates of correlation length on the same figure.
+    """Plots three estimates of correlation length.
 
     These are:
         1. Estimate from fitting a cosh function to the correlation between
@@ -192,6 +108,9 @@ def plot_correlation_length(
         3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
 
     2. is evaluated at a specific value of the separation, x_2.
+
+    Points and error bars are means and standard deviations taken across a bootstrap
+    sample.
     """
     xi_arcosh = np.reciprocal(effective_pole_mass)
 
@@ -237,8 +156,8 @@ def plot_correlation_length(
 
 @figure
 def plot_two_point_correlator(two_point_correlator):
-    """Represent the two point correlator as a heatmap. The data shown is the mean
-    of the bootstrap sample of correlation functions, and is normalised so that
+    """Represents the two point correlator as a heatmap. The data shown is the mean
+    of a bootstrap sample of correlation functions, and is normalised so that
     G(0, 0) = 1. The colour axis is scaled using a symmetric log scale, with a linear
     region spanning [-0.01, 0.01].
     """
@@ -301,6 +220,14 @@ def plot_two_point_correlator_error(two_point_correlator):
 
 @figure
 def plot_magnetization(magnetization_series):
+    """Plots a histogram of the magnetization of each configuration in the Markov
+    chain resulting from the Metropolis-Hastings sampling phase.
+
+    See also
+    --------
+    :py:func:`plot_magnetization_series` displays the same data as a sequence,
+    i.e. in order of their appearance in the Markov chain.
+    """
     fig, ax = plt.subplots()
     ax.set_title("Magnetization")
     ax.set_ylabel("Frequency")
@@ -311,6 +238,13 @@ def plot_magnetization(magnetization_series):
 
 @figure
 def plot_magnetization_series(magnetization_series, sample_interval):
+    """Plots the magnetization of each configuration in the Markov chain over the
+    course of the Metropolis-Hastings sampling phase.
+
+    See also
+    --------
+    :py:func:`plot_magnetization` displays the same data as a histogram.
+    """
     n_rows = 5
     if magnetization_series.size % n_rows != 0:
         magnetization_series = np.pad(
@@ -337,6 +271,11 @@ def plot_magnetization_series(magnetization_series, sample_interval):
 def plot_magnetization_autocorr(
     magnetization_autocorr, magnetization_optimal_window, sample_interval
 ):
+    """Plots the autocorrelation function for the magnetization of the sequence of
+    configurations generated in the Metropolis-Hastings sampling phase. The x-axis
+    corresponds to a number of steps separating pairs of configurations in the
+    sequence.
+    """
     cut = max(10, 2 * magnetization_optimal_window)
     chain_indices = np.arange(cut) * sample_interval
 
@@ -377,6 +316,11 @@ def plot_magnetization_integrated_autocorr(
     magnetization_optimal_window,
     sample_interval,
 ):
+    """Plots the integrated autocorrelation function for the magnetization of the
+    sequence of configurations generated in the Metropolis-Hastings sampling phase.
+    The x axis represents the size of the 'window' in which the summation is performed,
+    i.e. the point at which the autocorrelation function is truncated.
+    """
     cut = max(10, 2 * np.max(magnetization_optimal_window))
     chain_indices = np.arange(cut) * sample_interval
     tau = magnetization_integrated_autocorr[magnetization_optimal_window]
