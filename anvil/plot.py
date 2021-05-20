@@ -26,7 +26,7 @@ def plot_zero_momentum_correlator(
     fit_zero_momentum_correlator,
     cosh_fit_window,
 ):
-    """Plots the correlation function for pairs of one-dimensional 'slices', otherwise
+    r"""Plots the correlation function for pairs of one-dimensional 'slices', otherwise
     referred to as the two point correlator at zero spatial momentum, as a function of
     time. Points and errorbars are means and standard deviations across a boostrap
     sample.
@@ -86,7 +86,7 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
         y=effective_pole_mass.mean(axis=-1),
         yerr=effective_pole_mass.std(axis=-1),
     )
-    ax.set_ylabel("$m_p^\mathrm{eff}$")
+    ax.set_ylabel(r"$m_p^\mathrm{eff}$")
     ax.set_xlabel("$x_2$")
     ax.set_title("Effective pole mass")
     return fig
@@ -282,7 +282,7 @@ def plot_magnetization_autocorr(
     fig, ax = plt.subplots()
     ax.set_title("Autocorrelation of magnetization")
     ax.set_ylabel(r"$\Gamma_M(\delta t)$")
-    ax.set_xlabel("$\delta t$")
+    ax.set_xlabel(r"$\delta t$")
 
     ax.plot(chain_indices, magnetization_autocorr[:cut])
 
