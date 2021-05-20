@@ -4,16 +4,17 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
     <title>Basic usage &#8212; anvil  documentation</title>
-    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css" />
     
-    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
     <script src="../_static/jquery.js"></script>
     <script src="../_static/underscore.js"></script>
     <script src="../_static/doctools.js"></script>
-    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -46,14 +47,14 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="basic-usage">
+  <section id="basic-usage">
 <span id="basicusage"></span><h1>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h1>
 <p>The purpose of <code class="docutils literal notranslate"><span class="pre">anvil</span></code> is twofold, it can be used as a <code class="docutils literal notranslate"><span class="pre">python</span></code>
 library for implementing your own normalising flow models, or can be used
 as a commandline application which allows you to train and sample models
 for various sizes of 2-D scalar lattice field theories with <span class="math notranslate nohighlight">\(\phi^4\)</span>
 interactions.</p>
-<div class="section" id="running-anvil">
+<section id="running-anvil">
 <h2>Running <code class="docutils literal notranslate"><span class="pre">anvil</span></code><a class="headerlink" href="#running-anvil" title="Permalink to this headline">¶</a></h2>
 <p>We provide a pair of complementary <code class="docutils literal notranslate"><span class="pre">reportengine</span></code>
 applications: <code class="docutils literal notranslate"><span class="pre">anvil-train</span></code> and <code class="docutils literal notranslate"><span class="pre">anvil-sample</span></code>. The idea of these
@@ -139,8 +140,8 @@ see the full range of options when running reports run:</p>
 <p>You can also use that command to find out about specific actions, or modules
 which are part of <code class="docutils literal notranslate"><span class="pre">anvil-sample</span></code>, this is explained by the output of the
 help.</p>
-</div>
-<div class="section" id="anvil-as-a-library">
+</section>
+<section id="anvil-as-a-library">
 <h2><code class="docutils literal notranslate"><span class="pre">anvil</span></code> as a library<a class="headerlink" href="#anvil-as-a-library" title="Permalink to this headline">¶</a></h2>
 <p>We supply some basic
 machinery to build your own normalising flow models. The relevant modules for
@@ -161,8 +162,8 @@ see <code class="docutils literal notranslate"><span class="pre">examples/train_
 <p>Which should produce some example plots in <code class="docutils literal notranslate"><span class="pre">examples/example_output</span></code>,
 for example:</p>
 <a class="reference internal image-reference" href="../_images/ratio.png"><img alt="ratio plot of sampled covariance matrix vs. target covariance matrix. The covariance is reproduced within a few percent." src="../_images/ratio.png" style="width: 400px;" /></a>
-</div>
-</div>
+</section>
+</section>
 
 
             <div class="clearer"></div>
@@ -229,7 +230,7 @@ for example:</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2021, Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.5.4.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.1.
     </div>
   </body>
 </html>
