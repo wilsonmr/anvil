@@ -27,13 +27,12 @@ If you plan on developing the code, then we highly recommend also installing the
  - `Jupyter <https://jupyter.org/>`_
  - `black <https://pypi.org/project/black/>`_
  - `pylint <https://pypi.org/project/pylint/>`_
- - `pytest <https://pypi.org/project/pytest/>`_
 
 Those packages can be installed using ``conda``:
 
 .. code::
 
-    conda install jupyter black pylint pytest
+    conda install jupyter black pylint
 
 Where possible we try to follow the guidelines on formatting set out by
 ``black``, we also try to make good commit messages. We ask that if you
