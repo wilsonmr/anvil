@@ -19,6 +19,6 @@ setup(
         ]
     },
     packages=find_packages(),
-    package_data= {'': ['*.yml']},
+    package_data= {'': ['*.yml', '*.mplstyle']},
     zip_safe=False,
 )
