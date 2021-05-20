@@ -185,14 +185,35 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(
-        self, manual_bootstrap_seed: (int, type(None)) = None):
+    def produce_bootstrap_seed(self, manual_bootstrap_seed: (int, type(None)) = None):
         if manual_bootstrap_seed is None:
             return randint(0, maxsize)
         # numpy is actually this strict but let's keep it sensible.
-        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2**32):
+        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2 ** 32):
             raise ConfigError("Seed is outside of appropriate range: [0, 2 ** 32]")
         return manual_bootstrap_seed
+
+    def parse_cosh_fit_min_separation(self, n: int, training_geometry):
+        """The smallest lattice separation to include in when fitting a cosh function
+        to the correlator, so as to the extract the correlation length.
+
+        See also: ``produce_cosh_fit_window``.
+        """
+        if n > training_geometry.length // 2 - 2:
+            raise ConfigError("Not enough points to for a three-parameter fit.")
+        return n
+
+    def produce_cosh_fit_window(self, training_geometry, cosh_fit_min_separation=None):
+        """Window of values corresponding to lattice separations, within which to fit
+        a cosh function to the correlator, so as to the extract the correlation length.
+        """
+        if cosh_fit_min_separation is None:
+            return slice(1, None)  # include all but (0, 0) separation by default
+
+        return slice(
+            cosh_fit_min_separation,
+            training_geometry.length - cosh_fit_min_separation + 1,
+        )
 
     @element_of("windows")
     def parse_window(self, window: float):

@@ -19,34 +19,41 @@ def cosh_shift(x, xi, A, c):
     return A * np.cosh(-x / xi) + c
 
 
-def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
-    # Bootstrap this whole process
+def fit_zero_momentum_correlator(
+    zero_momentum_correlator, training_geometry, cosh_fit_window=slice(1, None)
+):
+    t = np.arange(training_geometry.length) - training_geometry.length // 2
 
-    T = training_geometry.length
-    # TODO: would be good to specify this in runcard
-    t0 = T // 4
-    window = slice(t0, T - t0 + 1)
+    # fit for each correlation func in the bootstrap ensemble
+    optimised_parameters = []
+    for correlator in zero_momentum_correlator.transpose():
+        try:
+            popt, pcov = optim.curve_fit(
+                cosh_shift,
+                xdata=t[cosh_fit_window],
+                ydata=correlator[cosh_fit_window],
+            )
+            optimised_parameters.append(popt)
+        except RuntimeError:
+            pass
 
-    t = np.arange(T)
-    y = zero_momentum_correlator.mean(axis=-1)
-    yerr = zero_momentum_correlator.std(axis=-1)
-
-    try:
-        popt, pcov = optim.curve_fit(
-            cosh_shift,
-            xdata=t[window] - T // 2,
-            ydata=y[window],
-            sigma=yerr[window],
+    n_boot = zero_momentum_correlator.shape[-1]
+    failures = n_boot - len(optimised_parameters)
+    if failures > 0:
+        log.warning(
+            f"Failed to fit cosh to correlation function for {failures}/{n_boot} members of the bootstrap ensemble."
         )
-        return (popt, pcov, t0)
-    except RuntimeError:
-        log.warning("Failed to fit cosh to correlation function.")
-        return None
+        if failures >= n_boot - 1:
+            log.warning("Too many failures: no fit parameters will be returned.")
+            return None
+
+    xi, A, c = np.array(optimised_parameters).transpose()
+    return xi, A, c
 
 
 def correlation_length_from_fit(fit_zero_momentum_correlator):
-    popt, pcov, _ = fit_zero_momentum_correlator
-    return popt[0], np.sqrt(pcov[0, 0])
+    xi, _, _ = fit_zero_momentum_correlator
+    return xi
 
 
 def autocorrelation(chain):

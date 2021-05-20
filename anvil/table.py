@@ -32,11 +32,11 @@ def table_autocorrelation(
 @table
 def table_fit(fit_zero_momentum_correlator, training_geometry):
     if fit_zero_momentum_correlator is not None:
-        popt, pcov, t0 = fit_zero_momentum_correlator
+        xi, A, c = fit_zero_momentum_correlator
 
         res = [
-            [popt[0], np.sqrt(pcov[0, 0])],
-            [popt[2], np.sqrt(pcov[2, 2])],
+            [xi.mean(), xi.std()],
+            [c.mean(), c.std()],
         ]
         df = pd.DataFrame(
             res,
@@ -97,7 +97,7 @@ def table_correlation_length(
     )
 
     res = [
-        list(correlation_length_from_fit),
+        [correlation_length_from_fit.mean(), correlation_length_from_fit.std()],
         [xi_arcosh.mean(), xi_arcosh.std()],
         [
             second_moment_correlation_length.mean(),

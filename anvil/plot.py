@@ -113,32 +113,43 @@ def plot_zero_momentum_correlator(
     zero_momentum_correlator,
     training_geometry,
     fit_zero_momentum_correlator,
+    cosh_fit_window,
 ):
     """Plot zero_momentum_2pf as a function of t. Points are means across bootstrap
     sample and errorbars are standard deviations across boostrap samples
     """
-    L = training_geometry.length
-
     fig, ax = plt.subplots()
 
     ax.errorbar(
-        x=np.arange(L),
+        x=np.arange(training_geometry.length),
         y=zero_momentum_correlator.mean(axis=-1),
         yerr=zero_momentum_correlator.std(axis=-1),
         linestyle="",
+        zorder=2,
         label="sample statistics",
     )
 
     if fit_zero_momentum_correlator is not None:
-        popt, pcov, x0 = fit_zero_momentum_correlator
+        t = np.arange(training_geometry.length)[cosh_fit_window]
+        fit = []
+        for xi, A, c in zip(*fit_zero_momentum_correlator):
+            fit.append(
+                cosh_shift(t - training_geometry.length // 2, xi, A, c),
+            )
+        fit = np.array(fit).T  # (n_points, n_boot)
 
-        x_2 = np.linspace(x0, L - x0, 100)
-        ax.plot(
-            x_2,
-            cosh_shift(x_2 - L // 2, *popt),
-            marker="",
-            label=r"fit: $A \cosh(-(x_2 - L/2) / \xi) + c$",
+        ax.fill_between(
+            t,
+            fit.mean(axis=1) - fit.std(axis=1),
+            fit.mean(axis=1) + fit.std(axis=1),
+            color="orange",
+            alpha=0.3,
+            zorder=1,
+            label=r"fit: $A \cosh(-(x_2 - L/2) / \xi) + c$"
+            + "\n"
+            + r"($1\sigma$ confidence)",
         )
+
     ax.set_yscale("log")
     ax.set_ylabel(r"$\sum_{x_1=0}^{L-1} G(x_1, x_2)$")
     ax.set_xlabel("$x_2$")
@@ -205,8 +216,8 @@ def plot_correlation_length(
         zorder=1,
     )
 
-    xi_fit = correlation_length_from_fit[0]  # .mean(  # TODO: update when bootstrapped)
-    e_fit = correlation_length_from_fit[1]  # .std()
+    xi_fit = correlation_length_from_fit.mean()
+    e_fit = correlation_length_from_fit.std()
     fit_hline = ax.axhline(xi_fit, linestyle="-", marker="", color="orange", zorder=2)
     fit_fill = ax.fill_between(
         ax.get_xlim(),
