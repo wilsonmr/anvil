@@ -3,37 +3,51 @@
 r"""
 layers.py
 
-Contains nn.Modules which implement transformations of input configurations whilst computing
-the Jacobian determinant of the transformation.
+Contains the transformations or "layers" which are the building blocks of
+normalising flows. The layers are implemented using the PyTorch library, which
+in practice means they subclass :py:class:`torch.nn.Module`. For more
+information, check out the PyTorch
+`Module docs <https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module>`_.
 
-Each transformation layers may contain several neural networks or learnable parameters.
+The basic idea is of a flow is to generate a latent variable, in our framework
+this would be using a class in :py:mod:`anvil.distributions`. The latent
+variables are then transformed by sequentially applying the transformation
+layers. The key feature of the transformations is the ability to easily calculate
+the Jacobian determinant. If the base density function is known, then we can
+evaluate the model density exactly.
 
-A normalising flow, f, can be constructed from multiple layers using function composition:
+The bottom line is that we enforce a convention to the ``forward`` method
+of each layer (a special method of :py:class:`torch.nn.Module` subclasses).
+All layers in this module should contain a ``forward`` method which takes two
+:py:class:`torch.Tensor` objects as inputs:
 
-        f(z) = g_n( ... ( g_2( g_1( z ) ) ) ... )
-
-which is implemented using the architecture provided by torch.nn
-
-All layers in this module contain a `forward` method which takes two torch.tensor objects
-as inputs:
-
-    - a batch of input configurations, dimensions (batch size, lattice size).
-
-    - a batch of scalars, dimensions (batch size, 1), that are the logarithm of the
+    - a batch of input configurations, dimensions ``(batch size, lattice size)``.
+    - a batch of scalars, dimensions ``(batch size, 1)``, that are the logarithm of the
       'current' probability density, at this stage in the normalising flow.
 
-and returns two torch.tensor objects:
+Each transformation layers may contain several neural networks or learnable
+parameters.
 
-    - a batch of configurations \phi which have been transformed according to the 
-      transformation, with the same dimensions as the input configurations.
+A full normalising flow, f, can be constructed from multiple layers using
+function composition:
 
-    - the updated logarithm of the probability density, including the contribution from
-      the Jacobian determinant of this transformation.
+.. math::
+
+        f(z) = g_{N_{\rm layers}}( \ldots ( g_2( g_1( z ) ) ) \ldots )
+
+As a matter of convenience we provide a subclass of
+:py:class:`torch.nn.Sequential`, which is initialised by passing multiple layers
+as arguments (in the order in which the layers are applied). The main feature
+of our version, :py:class:`Sequential`, is that it conforms to our ``forward``
+convention. From the perspective of the user :py:class:`Sequential` appears
+as a single subclass of :py:class:`torch.nn.Module` which performs the
+full normalising flow transformation :math:`f(z)`.
+
 """
 import torch
 import torch.nn as nn
 
-from anvil.core import FullyConnectedNeuralNetwork
+from anvil.neural_network import DenseNeuralNetwork
 
 
 class CouplingLayer(nn.Module):
@@ -113,7 +127,7 @@ class AdditiveLayer(CouplingLayer):
     ):
         super().__init__(size_half, even_sites)
 
-        self.t_network = FullyConnectedNeuralNetwork(
+        self.t_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
@@ -121,14 +135,13 @@ class AdditiveLayer(CouplingLayer):
             bias=not z2_equivar,
         )
 
-    def forward(self, v_in, log_density, *unused) -> torch.Tensor:
+    def forward(self, v_in, log_density, *args) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
-        t_out = self.t_network(
-            (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
-        )
+        t_out = self.t_network(v_for_net)
 
         v_out = self._join_func([v_in_passive, v_in_active - t_out], dim=1)
 
@@ -161,14 +174,14 @@ class AffineLayer(CouplingLayer):
     ):
         super().__init__(size_half, even_sites)
 
-        self.s_network = FullyConnectedNeuralNetwork(
+        self.s_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
             activation=activation,
             bias=not z2_equivar,
         )
-        self.t_network = FullyConnectedNeuralNetwork(
+        self.t_network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half,
             hidden_shape=hidden_shape,
@@ -177,16 +190,16 @@ class AffineLayer(CouplingLayer):
         )
         self.z2_equivar = z2_equivar
 
-    def forward(self, v_in, log_density, *unused) -> torch.Tensor:
+    def forward(self, v_in, log_density, *args) -> torch.Tensor:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
-        v_for_net = (v_in_passive - v_in_passive.mean()) / v_in_passive.std()
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
         s_out = self.s_network(v_for_net)
         t_out = self.t_network(v_for_net)
 
-        # If enforcing s(-v) = -s(v), we want to use |s(v)| in affine transf.
+        # If enforcing C(-v) = -C(v), we want to use |s(v)| in affine transf.
         if self.z2_equivar:
             s_out = torch.abs(s_out)
 
@@ -236,7 +249,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         self.size_half = size_half
         self.n_segments = n_segments
 
-        self.network = FullyConnectedNeuralNetwork(
+        self.network = DenseNeuralNetwork(
             size_in=size_half,
             size_out=size_half * (3 * n_segments - 1),
             hidden_shape=hidden_shape,
@@ -255,13 +268,11 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         """Forward pass of the rational quadratic spline layer."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
-        v_for_net = (
-            v_in_passive - v_in_passive.mean()
-        ) / v_in_passive.std()  # reduce numerical instability
+        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
 
         # Naively enforce C(-v) = -C(v)
         if self.z2_equivar:
-            v_in_passive_stand[negative_mag] = -v_in_passive_stand[negative_mag]
+            v_for_net[negative_mag] = -v_for_net[negative_mag]
 
         v_out_b = torch.zeros_like(v_in_active)
         gradient = torch.ones_like(v_in_active).unsqueeze(dim=-1)
@@ -396,35 +407,89 @@ class GlobalAffineLayer(nn.Module):
         return self.scale * v_in + self.shift, log_density
 
 
-# TODO not necessary to define a nn.module for this now I've taken out learnable gamma
+# NOTE: not necessary to define a nn.module for this now gamma is no longer learnable
 class BatchNormLayer(nn.Module):
-    """Performs batch normalisation on the input vector.
+    r"""Performs batch normalisation on the inputs, conforming to our ``forward``
+    convention.
+
+    Inputs are standardised over all tensor dimensions such that the resulting sample
+    has null mean and unit variance, after which a rescaling factor is applied.
+
+    .. math::
+
+            v_{\rm out} = \gamma
+                \frac{v_{\rm in} - \mathbb{E}[ v_{\rm in} ]}
+                {\sqrt{\var( v_{\rm in} ) + \epsilon}}
 
     Parameters
     ----------
-    scale: int
-        An additional scale factor to be applied after batch normalisation.
+    scale: float
+        The multiplicative factor, :math:`\gamma`, applied to the standardised data.
+
+    Notes
+    -----
+    Applying batch normalisation before the first spline layer can be helpful for
+    ensuring that the inputs remain within the transformation interval. However,
+    this layer adds undesirable stochasticity which can impede optimisation. One
+    might consider replacing it with :py:class:`anvil.layers.GlobalRescaling` using
+    a static scale parameter.
     """
 
     def __init__(self, scale=1):
         super().__init__()
         self.gamma = scale
 
-    def forward(self, v_in, log_density, *unused):
+    def forward(self, v_in, log_density, *args):
         """Forward pass of the batch normalisation transformation."""
-        mult = self.gamma / torch.std(v_in)
+        mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
-        log_density -= mult * v_out.shape[1]
+        log_density -= torch.log(mult) * v_out.shape[1]
         return (v_out, log_density)
 
 
 class GlobalRescaling(nn.Module):
-    def __init__(self, initial=1):
+    r"""Performs a global rescaling of the inputs via a (potentially learnable)
+    multiplicative factor, conforming to our ``forward`` convention.
+
+    Parameters
+    ----------
+    scale: float
+        The multiplicative factor applied to the inputs.
+    learnable: bool, default=True
+        If True, ``scale`` will be optimised during the training.
+
+    Notes
+    -----
+    Applying a rescaling layer with a learnable ``scale`` to the final layer of a
+    normalizing flow can be useful since it avoids the need to tune earlier layers
+    to match the width of the target density. However, for best performance one
+    should generally use a static ``scale`` to reduce stochasticity in the
+    optimisation.
+
+    """
+
+    def __init__(self, scale=1, learnable=True):
         super().__init__()
 
-        self.scale = nn.Parameter(torch.Tensor([initial]))
+        self.scale = torch.Tensor([scale])
+        if learnable:
+            self.scale = nn.Parameter(self.scale)
 
-    def forward(self, v_in, log_density, *unused):
+    def forward(self, v_in, log_density, *args):
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
         return v_out, log_density
+
+
+class Sequential(nn.Sequential):
+    """Similar to :py:class:`torch.nn.Sequential` except conforms to our
+    ``forward`` convention.
+    """
+
+    def forward(self, v, log_density, *args):
+        """overrides the base class ``forward`` method to conform to our
+        conventioned for expected inputs/outputs of ``forward`` methods.
+        """
+        for module in self:
+            v, log_density = module(v, log_density, *args)
+        return v, log_density

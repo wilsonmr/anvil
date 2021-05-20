@@ -127,8 +127,8 @@ class FreeScalarEigenmodes:
         """Returns a stack of complex arrays where real and imaginary components
         are drawn from a Gaussian distribution with the same width.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
         sigma: numpy.ndarray
@@ -137,8 +137,8 @@ class FreeScalarEigenmodes:
             (optional) flag. If True, the imaginary component is set to
             zero, but a complex array is still returned.
 
-        Returns:
-        --------
+        Returns
+        -------
         out: numpy.ndarray
             complex array of shape (n_sample, *sigma.shape)
         """
@@ -157,13 +157,13 @@ class FreeScalarEigenmodes:
         Gaussian distributions with variances given by the eigenvalues of the
         kinetic operator - see _variance() method above.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
 
-        Returns:
-        --------
+        Returns
+        -------
         eigenmodes: numpy.ndarray
             complex array of eigenmodes with shape (n_sample, L, L)
             where L is the side length of the square lattice.
@@ -206,13 +206,13 @@ class FreeScalarEigenmodes:
     def gen_real_space_fields(self, n_sample):
         """Returns the inverse fourier transform of a sample of eigenmodes.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
 
-        Returns:
-        --------
+        Returns
+        -------
         fields: numpy.ndarray
             real array of real-space fields, with shape (n_sample, L, L),
             where L is the side-length of the square lattice.

@@ -40,8 +40,8 @@ def free_scalar_theory(couplings, lattice_length):
 def fourier_transform(configs, training_geometry):
     """Takes the Fourier transform of a sample of field configurations.
 
-    Inputs
-    ------
+    Parameters
+    ----------
     configs: torch.tensor
         A (hopefully decorrelated) sample of field configurations in the
         split representation. Shape: (sample_size, lattice_size)

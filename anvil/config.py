@@ -13,7 +13,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
-from anvil.models import MODEL_OPTIONS
+from anvil.models import LAYER_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 from random import randint
@@ -84,12 +84,12 @@ class ConfigParser(Config):
         return param
 
     @explicit_node
-    def produce_model_action(self, model: str):
+    def produce_layer_action(self, layer: str):
         """Given a string, return the flow model action indexed by that string."""
         try:
-            return MODEL_OPTIONS[model]
+            return LAYER_OPTIONS[layer]
         except KeyError:
-            raise ConfigError(f"Invalid model {model}", model, MODEL_OPTIONS.keys())
+            raise ConfigError(f"Invalid model {layer}", layer, LAYER_OPTIONS.keys())
 
     def parse_n_batch(self, nb: int):
         """Batch size for training."""

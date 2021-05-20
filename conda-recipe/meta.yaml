@@ -27,6 +27,7 @@ build:
 test:
   requires:
     - pytest
+    - hypothesis
   commands:
     - pytest --pyargs anvil
 

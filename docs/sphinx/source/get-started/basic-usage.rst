@@ -118,7 +118,7 @@ We supply some basic
 machinery to build your own normalising flow models. The relevant modules for
 this purpose are
 
- - :py:mod:`anvil.core`: containing some basic extensions to ``pytorch`` modules relevant for this project.
+ - :py:mod:`anvil.neural_network`: Generic neural networks.
  - :py:mod:`anvil.layers`: a collection of transformation layer classes
  - :py:mod:`anvil.geometry`: classes which transform the output of the transformations into meaningful geometries. These dictate which sites in your lattice get alternated between active and passive partitions.
  - :py:mod:`anvil.distributions`: a collection of distributions which can be used as base distributions (for latent variables) or target distributions.
