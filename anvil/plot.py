@@ -25,13 +25,14 @@ def plot_zero_momentum_correlator(
     training_geometry,
     fit_zero_momentum_correlator,
     cosh_fit_window,
+    plot_cosh_fit=True,
 ):
     r"""Plots the correlation function for pairs of one-dimensional 'slices', otherwise
     referred to as the two point correlator at zero spatial momentum, as a function of
     time. Points and errorbars are means and standard deviations across a boostrap
     sample.
 
-    Also plots the :math:`1\sigma` confidence interval for a pure-exponential (cosh)
+    Optionally plots a :math:`1\sigma` confidence interval for a pure-exponential (cosh)
     fit performed for each member of the bootstrap sample in
     :py:func:`fit_zero_momentum_correlator`.
     """
@@ -46,7 +47,7 @@ def plot_zero_momentum_correlator(
         label="sample statistics",
     )
 
-    if fit_zero_momentum_correlator is not None:
+    if plot_cosh_fit:
         t = np.arange(training_geometry.length)[cosh_fit_window]
         fit = []
         for xi, A, c in zip(*fit_zero_momentum_correlator):

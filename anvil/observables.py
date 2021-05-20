@@ -5,12 +5,11 @@ observables.py
 """
 import numpy as np
 from scipy.signal import correlate
-from math import ceil, pi, sin
+import scipy.optimize as optim
 import logging
 
 from anvil.utils import bootstrap_sample, Multiprocessing
 
-import scipy.optimize as optim
 
 log = logging.getLogger(__name__)
 
@@ -22,10 +21,44 @@ def cosh_shift(x, xi, A, c):
 def fit_zero_momentum_correlator(
     zero_momentum_correlator, training_geometry, cosh_fit_window
 ):
+    r"""Uses scipy.optimize.curve_fit to fit a cosh function (i.e. exponential decay
+    with periodicity) to each correlator in the bootrap ensemble.
+
+    The correlator decays as a pure exponential in the limit of large separations,
+    and the characteristic scale of this decay is the correlation length, whose
+    reciprocal is a.k.a the (effective) pole mass.
+
+    Parameters
+    ----------
+    zero_momentum_correlator: torch.Tensor
+        The two point correlation function at zero spatial momentum, i.e. the
+        correlation between 1-d 'slices'.
+    training_geometry: anvil.Geometry.
+        The lattice.
+    cosh_fit_window: slice object
+        A slice object which selects the points (i.e. separations) to include in the
+        fit. In general the signal at short separations will be contaminated by
+        shorter modes and should not be included in the fit.
+
+    Returns
+    -------
+    xi: list
+        List of optimal correlation lengths for each member of the bootstrap ensemble
+        for whom the fitting process converged successfully.
+    A: list
+        Same as above, but for the amplitude of the cosh function.
+    c: list
+        Same as above, but for the global shift in the fit (which should correspond
+        to the absolute value of the magnetization, squared.
+
+    See also
+    --------
+    :py:func:`anvil.observables.cosh_shift` : the function being fit to the data.
+    """
     t = np.arange(training_geometry.length) - training_geometry.length // 2
 
     # fit for each correlation func in the bootstrap ensemble
-    optimised_parameters = []
+    xi, A, c = [], [], []
     for correlator in zero_momentum_correlator.transpose():
         try:
             popt, pcov = optim.curve_fit(
@@ -33,26 +66,36 @@ def fit_zero_momentum_correlator(
                 xdata=t[cosh_fit_window],
                 ydata=correlator[cosh_fit_window],
             )
-            optimised_parameters.append(popt)
+            xi.append(popt[0])
+            A.append(popt[1])
+            c.append(popt[2])
         except RuntimeError:
             pass
 
     n_boot = zero_momentum_correlator.shape[-1]
-    n_fits = len(optimised_parameters)
+    n_fits = len(xi)
     log.info(
         f"Cosh fit succeeded for {n_fits}/{n_boot} members of the bootstrap ensemble."
     )
-    if n_fits < 2:
-        log.warning("Too few successful fits: no fit parameters will be returned.")
-        return None
-
-    xi, A, c = np.array(optimised_parameters).transpose()
     return xi, A, c
 
 
 def correlation_length_from_fit(fit_zero_momentum_correlator):
+    """Returns numpy array containing a value for the  correlation length for each member
+    of the bootstrap ensemble for whom :py:func:`fit_zero_momentum_correlator` successfully
+    converged.
+    """
     xi, _, _ = fit_zero_momentum_correlator
-    return xi
+    return np.array(xi)
+
+
+def abs_magnetization_sq_from_fit(fit_zero_momentum_correlator):
+    """Returns numpy array containing a value for the absolute magnetization squared
+    for each member of the bootstrap ensemble for whom :py:func:`fit_zero_momentum_correlator`
+    successfully converged.
+    """
+    _, _, c = fit_zero_momentum_correlator
+    return np.array(c)
 
 
 def autocorrelation(chain):
@@ -109,12 +152,12 @@ def magnetization(configs, bootstrap_sample_size, bootstrap_seed):
     )
 
 
-def abs_magnetization_squared(magnetization):
+def abs_magnetization_sq(magnetization):
     return np.abs(magnetization).mean(axis=-1) ** 2  # <|m|>^2
 
 
-def magnetic_susceptibility(magnetization, abs_magnetization_squared):
-    return (magnetization ** 2).mean(axis=-1) - abs_magnetization_squared
+def magnetic_susceptibility(magnetization, abs_magnetization_sq):
+    return (magnetization ** 2).mean(axis=-1) - abs_magnetization_sq
 
 
 def magnetization_series(configs):
@@ -182,8 +225,8 @@ def two_point_correlator(
     return correlator.reshape((training_geometry.length, training_geometry.length, -1))
 
 
-def two_point_connected_correlator(two_point_correlator, abs_magnetization_squared):
-    return two_point_correlator - abs_magnetization_squared.view(1, 1, -1)
+def two_point_connected_correlator(two_point_correlator, abs_magnetization_sq):
+    return two_point_correlator - abs_magnetization_sq.view(1, 1, -1)
 
 
 def zero_momentum_correlator(two_point_correlator):
@@ -238,11 +281,11 @@ def second_moment_correlation_length(two_point_correlator, susceptibility):
 def low_momentum_correlation_length(two_point_correlator, susceptibility):
     """A low-momentum estimate for the correlation length."""
     L = two_point_correlator.shape[0]
-    kernel = np.cos(2 * pi / L * np.arange(L)).reshape(L, 1, 1)
+    kernel = np.cos(2 * np.pi / L * np.arange(L)).reshape(L, 1, 1)
 
     g_tilde_00 = susceptibility
     g_tilde_10 = (kernel * two_point_correlator).sum(axis=(0, 1))
 
-    xi_sq = (g_tilde_00 / g_tilde_10 - 1) / (4 * sin(pi / L) ** 2)
+    xi_sq = (g_tilde_00 / g_tilde_10 - 1) / (4 * np.sin(np.pi / L) ** 2)
 
     return np.sqrt(xi_sq)

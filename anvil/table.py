@@ -30,20 +30,17 @@ def table_autocorrelation(
 
 
 @table
-def table_fit(fit_zero_momentum_correlator, training_geometry):
-    if fit_zero_momentum_correlator is not None:
-        xi, A, c = fit_zero_momentum_correlator
-
-        res = [
-            [xi.mean(), xi.std()],
-            [c.mean(), c.std()],
-        ]
-        df = pd.DataFrame(
-            res,
-            columns=["mean", "error"],
-            index=["xi_from_fit", "magnetization_from_fit"],
-        )
-        return df
+def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
+    res = [
+        [correlation_length_from_fit.mean(), correlation_length_from_fit.std()],
+        [abs_magnetization_sq_from_fit.mean(), abs_magnetization_sq_from_fit.std()],
+    ]
+    df = pd.DataFrame(
+        res,
+        columns=["mean", "error"],
+        index=["xi_from_fit", "abs_magnetization_sq_from_fit"],
+    )
+    return df
 
 
 @table
@@ -64,15 +61,15 @@ def table_two_point_scalars(ising_energy, susceptibility):
 
 
 @table
-def table_magnetization(abs_magnetization_squared, magnetic_susceptibility):
+def table_magnetization(abs_magnetization_sq, magnetic_susceptibility):
     res = [
-        [abs_magnetization_squared.mean(), abs_magnetization_squared.std()],
+        [abs_magnetization_sq.mean(), abs_magnetization_sq.std()],
         [magnetic_susceptibility.mean(), magnetic_susceptibility.std()],
     ]
     df = pd.DataFrame(
         res,
         columns=["mean", "error"],
-        index=["abs_magnetization_squared", "magnetic_susceptibility"],
+        index=["abs_magnetization_sq", "magnetic_susceptibility"],
     )
     return df
 
