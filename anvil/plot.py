@@ -395,11 +395,11 @@ def plot_magnetization_integrated_autocorr(
         ax.transData,
         sample_interval,
         f"sample interval: {sample_interval}",
-        "upper left",
+        "center right",
         pad=0.6,
         frameon=False,
         sep=4,
-        label_top=True,
+        label_top=False,
         fontproperties=FontProperties(size="x-large"),
     )
     ax.add_artist(scalebar)
