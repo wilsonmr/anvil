@@ -1,3 +1,6 @@
+font.family: STIXGeneral
+mathtext.fontset: stix
+
 figure.figsize: 8, 6
 figure.titlesize: large
 figure.dpi: 100
