@@ -13,6 +13,7 @@
 {@table_correlation_length@}
 ## Magnetisation
 {@table_magnetization@}
+{@plot_magnetization@}
 {@plot_magnetization_series@}
 {@plot_magnetization_autocorr@}
 {@plot_magnetization_integrated_autocorr@}
