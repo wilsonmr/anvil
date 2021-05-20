@@ -20,7 +20,7 @@ def cosh_shift(x, xi, A, c):
 
 
 def fit_zero_momentum_correlator(
-    zero_momentum_correlator, training_geometry, cosh_fit_window=slice(1, None)
+    zero_momentum_correlator, training_geometry, cosh_fit_window
 ):
     t = np.arange(training_geometry.length) - training_geometry.length // 2
 
