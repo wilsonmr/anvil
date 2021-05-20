@@ -9,6 +9,7 @@ import logging
 
 from reportengine.app import App
 from anvil.config import ConfigParser
+from anvil.style import default_style
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ class SampleApp(App):
 
     def __init__(self, name="anvil-sample", *, providers):
         super().__init__(name, providers)
+
+        self.default_style = default_style
 
 
 def main():
