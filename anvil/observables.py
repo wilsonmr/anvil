@@ -30,11 +30,11 @@ def fit_zero_momentum_correlator(
 
     Parameters
     ----------
-    zero_momentum_correlator: torch.Tensor
+    zero_momentum_correlator
         The two point correlation function at zero spatial momentum, i.e. the
         correlation between 1-d 'slices'.
-    training_geometry: anvil.Geometry.
-        The lattice.
+    training_geometry
+        The anvil.geometry object defining the lattice.
     cosh_fit_window: slice object
         A slice object which selects the points (i.e. separations) to include in the
         fit. In general the signal at short separations will be contaminated by
