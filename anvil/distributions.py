@@ -5,12 +5,10 @@ distributions.py
 
 Module containing classes corresponding to different probability distributions.
 """
-import torch
-import torch.nn as nn
+from torch.distributions import Normal
 
-from math import log, sqrt, pi
 
-class Gaussian:
+class Gaussian(Normal):
     """
     Class which handles the generation of a sample of latent Gaussian variables.
 
@@ -18,46 +16,51 @@ class Gaussian:
     -------
     lattice_size: int
         Number of nodes on the lattice.
-    sigma: float
-        Standard deviation for the distribution.
-    mean: float
+    loc: float, default=0
         Mean for the distribution.
+    scale: float, default=1
+        Standard deviation for the distribution.
     """
 
-    def __init__(self, size_out, *, sigma=1, mean=0):
+    def __init__(self, size_out, *, loc=0, scale=1):
+        super().__init__(loc, scale)
         self.size_out = size_out
-        self.sigma = sigma
-        self.mean = mean
-        
-        # Pre-calculate normalisation for log density
-        self.exp_coeff = 1 / (2 * self.sigma ** 2)
-        self.log_normalisation = self.size_out * log(sqrt(2 * pi) * self.sigma)
+
 
     def __call__(self, sample_size):
         """Return a sample of variables drawn from the normal distribution,
-        with dimensions (sample_size, lattice_size)."""
-        sample = torch.empty(sample_size, self.size_out).normal_(
-            mean=self.mean, std=self.sigma
-        )
-        
+        with dimensions (sample_size, lattice_size).
+        """
+        sample = self.sample((sample_size, self.size_out))
         return sample, self.log_density(sample)
 
-    
+
     def log_density(self, sample):
-        """Logarithm of the pdf, calculated for a given sample. Dimensions (sample_size, 1)."""
-        exponent = -self.exp_coeff * torch.sum(
-            (sample - self.mean).pow(2), dim=1, keepdim=True
-        )
-        return exponent - self.log_normalisation
+        """Returns the log probability for each configuration.
+
+        Parameters
+        ----------
+        sample: torch.tensor
+            input sample size (n_batch, self.size_out)
+
+        Returns
+        -------
+        log_density: torch.tensor
+            density evaluated for each input configuration, number of dimensions
+            is retained: size (n_batch, 1).
+
+        """
+        return self.log_prob(sample).sum(dim=1, keepdim=True)
 
 
 class PhiFourScalar:
-    """Return the phi^4 action given either a single state size
-    (1, length * length) or a stack of N states (N, length * length).
-    See Notes about action definition.
+    r"""Class associated with the action for a scalar field theory with
+    :math:`\phi^4` interaction.
 
-    The forward pass returns the corresponding log density (unnormalised) which
-    is equal to -S
+    methods to evaluate either the action or shifted log density on either a
+    single state - torch tensor, size (1, length * length) - or a stack of N
+    states - torch tensor, size (N, length * length).
+    See Notes about action definition.
 
     Parameters
     ----------
@@ -82,37 +85,41 @@ class PhiFourScalar:
     -----
     The general form of the action is
 
-        S(\phi) = \sum_{x \in \Lambda} [
+    .. math::
 
-            C_ising * \sum_{\mu = 1}^d \phi(x + e_\mu) \phi(x)
+        S(\phi) = \sum_{x \in \Lambda} \left[
+            C_{\rm ising} * \sum_{\mu = 1}^d \phi(x + e_\mu) \phi(x) +
+            C_{\rm quadratic} * \phi(x)^2 +
+            C_{\rm quartic} * \phi(x)^4
+        \right]
 
-          + C_quadratic * \phi(x)^2
-
-          + C_quartic * \phi(x)^4
-
-        ]
-
-    where C_ising, C_quadratic and C_quartic are coefficients built from the two couplings
-    provided in the constructor, \Lambda is the lattice, d is the number of space-time
-    dimensions and and e_\mu is a unit vector in the \mu-th dimensions.
-
+    where :math:`C_{\rm ising}`, :math:`C_{\rm quadratic}` and
+    :math:`C_{\rm quartic}` are coefficients built from the two couplings
+    provided in the constructor, :math:`\Lambda` is the space-time lattice
+    (the sum over the lattice is a sum over the lattice sites),
+    d is the number of space-time dimensions and
+    :math:`e_\mu` is a unit vector in the :math:`\mu^{th}` dimension.
 
     Examples
     --------
     Consider the toy example of this class acting on a random state
 
+    >>> from anvil.geometry import Geometry2D
+    >>> from anvil.distributions import PhiFourScalar
+    >>> import torch
     >>> geom = Geometry2D(2)
-    >>> action = PhiFourAction(geom, "standard", {"m_sq": 4, "g": 0})
-    >>> state = torch.rand((1, 2*2))
-    >>> action(state)
+    >>> target = PhiFourScalar.from_standard(geom, **{"m_sq": 4, "g": 0})
+    >>> state = torch.rand((1, 2*2)) # 2-D so lattice cardinality is 4
+    >>> target.log_density(state)
     tensor([[-2.3838]])
     >>> state = torch.rand((5, 2*2))
-    >>> action(state)
+    >>> target.log_density(state)
     tensor([[-3.9087],
             [-2.2697],
             [-2.3940],
             [-2.3499],
             [-1.9730]])
+
     """
 
     def __init__(
@@ -124,8 +131,8 @@ class PhiFourScalar:
     ):
         self.shift = geometry.get_shift()
         self.c_ising = ising_coefficient
-        self.c2 = quadratic_coefficient
-        self.c4 = quartic_coefficient
+        self.c_quadratic = quadratic_coefficient
+        self.c_quartic = quartic_coefficient
 
     @classmethod
     def from_standard(cls, geometry, *, m_sq, g):
@@ -147,8 +154,8 @@ class PhiFourScalar:
         """Action computed for a sample of field configurations."""
         return (
             self.c_ising * (phi[:, self.shift] * phi.unsqueeze(dim=1)).sum(dim=1)
-            + self.c2 * phi.pow(2)
-            + self.c4 * phi.pow(4)
+            + self.c_quadratic * phi.pow(2)
+            + self.c_quartic * phi.pow(4)
         ).sum(dim=1, keepdim=True)
 
     def log_density(self, phi):
@@ -156,8 +163,8 @@ class PhiFourScalar:
         for a sample of field configurations."""
         return -self.action(phi)
 
-def gaussian(lattice_size, sigma=1):
-    return Gaussian(lattice_size, sigma=sigma)
+def gaussian(lattice_size, loc=0, sigma=1):
+    return Gaussian(lattice_size, loc=loc, scale=sigma)
 
 def phi_four(geometry, parameterisation, couplings):
     constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
