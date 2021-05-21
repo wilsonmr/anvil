@@ -16,40 +16,45 @@ a sample of generated field configurations.
 
 import torch
 import numpy as np
-
 import matplotlib.pyplot as plt
 import pandas as pd
+from typing import Dict
 
 from reportengine import collect
 from reportengine.figure import figure
 from reportengine.table import table
 
-from anvil.free_scalar import FreeScalarEigenmodes
+import anvil.free_scalar
 from anvil.checks import check_trained_with_free_theory
 
 
-def free_scalar_theory(couplings, lattice_length):
-    """Returns instance of FreeScalarEigenmodes class with specific
-    mass and lattice size.
-    """
+def free_scalar_theory(
+    couplings: Dict[str, float], lattice_length: int
+) -> anvil.free_scalar.FreeScalarEigenmodes:
+    """Returns instance of FreeScalarEigenmodes with specific mass and lattice size."""
     # TODO: load target and extract m_sq from target.c2 - indep or parameterisation?
     m_sq = couplings["m_sq"]
-    return FreeScalarEigenmodes(m_sq=m_sq, lattice_length=lattice_length)
+    return anvil.free_scalar.FreeScalarEigenmodes(
+        m_sq=m_sq, lattice_length=lattice_length
+    )
 
 
-def fourier_transform(configs, training_geometry):
+def fourier_transform(
+    configs: torch.Tensor, training_geometry: anvil.geometry.Geometry2D
+) -> torch.Tensor:
     """Takes the Fourier transform of a sample of field configurations.
 
     Parameters
     ----------
-    configs: torch.tensor
+    configs
         A (hopefully decorrelated) sample of field configurations in the
         split representation. Shape: (sample_size, lattice_size)
-    training_geometry: geometry object
+    training_geometry
+        The geometry object corresponding to the lattice.
 
     Returns
     -------
-    phi_tilde: torch.tensor
+    torch.Tensor
         The Fourier transform of the sample in the Cartesian representation.
         Defined such that the momenta increase monotonically with the index
         on each axis.
@@ -75,12 +80,25 @@ def fourier_transform(configs, training_geometry):
     return phi_tilde
 
 
-def eigvals_from_sample(fourier_transform, training_geometry):
-    """Returns a prediction for the eigenvalues of the kinetic operator
-    for the free theory, based on the sample variance of the fourier
-    transformed fields.
+def eigvals_from_sample(
+    fourier_transform: torch.Tensor, training_geometry: anvil.geometry.Geometry2D
+) -> np.ndarray:
+    """Returns a prediction for the eigenvalues of the kinetic operator.
 
-    The output is converted to an (L x L) numpy.ndarray.
+    The prediction is based on the sample variance of the field configurations in
+    Fourier space.
+
+    Parameters
+    ----------
+    fourier_transform
+        Sample of field configurations in Fourier space.
+    training_geometry
+        Geometry object corresponding to the lattice.
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of dimensions (L, L) containing the eigenvalues.
     """
     variance = fourier_transform.real.var(dim=0) + fourier_transform.imag.var(dim=0)
     eigvals = training_geometry.length ** 2 * torch.reciprocal(variance)

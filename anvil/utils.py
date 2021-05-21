@@ -7,7 +7,10 @@ from functools import wraps
 from math import ceil
 import torch
 import sys
+import torch
+from typing import Tuple, NewType
 
+LayerInOut = NewType("LayerInOut", Tuple[torch.Tensor, torch.Tensor])
 
 
 class Multiprocessing:
@@ -69,7 +72,13 @@ class Multiprocessing:
 
             procs = []
             for k in range(self.n_cores):
-                p = mp.Process(target=self.target, args=(k, output_dict,),)
+                p = mp.Process(
+                    target=self.target,
+                    args=(
+                        k,
+                        output_dict,
+                    ),
+                )
                 procs.append(p)
                 p.start()
 
@@ -102,10 +111,9 @@ def get_num_parameters(model):
         num += torch.numel(parameter)
     return num
 
+
 def handler(signum, frame):
     """Handles keyboard interruptions and terminations and exits in such a way that,
     if the program is currently inside a try-except-finally block, the finally clause
     will be executed."""
     sys.exit(1)
-
-

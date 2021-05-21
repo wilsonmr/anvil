@@ -12,12 +12,13 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.geometry import Geometry2D
-from anvil.checkpoint import TrainingOutput
+from anvil.checkpoint import TrainingOutput, Checkpoint
 from anvil.models import LAYER_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 from random import randint
 from sys import maxsize
+from typing import Dict, Optional
 
 log = logging.getLogger(__name__)
 
@@ -27,34 +28,37 @@ class ConfigParser(Config):
     objects
     """
 
-    def parse_lattice_length(self, length: int):
+    def parse_lattice_length(self, length: int) -> int:
+        """The number of nodes along each spatial dimension."""
         return length
 
-    def parse_lattice_dimension(self, dim: int):
-        """Parse lattice dimension from runcard"""
+    def parse_lattice_dimension(self, dim: int) -> int:
+        """The number of spatial dimensions."""
         if dim != 2:
             raise ConfigError("Currently only 2 dimensions is supported")
         return dim
 
-    def produce_lattice_size(self, lattice_length, lattice_dimension):
-        """returns the total number of nodes on lattice"""
+    def produce_lattice_size(self, lattice_length: int, lattice_dimension: int) -> int:
+        """The total number of nodes on the lattice."""
         return pow(lattice_length, lattice_dimension)
 
-    def produce_size_half(self, lattice_size):
-        """Given the number of nodes in a field configuration, return an integer
-        of lattice_size/2 which is the size of the input vector for each coupling layer.
+    def produce_size_half(self, lattice_size: int) -> int:
+        """Half of the number of nodes on the lattice.
+
+        This defines the size of the input layer to the neural networks.
         """
         # NOTE: we may want to make this more flexible
         if (lattice_size % 2) != 0:
             raise ConfigError("Lattice size is expected to be an even number")
         return int(lattice_size / 2)
 
-    def produce_geometry(self, lattice_length):
+    def produce_geometry(self, lattice_length: int) -> Geometry2D:
+        """Returns the geometry object defining the lattice."""
         return Geometry2D(lattice_length)
 
     @explicit_node
-    def produce_target_dist(self, target):
-        """Return the function which initialises the correct action"""
+    def produce_target_dist(self, target: str):
+        """Returns the function which initialises the correct action"""
         try:
             return TARGET_OPTIONS[target]
         except KeyError:
@@ -64,7 +68,7 @@ class ConfigParser(Config):
 
     @explicit_node
     def produce_base_dist(self, base: str):
-        """Return the action which loads appropriate base distribution"""
+        """Returns the action which loads appropriate base distribution"""
         try:
             return BASE_OPTIONS[base]
         except KeyError:
@@ -72,48 +76,61 @@ class ConfigParser(Config):
                 f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
             )
 
-    def parse_sigma(self, sigma: (float, int)):
-        """Standard deviation of normal distribution."""
+    def parse_sigma(self, sigma: float) -> float:
+        """The standard deviation of a normal distribution."""
         return sigma
 
-    def parse_couplings(self, couplings: dict):
-        """Couplings for field theory."""
+    def parse_couplings(self, couplings: Dict[str, float]) -> Dict[str, float]:
+        """A dict containing the couplings for the target field theory."""
         return couplings  # TODO: obviously need to be more fool-proof about this
 
-    def parse_parameterisation(self, param: str):
+    def parse_parameterisation(self, param: str) -> str:
+        """A string defining the parameterisation used for the target theory."""
         return param
 
     @explicit_node
     def produce_layer_action(self, layer: str):
-        """Given a string, return the flow model action indexed by that string."""
+        """Given a string, returns the flow model action indexed by that string."""
         try:
             return LAYER_OPTIONS[layer]
         except KeyError:
             raise ConfigError(f"Invalid model {layer}", layer, LAYER_OPTIONS.keys())
 
-    def parse_n_batch(self, nb: int):
+    def parse_n_batch(self, nb: int) -> int:
         """Batch size for training."""
         return nb
 
-    def parse_epochs(self, epochs: int):
-        """Number of epochs to train. Equivalent to number of passes
-        multiplied by the batch size."""
+    def parse_epochs(self, epochs: int) -> int:
+        """Number of training iterations, i.e. updates of the model parameters."""
         return epochs
 
-    def parse_save_interval(self, save_int: int):
-        """Interval at which the model state is saved, in units of epochs."""
+    def parse_save_interval(self, save_int: int) -> int:
+        """A checkpoint containing the model state will be written every ``save_interval``
+        training iterations."""
         return save_int
 
     @element_of("training_outputs")
-    def parse_training_output(self, path: str):
+    def parse_training_output(self, path: str) -> TrainingOutput:
+        """Given a path to a training directory, returns an object that interfaces with
+        this directory."""
         return TrainingOutput(path)
 
     @element_of("cp_ids")
-    def parse_cp_id(self, cp: (int, type(None))):
+    def parse_cp_id(self, cp: Optional[int]) -> Optional[int]:
         return cp
 
     @element_of("checkpoints")
-    def produce_checkpoint(self, cp_id=None, training_output=None):
+    def produce_checkpoint(
+        self,
+        cp_id: Optional[int] = None,
+        training_output: Optional[TrainingOutput] = None,
+    ) -> Optional[Checkpoint]:
+        """Attempts to return a checkpoint object extracted from a training output.
+
+        - If ``cp_id == None``, no checkpoint is returned.
+        - If ``cp_id == -1``, the checkpoint with the highest ``cp_id`` is returned.
+        - Otherwise, attempts to load checkpoint with id ``cp_id``.
+        """
         if cp_id is None:
             return None
         if cp_id == -1:
@@ -123,79 +140,103 @@ class ConfigParser(Config):
         # get index from training_output class
         return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
 
-    def produce_training_context(self, training_output):
-        """Given a training output produce the context of that training"""
+    def produce_training_context(self, training_output: TrainingOutput) -> dict:
+        """Given a training output, produces the context of that training as a dict."""
         # NOTE: This seems a bit hacky, exposing the entire training configuration
         # file - hopefully doesn't cause any issues..
         return training_output.as_input()
 
-    def produce_training_geometry(self, training_context):
+    def produce_training_geometry(self, training_context: dict) -> Geometry2D:
         """Produces the geometry object used in training."""
         with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
 
-    def parse_optimizer(self, optimizer: str):
+    def parse_optimizer(self, optimizer: str) -> str:
+        """A label for the optimization algorithm to use during training.
+
+        An optimizer is loaded using ``getattr(torch.optim, <optimizer>)``. Therefore
+        this label must correspond to a `valid PyTorch optimizer`_.
+
+        .. _valid PyTorch optimizer: https://pytorch.org/docs/stable/optim.html#algorithms
+        """
         return optimizer
 
-    def parse_optimizer_params(self, params: dict):
+    def parse_optimizer_params(self, params: dict) -> dict:
+        """Parameters for the optimization algorithm.
+
+        Consult the documentation for `valid PyTorch optimizer`_ s.
+        """
         return params
 
-    def parse_scheduler(self, scheduler: str):
+    def parse_scheduler(self, scheduler: str) -> str:
+        """A label for the learning rate scheduler to use during training.
+
+        An scheduler is loaded using ``getattr(torch.optim.lr_scheduler, <optimizer>)``.
+        Therefore this label must correspond a `valid PyTorch scheduler`_.
+
+        .. _valid PyTorch scheduler: https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+        """
         return scheduler
 
-    def parse_scheduler_params(self, params: dict):
+    def parse_scheduler_params(self, params: dict) -> dict:
+        """Parameters for the learning rate scheduler.
+
+        Consult the documentation for `valid PyTorch scheduler`_ s.
+        """
         return params
 
-    def parse_sample_size(self, size: int):
-        """Number of configurations in output sample."""
+    def parse_sample_size(self, size: int) -> int:
+        """The number of configurations in the output sample."""
         return size
 
-    def parse_thermalization(self, therm: (int, type(None))):
-        """Number of Markov chain steps to discard to allow the chain to
-        reach an approximately stationary distribution."""
+    def parse_thermalization(self, therm: Optional[int]) -> Optional[int]:
+        """A number of Markov chain steps to be discarded before beginning to select
+        configurations for the output sample."""
         if therm is None:
             log.warning("Not Performing thermalization")
-            return therm
+            return None
         if therm < 1:
             raise ConfigError(
-                "thermalization must be greater than or equal to 1 or be None"
+                "Thermalization must be greater than or equal to 1 or be None"
             )
         return therm
 
-    def parse_sample_interval(self, interval: (int, type(None))):
-        """Number of Markov chain steps to discard between appending configurations
-        to the sample. Should be large enough so that configurations have become
-        decorrelated.
+    def parse_sample_interval(self, interval: Optional[int]) -> Optional[int]:
+        """A number of Markov chain steps to discard between configurations that are
+        selected for the output sample.
 
         Can be specified by the user in the runcard, or left to an automatic
         calculation based on the acceptance rate of the Metropolis-Hastings algorith.
         """
         if interval is None:
-            return interval
+            log.info("No sample_interval provided - will be calculated 'on the fly'.")
+            return None
         if interval < 1:
             raise ConfigError("sample_interval must be greater than or equal to 1")
-        log.warning(f"Using user specified sample_interval: {interval}")
+        log.info(f"Using user specified sample_interval: {interval}")
         return interval
 
-    def parse_bootstrap_sample_size(self, n_boot: int):
-        """Size of the bootstrap sample."""
+    def parse_bootstrap_sample_size(self, n_boot: int) -> int:
+        """The size of the bootstrap sample."""
         if n_boot < 2:
+            # TODO: would be nice to have the option to perform analysis without bootstrapping
             raise ConfigError("bootstrap sample size must be greater than 1")
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(
-        self, manual_bootstrap_seed: (int, type(None)) = None):
+    def produce_bootstrap_seed(self, manual_bootstrap_seed: Optional[int] = None):
+        """Optional seed for the random number generator which generates the bootstrap
+        sample, for the purpose of reproducibility."""
         if manual_bootstrap_seed is None:
             return randint(0, maxsize)
         # numpy is actually this strict but let's keep it sensible.
-        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2**32):
+        if (manual_bootstrap_seed < 0) or (manual_bootstrap_seed > 2 ** 32):
             raise ConfigError("Seed is outside of appropriate range: [0, 2 ** 32]")
         return manual_bootstrap_seed
 
     @element_of("windows")
-    def parse_window(self, window: float):
+    def parse_window(self, window: float) -> float:
         """A numerical factor featuring in the calculation of the optimal 'window'
         size, which is then used to measure the integrated autocorrelation time of
         observables.
@@ -204,15 +245,15 @@ class ConfigParser(Config):
         checking that the integrated autocorrelation has approximately plateaued
         at the optimal window size.
 
-        See `automatic_windowing_function` in the observables module for more details.
+        See :py:func:`anvil.observables.automatic_windowing_function`.
         """
         if window < 0:
             raise ConfigError("window must be positive")
-        log.warning(f"Using user specified window 'S': {window}")
+        log.warning(f"Using user specified window 'S' parameter: {window}")
         return window
 
-    def produce_use_multiprocessing(self):
-        """Don't use mp on MacOS"""
+    def produce_use_multiprocessing(self) -> bool:
+        """Don't use Python multiprocessing on MacOS"""
         if platform.system() == "Darwin":
             return False
         return True

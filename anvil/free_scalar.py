@@ -16,15 +16,20 @@ class FreeScalarEigenmodes:
     r"""
     The action for the theory of a free scalar on a lattice is
 
+    .. math::
+
         S(\phi) = \frac{1}{2} \sum_x \sum_y \phi(x) K(x, y) \phi(y)
 
     The eigenmodes of the matrix
-
+    
+    .. math:
         K(x, y) = \box(x, y) + m^2 \delta(x - y)
 
     (which is referred to here as the kinetic operator) are the momentum
-    states \tilde\phi(p), and the associated eigenvalues in two dimensions
+    states :math:`\tilde\phi(p)`, and the associated eigenvalues in two dimensions
     are
+
+    .. math:
 
         \lambda(p) = m^2 + 4 \sin^2(p1 / 2) + 4 \sin^2(p2 / 2)
 
@@ -32,10 +37,14 @@ class FreeScalarEigenmodes:
 
     It can be shown that the action can be written in Fourier space as
 
+    .. math:
+
         S(\tilde\phi) = \frac{1}{2V} \lambda(p) |\tilde\phi(p)|^2
 
     and hence the partition function is a product of Gaussian distributions
-    for the variables |\tilde\phi(p)|, with variances
+    for the variables :math:`|\tilde\phi(p)|`, with variances
+
+    .. math:
 
         \sigma^2(p) = V / \lambda(p)
 
@@ -140,7 +149,7 @@ class FreeScalarEigenmodes:
         Returns
         -------
         out: numpy.ndarray
-            complex array of shape (n_sample, *sigma.shape)
+            complex array of shape (n_sample, ``*`` sigma.shape)
         """
         shape_out = np.zeros((n_sample, *(sigma.shape)))
         if real:

@@ -5,49 +5,73 @@ distributions.py
 
 Module containing classes corresponding to different probability distributions.
 """
-from torch.distributions import Normal
+from __future__ import annotations
+from typing import TYPE_CHECKING, Dict
+
+if TYPE_CHECKING:
+    from anvil.geometry import Geometry2D
+    from anvil.utils import LayerInOut
+
+import torch.distributions
 
 
-class Gaussian(Normal):
+class Gaussian(torch.distributions.Normal):
     """
     Class which handles the generation of a sample of latent Gaussian variables.
 
     Parameters
     ----------
-    lattice_size: int
-        Number of nodes on the lattice.
-    loc: float, default=0
-        Mean for the distribution.
-    scale: float, default=1
-        Standard deviation for the distribution.
+    size_out
+        Number of (independent) Gaussian numbers making up a 'latent configuration'.
+    loc
+        Mean of the Gaussian distribution.
+    scale
+        Standard deviation of the Gaussian distribution.
+
+    Attributes
+    ----------
+    size_out
+        Number of (independent) Gaussian numbers making up a 'latent configuration'.
     """
 
-    def __init__(self, size_out, *, loc=0, scale=1):
+    def __init__(self, size_out: int, *, loc: float = 0, scale: float = 1):
         super().__init__(loc, scale)
         self.size_out = size_out
 
-
-    def __call__(self, sample_size):
+    def __call__(self, sample_size: int) -> LayerInOut:
         """Return a sample of variables drawn from the normal distribution,
-        with dimensions (sample_size, lattice_size).
+        dimensions ``(sample_size, self.size_out)``.
+
+        Parameters
+        ----------
+        sample_size
+            Number of latent configurations, each containing ``self.size_out``
+            independent Gaussian numbers, in the sample
+
+        Returns
+        -------
+        tuple
+            Sample drawn from Gaussian distribution, dimensions
+            ``(sample_size, self.size_out)``
+            Tensor containing logarithm of the probability density evaluated for
+            each latent configuration, dimensions ``(sample_size, 1)``
         """
         sample = self.sample((sample_size, self.size_out))
         return sample, self.log_density(sample)
 
-
-    def log_density(self, sample):
-        """Returns the log probability for each configuration.
+    def log_density(self, sample: torch.Tensor) -> torch.Tensor:
+        """Returns the log probability for each latent configuration.
 
         Parameters
         ----------
-        sample: torch.tensor
-            input sample size (n_batch, self.size_out)
+        sample
+            Sample of Gaussian variables, dimensions ``(sample_size, self.size_out)``
 
         Returns
         -------
-        log_density: torch.tensor
-            density evaluated for each input configuration, number of dimensions
-            is retained: size (n_batch, 1).
+        torch.Tensor
+            Tensor containing logarithm of the probability density evaluated for
+            each latent configuration, dimensions ``(sample_size, 1)``
 
         """
         return self.log_prob(sample).sum(dim=1, keepdim=True)
@@ -58,8 +82,8 @@ class PhiFourScalar:
     :math:`\phi^4` interaction.
 
     methods to evaluate either the action or shifted log density on either a
-    single state - torch tensor, size (1, length * length) - or a stack of N
-    states - torch tensor, size (N, length * length).
+    single state - torch tensor, size ``(1, length * length)`` - or a stack of
+    ``N`` states - torch tensor, size ``(N, length * length)``.
     See Notes about action definition.
 
     The parameters required differ depending on the parameterisation you're
@@ -76,12 +100,12 @@ class PhiFourScalar:
 
     Parameters
     ----------
-    geometry:
-        define the geometry of the lattice, including dimension, size and
+    geometry
+        defines the geometry of the lattice, including dimension, size and
         how the state is split into two parts
-    parameterisation:
+    parameterisation
         which parameterisation to use. See below for options.
-    couplings: dict
+    couplings
         dictionary with two entries that are the couplings of the theory.
         See below.
 
@@ -92,13 +116,13 @@ class PhiFourScalar:
     .. math::
 
         S(\phi) = \sum_{x \in \Lambda} \left[
-            C_{\rm ising} * \sum_{\mu = 1}^d \phi(x + e_\mu) \phi(x) +
-            C_{\rm quadratic} * \phi(x)^2 +
-            C_{\rm quartic} * \phi(x)^4
+            c_{\rm ising} * \sum_{\mu = 1}^d \phi(x + e_\mu) \phi(x) +
+            c_{\rm quadratic} * \phi(x)^2 +
+            c_{\rm quartic} * \phi(x)^4
         \right]
 
-    where :math:`C_{\rm ising}`, :math:`C_{\rm quadratic}` and
-    :math:`C_{\rm quartic}` are coefficients built from the two couplings
+    where :math:`c_{\rm ising}`, :math:`c_{\rm quadratic}` and
+    :math:`c_{\rm quartic}` are coefficients built from the two couplings
     provided in the constructor, :math:`\Lambda` is the space-time lattice
     (the sum over the lattice is a sum over the lattice sites),
     d is the number of space-time dimensions and
@@ -128,10 +152,10 @@ class PhiFourScalar:
 
     def __init__(
         self,
-        geometry,
-        ising_coefficient,
-        quadratic_coefficient,
-        quartic_coefficient,
+        geometry: Geometry2D,
+        ising_coefficient: float,
+        quadratic_coefficient: float,
+        quartic_coefficient: float,
     ):
         self.shift = geometry.get_shift()
         self.c_ising = ising_coefficient
@@ -139,40 +163,116 @@ class PhiFourScalar:
         self.c_quartic = quartic_coefficient
 
     @classmethod
-    def from_standard(cls, geometry, *, m_sq, g):
+    def from_standard(
+        cls, geometry: Geometry2D, *, m_sq: float, g: float
+    ) -> PhiFourScalar:
+        """
+        Standard parameterisation.
+
+        Parameters
+        ----------
+        m_sq
+            Bare mass squared
+        g
+            Quartic coupling constant
+        """
         return cls(geometry, -1, (4 + m_sq) / 2, g / 24)
 
     @classmethod
-    def from_bosetti2015(cls, geometry, *, beta, lam):
+    def from_bosetti2015(
+        cls, geometry: Geometry2D, *, beta: float, lam: float
+    ) -> PhiFourScalar:
+        """
+        Parameterisation used in Bosetti et al. (2015),
+        https://arxiv.org/abs/1506.08587
+
+        Parameters
+        ----------
+        beta
+            inverse temperature
+        lam
+            Quartic coupling constant
+        """
         return cls(geometry, -beta, 1 - 2 * lam, lam)
 
     @classmethod
-    def from_albergo2019(cls, geometry, *, m_sq, lam):
+    def from_albergo2019(
+        cls, geometry: Geometry2D, *, m_sq: float, lam: float
+    ) -> PhiFourScalar:
+        """
+        Parameterisation used in Albergo et al. (2019),
+        https://arxiv.org/abs/1904.12072
+
+        Parameters
+        ----------
+        m_sq
+            Bare mass squared
+        lam
+            Quartic coupling constant
+        """
         return cls(geometry, -2, 4 + m_sq, lam)
 
     @classmethod
-    def from_nicoli2020(cls, geometry, *, kappa, lam):
+    def from_nicoli2020(
+        cls, geometry: Geometry2D, *, kappa: float, lam: float
+    ) -> PhiFourScalar:
+        """
+        Parameterisation used in Nicoli et al. (2020),
+        https://arxiv.org/abs/2007.07115
+
+        Parameters
+        ----------
+        m_sq
+            Bare mass squared
+        lam
+            Quartic coupling constant
+        """
         return cls.from_bosetti2015(geometry, beta=2 * kappa, lam=lam)
 
-    def action(self, phi):
-        """Action computed for a sample of field configurations."""
+    def action(self, phi: torch.Tensor) -> torch.Tensor:
+        """Action computed for a sample of field configurations.
+
+        Parameters
+        ----------
+        phi
+            Tensor containing sample of configurations, dimensions
+            ``(sample_size, lattice_size)``
+
+        Returns
+        -------
+        torch.Tensor
+            The computed action for each configuration in the sample, dimensions
+            ``(sample_size, 1)``
+        """
         return (
             self.c_ising * (phi[:, self.shift] * phi.unsqueeze(dim=1)).sum(dim=1)
             + self.c_quadratic * phi.pow(2)
             + self.c_quartic * phi.pow(4)
         ).sum(dim=1, keepdim=True)
 
-    def log_density(self, phi):
-        """Logarithm of the un-normalized probability density, i.e. negative action,
-        for a sample of field configurations."""
+    def log_density(self, phi: torch.Tensor) -> torch.Tensor:
+        """The negative action for a sample of field configurations.
+
+        This is equal to the logarithm of the probability density up to an constant
+        arising from unknown normalisation (the partition function).
+
+        See :py:mod:`anvil.distributions.PhiFourScalar.action`
+        """
         return -self.action(phi)
 
-def gaussian(lattice_size, loc=0, sigma=1):
+
+def gaussian(lattice_size, loc: float = 0, sigma: float = 1) -> Gaussian:
+    """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
     return Gaussian(lattice_size, loc=loc, scale=sigma)
 
-def phi_four(geometry, parameterisation, couplings):
+
+def phi_four(
+    geometry, parameterisation: str, couplings: Dict[str, float]
+) -> PhiFourScalar:
+    """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
     constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
     return constructor(geometry, **couplings)
+
 
 BASE_OPTIONS = {
     "gaussian": gaussian,

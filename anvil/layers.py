@@ -44,6 +44,12 @@ as a single subclass of :py:class:`torch.nn.Module` which performs the
 full normalising flow transformation :math:`f(z)`.
 
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from anvil.utils import LayerInOut
+
 import torch
 import torch.nn as nn
 
@@ -51,20 +57,26 @@ from anvil.neural_network import DenseNeuralNetwork
 
 
 class CouplingLayer(nn.Module):
-    """
-    Base class for coupling layers.
+    r"""
+    Base class for coupling layers, inheriting from py:class:`torch.nn.Module` but
+    redefining the ``forward`` method so that the Jacobian determinant of the layers
+    are accumulated alongside the activations.
 
     A generic coupling layer takes the form
+    
+    .. math::
 
-        v^P <- v^P                  passive partition
-        v^A <- C( v^A ; {N(v^P)} )  active partition
+        v^P & \leftarrow v^P \\
+        v^A & \leftarrow C \left( v^A ; \{\mathbf{N}(v^P)\} \right)
 
-    where the |\Lambda|-dimensional input configuration or 'vector' v has been split
-    into two partitions, labelled by A and P (active and passive). Here, the paritions
-    are split according to a checkerboard (even/odd) scheme.
+    where the :math:`|\Lambda|`-dimensional input configuration :math:`v` has been split
+    into two partitions, labelled by :math:`A` and :math:`P` (active and passive).
 
-    {N(v^P)} is a set of functions of the passive partition (neural networks) that
-    parameterise the coupling layer.
+    Here, the paritions are split according to a checkerboard (even/odd) scheme, as
+    defined in :py:class:`anvil.geometry.Geometry2D`.
+
+    :math:`\{\mathbf{N}(v^P)\}` is a set of functions of the passive partition that parameterise
+    the coupling layer. These functions are to be modelled by neural networks.
 
     Parameters
     ----------
@@ -75,16 +87,6 @@ class CouplingLayer(nn.Module):
         dictates which half of the data is transformed as a and b, since
         successive affine transformations alternate which half of the data is
         passed through neural networks.
-
-    Attributes
-    ----------
-    _passive_ind: slice
-        Slice object which can be used to access the passive partition.
-    _active_ind: slice
-        Slice object which can be used to access the partition that gets transformed.
-    _join_func: function
-        Function which returns the concatenation of the two partitions in the
-        appropriate order.
     """
 
     def __init__(self, size_half: int, even_sites: bool):
@@ -105,15 +107,23 @@ class CouplingLayer(nn.Module):
 
 
 class AdditiveLayer(CouplingLayer):
-    r"""Extension to `nn.Module` for an additive coupling layer.
+    r"""Class implementing additive coupling layers.
 
     The additive transformation is given by
 
-        C( v^A ; t(v^P) ) = v^A - t(v^P)
+    .. math::
 
-    The Jacobian determinant is
+        C( v^A ; \mathbf{t}(v^P) ) = v^A - \mathbf{t}(v^P)
+
+    where :math:`\mathbf{t}` is a neural network.
+
+    The transformation is volume-preserving, i.e.
+
+    .. math::
 
         \log \det J = 0
+
+    Reference: https://arxiv.org/abs/1410.8516
     """
 
     def __init__(
@@ -135,7 +145,9 @@ class AdditiveLayer(CouplingLayer):
             bias=not z2_equivar,
         )
 
-    def forward(self, v_in, log_density, *args) -> torch.Tensor:
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
+    ) -> LayerInOut:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -149,18 +161,22 @@ class AdditiveLayer(CouplingLayer):
 
 
 class AffineLayer(CouplingLayer):
-    r"""Extension to `nn.Module` for an affine coupling layer.
+    r"""Class implementing affine coupling layers.
 
     The affine transformation is given by
 
-        C( v^A ; s(v^P), t(v^P) ) = ( v^A - t(v^P) ) * \exp( -s(v^P) )
+    .. math::
+
+        C( v^A ; \mathbf{s}(v^P), \mathbf{t}(v^P) )
+        = ( v^A - \mathbf{t}(v^P) ) * \exp( -\mathbf{s}(v^P) )
 
     The Jacobian determinant is
 
-        \log \det J = \sum_x s_x(v^P)
+    .. math::
 
-    where x are the lattice sites in the active partition.
+        \log \det J = - \sum_{x\in\Lambda^A} \mathbf{s}_x(v^P)
 
+    Reference: https://arxiv.org/abs/1605.08803
     """
 
     def __init__(
@@ -190,7 +206,9 @@ class AffineLayer(CouplingLayer):
         )
         self.z2_equivar = z2_equivar
 
-    def forward(self, v_in, log_density, *args) -> torch.Tensor:
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
+    ) -> LayerInOut:
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -212,28 +230,58 @@ class AffineLayer(CouplingLayer):
 
 
 class RationalQuadraticSplineLayer(CouplingLayer):
-    r"""A coupling transformation from a finite interval to itself based on a piecewise
-    rational quadratic spline function.
+    r"""Class implementing rational quadratic spline coupling layers.
 
-    The interval is divided into K segments (bins) with widths w_k and heights h_k. The
-    'knot points' (\phi_k, x_k) are the cumulative sum of (h_k, w_k), starting at (-B, -B)
-    and ending at (B, B).
+    The transformation maps a finite interval :math:`[-a, a]` to itself and is defined
+    by a piecewise rational quadratic spline function, with the pieces joined up at 'knots'.
 
-    In addition to the w_k and h_k, the derivatives d_k at the internal knot points are
-    generated by a neural network. d_0 and d_K are set to 1.
+    The interval is divided into :math:`K` bins with widths :math:`w^k` and heights
+    :math:`\mathbf{h}^k`. In addition to the widths and heights, the derivatives
+    :math:`\mathbf{d}^k` at the internal knots are generated by a neural network.
+    :math:`\mathbf{d}^0` and :math:`\mathbf{d}^K` are set to unity.
 
-    Defing the slopes s_k = h_k / w_k and fractional position within a bin
+    Define the slopes connecting knots
 
-            alpha(x) = (x - x_{k-1}) / w_k
+    .. math ::
 
-    the coupling transformation is defined piecewise by
+        \mathbf{s}_i^k = \frac{\mathbf{h}_i^k}{\mathbf{w}_i^k}
 
-            C(v^A, {h_k, s_k, d_k | k = 1, ..., K})
-                 = \phi_{k-1}
-                 + ( h_k(s_k * \alpha^2 + d_k * \alpha * (1 - \alpha)) )
-                 / ( s_k + (d_{k+1} + d_k - 2s_k) * \alpha * (1 - \alpha) )
+    and fractional position of the input :math:`v_{i,x}` in the :math:`\ell` -th bin
+
+    .. math::
+
+        \frac{(v_{i,x} - v_{i,x}^{\ell-1})}{\mathbf{w}_{i,x}^\ell}
+        \equiv \alpha_{i,x} \in [0, 1]
+
+    Then, the transformation is given by
+
+    .. math::
+
+        C_{i,x} ( v_{i, x} ; \mathbf{N}_{i, x}) = -a + \sum_{k=1}^{\ell-1} \mathbf{h}_{i,x}^k
+        + \frac{ \mathbf{h}_{i, x}^\ell
+        \left[ \mathbf{s}_{i,x}^\ell \alpha_{i,x}^2
+        + \mathbf{d}_{i,x}^{\ell-1} \alpha_{i,x} (1 - \alpha_{i,x}) \right] }
+        {\mathbf{s}_{i,x}^\ell + (\mathbf{d}_{i,x}^{\ell-1}
+        + \mathbf{d}_{i,x}^\ell - 2 \mathbf{s}_{i,x}^\ell) \alpha_{i,x}(1 - \alpha_{i,x})}
+
+    The gradient is
+
+    .. math::
+
+        \frac{1}{\mathbf{w}_{i,x}^\ell} \frac{d C_{i, x}}{d\alpha_{i,x}}
+        = \frac{ (\mathbf{s}_{i,x}^\ell)^2 \left[
+        \mathbf{d}_{i,x}^\ell \alpha_{i,x}^2 + 2\mathbf{s}_{i,x}^\ell
+        \alpha_{i,x}(1 - \alpha_{i,x})
+        + \mathbf{d}_{i,x}^{\ell-1} (1 - \alpha_{i,x})^2 \right]}
+        {\left[ \mathbf{s}_{i,x}^\ell
+        + (\mathbf{d}_{i,x}^{\ell-1} + \mathbf{d}_{i,x}^\ell - 2\mathbf{s}_{i,x}^\ell
+        \alpha_{i,x} (1 - \alpha_{i,x}) \right]^2}
+
+    To obtain the logarithm of the Jacobian determinant we first take the logarithm and
+    then sum over :math:`x\in\Lambda^A` .
+
+    Reference: https://arxiv.org/abs/1906.04032
     """
-    # TODO sort out indices
 
     def __init__(
         self,
@@ -264,7 +312,9 @@ class RationalQuadraticSplineLayer(CouplingLayer):
 
         self.z2_equivar = z2_equivar
 
-    def forward(self, v_in, log_density, negative_mag):
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, negative_mag: torch.Tensor
+    ) -> LayerInOut:
         """Forward pass of the rational quadratic spline layer."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -397,12 +447,14 @@ class GlobalAffineLayer(nn.Module):
         Every scaled data point will be shifted by this factor.
     """
 
-    def __init__(self, scale, shift):
+    def __init__(self, scale: float, shift: float):
         super().__init__()
         self.scale = scale
         self.shift = shift
 
-    def forward(self, v_in, log_density):
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
+    ) -> LayerInOut:
         """Forward pass of the global affine transformation."""
         return self.scale * v_in + self.shift, log_density
 
@@ -419,11 +471,11 @@ class BatchNormLayer(nn.Module):
 
             v_{\rm out} = \gamma
                 \frac{v_{\rm in} - \mathbb{E}[ v_{\rm in} ]}
-                {\sqrt{\var( v_{\rm in} ) + \epsilon}}
+                {\sqrt{\mathrm{var}( v_{\rm in} ) + \epsilon}}
 
     Parameters
     ----------
-    scale: float
+    scale
         The multiplicative factor, :math:`\gamma`, applied to the standardised data.
 
     Notes
@@ -435,11 +487,13 @@ class BatchNormLayer(nn.Module):
     a static scale parameter.
     """
 
-    def __init__(self, scale=1):
+    def __init__(self, scale: float = 1):
         super().__init__()
         self.gamma = scale
 
-    def forward(self, v_in, log_density, *args):
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
+    ) -> LayerInOut:
         """Forward pass of the batch normalisation transformation."""
         mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
@@ -453,9 +507,9 @@ class GlobalRescaling(nn.Module):
 
     Parameters
     ----------
-    scale: float
+    scale:
         The multiplicative factor applied to the inputs.
-    learnable: bool, default=True
+    learnable:
         If True, ``scale`` will be optimised during the training.
 
     Notes
@@ -468,14 +522,17 @@ class GlobalRescaling(nn.Module):
 
     """
 
-    def __init__(self, scale=1, learnable=True):
+    def __init__(self, scale: float = 1, learnable: bool = True):
         super().__init__()
 
         self.scale = torch.Tensor([scale])
         if learnable:
             self.scale = nn.Parameter(self.scale)
 
-    def forward(self, v_in, log_density, *args):
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
+    ) -> LayerInOut:
+        """Forward pass of the global rescaling layer."""
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
         return v_out, log_density
@@ -486,7 +543,7 @@ class Sequential(nn.Sequential):
     ``forward`` convention.
     """
 
-    def forward(self, v, log_density, *args):
+    def forward(self, v: torch.Tensor, log_density: torch.Tensor, *args) -> LayerInOut:
         """overrides the base class ``forward`` method to conform to our
         conventioned for expected inputs/outputs of ``forward`` methods.
         """
