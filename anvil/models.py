@@ -9,13 +9,16 @@ to produce sequences of transformations.
 
 """
 from functools import partial
+from typing import List
 
 from reportengine import collect
 
 import anvil.layers as layers
 
 
-def _coupling_block(coupling_layer, **kwargs):
+def _coupling_block(
+    coupling_layer: layers.CouplingLayer, **kwargs
+) -> layers.Sequential:
     """Helper function which wraps a pair of coupling layers from
     :py:mod:`anvil.layers` in the module container
     :py:class`anvil.layers.Sequential`. The first transformation layer acts on
@@ -32,12 +35,12 @@ def _coupling_block(coupling_layer, **kwargs):
 
 
 def real_nvp(
-    size_half,
-    n_blocks,
-    hidden_shape,
-    activation="tanh",
-    z2_equivar=True,
-):
+    size_half: int,
+    n_blocks: int,
+    hidden_shape: List[int],
+    activation: str = "tanh",
+    z2_equivar: bool = True,
+) -> layers.Sequential:
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, wrapped in the module container
     :py:class`anvil.layers.Sequential`.
@@ -48,37 +51,35 @@ def real_nvp(
 
     Parameters
     ----------
-    size_half: int
+    size_half
         Inferred from ``lattice_size``, the size of the active/passive
         partitions (which are equal size, `lattice_size / 2`).
-    n_blocks: int
+    n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
-    hidden_shape: list[int]
+    hidden_shape
         the shape of the neural networks used in the AffineLayer. The visible
         layers are defined by the ``lattice_size``. Typically we have found
         a single hidden layer neural network is effective, which can be
         specified by passing a list of length 1, i.e. ``[72]`` would
         be a single hidden layered network with 72 nodes in the hidden layer.
-    activation: str, default="tanh"
+    activation
         The activation function to use for each hidden layer. The output layer
         of the network is linear (has no activation function).
-    z2_equivar: bool, default=True
+    z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
 
     Returns
     -------
-    real_nvp: anvil.layers.Sequential
+    anvil.layers.Sequential
         A sequence of affine transformations, which we refer to as a real NVP
         (Non-volume preserving) flow.
 
     See Also
     --------
-    :py:mod:`anvil.neural_network` contains the fully connected neural network class
-    as well as valid choices for activation functions.
-
+    :py:mod:`anvil.neural_network`
     """
     blocks = [
         _coupling_block(
@@ -94,38 +95,38 @@ def real_nvp(
 
 
 def nice(
-    size_half,
-    n_blocks,
-    hidden_shape,
-    activation="tanh",
-    z2_equivar=True,
-):
+    size_half: int,
+    n_blocks: int,
+    hidden_shape: List[int],
+    activation: str = "tanh",
+    z2_equivar: bool = True,
+) -> layers.Sequential:
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
-    :py:class:`anvil.layers.AdditiveLayer`.
+    :py:class:`anvil.layers.AdditiveLayer` .
     The pairs of ``AdditiveLayer`` s act on the even and odd sites respectively.
 
     Parameters
     ----------
-    size_half: int
+    size_half
         Inferred from ``lattice_size``, the size of the active/passive
         partitions (which are equal size, `lattice_size / 2`).
-    n_blocks: int
+    n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
-    hidden_shape: list[int]
+    hidden_shape
         the shape of the neural networks used in the each layer. The visible
         layers are defined by the ``lattice_size``.
-    activation: str, default="tanh"
+    activation
         The activation function to use for each hidden layer. The output layer
         of the network is linear (has no activation function).
-    z2_equivar: bool, default=True
+    z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
 
     Returns
     -------
-    nice: anvil.layers.Sequential
+    anvil.layers.Sequential
         A sequence of additive transformations, which we refer to as a
         nice flow.
 
@@ -144,39 +145,40 @@ def nice(
 
 
 def rational_quadratic_spline(
-    size_half,
-    n_blocks,
-    hidden_shape,
-    n_segments,
-    interval=5,
-    activation="tanh",
-    z2_equivar=False,
-):
+    size_half: int,
+    n_blocks: int,
+    hidden_shape: List[int],
+    n_segments: int,
+    interval: float = 5,
+    activation: str = "tanh",
+    z2_equivar: bool = False,
+) -> layers.Sequential:
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
-    :py:class:`anvil.layers.RationalQuadraticSplineLayer` s followed by a single
+    :py:class:`anvil.layers.RationalQuadraticSplineLayer` s.
     The pairs of RQS's act on the even and odd sites respectively.
 
     Parameters
     ----------
-    size_half: int
+    size_half
         inferred from ``lattice_size``, the size of the active/passive
         partitions (which are equal size, `lattice_size / 2`).
-    n_blocks: int
+    n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations. For RQS this is set to 1.
-    hidden_shape: list[int]
+    hidden_shape
         the shape of the neural networks used in the each layer. The visible
         layers are defined by the ``lattice_size``.
-    n_segments: int
+    n_segments
         The number of segments to use in the RQS transformation.
-    interval: int, default=5
-        the interval within which the RQS applies the transformation, at present
-        if a field variable is outside of this region it is mapped to itself
+    interval
+        an integer :math:`a` denoting a symmetric interval :math:`[-a, a]`
+        within which the RQS applies the transformation. At present, if a
+        field variable is outside of this region it is mapped to itself
         (i.e the gradient of the transformation is 1 outside of the interval).
-    activation: str, default="tanh"
+    activation
         The activation function to use for each hidden layer. The output layer
         of the network is linear (has no activation function).
-    z2_equivar: bool, default=False
+    z2_equivar
         Whether or not to impose z2 equivariance. This is only done crudely
         by splitting the sites according to the sign of the sum across lattice
         sites.
@@ -197,26 +199,42 @@ def rational_quadratic_spline(
     return layers.Sequential(*blocks)
 
 
-def batch_norm(scale=1.0):
+def batch_norm(scale: float = 1.0) -> layers.Sequential:
     r"""Action which returns an instance of :py:class:`anvil.layers.BatchNormLayer`.
 
     Parameters
     ----------
-    scale: float, default=1.0
+    scale
         The multiplicative factor applied to the standardised data.
+
+    Returns
+    -------
+    anvil.layers.Sequential
+        An instance of :py:class:`anvil.layers.BatchNormLayer` wrapped by
+        :py:class:`anvil.layers.Sequential` , which is simply there to make
+        iterating over layers easier and has no effect on the transformation
+        applied to the layer inputs.
     """
     return layers.Sequential(layers.BatchNormLayer(scale=scale))
 
 
-def global_rescaling(scale, learnable=True):
+def global_rescaling(scale, learnable=True) -> layers.Sequential:
     r"""Action which returns and instance of :py:class:`anvil.layers.GlobalRescaling`.
 
     Parameters
     ----------
-    scale: float
+    scale
         The multiplicative factor applied to the inputs.
-    learnable: bool, default=True
+    learnable
         If True, ``scale`` will be optimised during the training.
+
+    Returns
+    -------
+    anvil.layers.Sequential
+        An instance of :py:class:`anvil.layers.GlobalRescaling` wrapped by
+        :py:class:`anvil.layers.Sequential` , which is simply there to make
+        iterating over layers easier and has no effect on the transformation
+        applied to the layer inputs.
     """
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
@@ -224,7 +242,7 @@ def global_rescaling(scale, learnable=True):
 _normalising_flow = collect("layer_action", ("model",))
 
 
-def model_to_load(_normalising_flow):
+def model_to_load(_normalising_flow) -> layers.Sequential:
     """action which wraps a list of layers in
     :py:class:`anvil.layers.Sequential`. This allows the user to specify an
     arbitrary combination of layers as the model.
