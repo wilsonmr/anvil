@@ -44,12 +44,6 @@ as a single subclass of :py:class:`torch.nn.Module` which performs the
 full normalising flow transformation :math:`f(z)`.
 
 """
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from anvil.utils import LayerInOut
-
 import torch
 import torch.nn as nn
 
@@ -130,7 +124,7 @@ class AdditiveLayer(CouplingLayer):
         self,
         size_half: int,
         *,
-        hidden_shape: list,
+        hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
         even_sites: bool,
@@ -147,7 +141,7 @@ class AdditiveLayer(CouplingLayer):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ) -> LayerInOut:
+    ):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -183,7 +177,7 @@ class AffineLayer(CouplingLayer):
         self,
         size_half: int,
         *,
-        hidden_shape: list,
+        hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
         even_sites: bool,
@@ -208,7 +202,7 @@ class AffineLayer(CouplingLayer):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ) -> LayerInOut:
+    ):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -288,7 +282,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
         size_half: int,
         interval: int,
         n_segments: int,
-        hidden_shape: list,
+        hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
         even_sites: bool,
@@ -314,7 +308,7 @@ class RationalQuadraticSplineLayer(CouplingLayer):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, negative_mag: torch.Tensor
-    ) -> LayerInOut:
+    ):
         """Forward pass of the rational quadratic spline layer."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -454,7 +448,7 @@ class GlobalAffineLayer(nn.Module):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ) -> LayerInOut:
+    ):
         """Forward pass of the global affine transformation."""
         return self.scale * v_in + self.shift, log_density
 
@@ -493,7 +487,7 @@ class BatchNormLayer(nn.Module):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ) -> LayerInOut:
+    ):
         """Forward pass of the batch normalisation transformation."""
         mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
@@ -531,7 +525,7 @@ class GlobalRescaling(nn.Module):
 
     def forward(
         self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ) -> LayerInOut:
+    ):
         """Forward pass of the global rescaling layer."""
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
@@ -543,7 +537,7 @@ class Sequential(nn.Sequential):
     ``forward`` convention.
     """
 
-    def forward(self, v: torch.Tensor, log_density: torch.Tensor, *args) -> LayerInOut:
+    def forward(self, v: torch.Tensor, log_density: torch.Tensor, *args):
         """overrides the base class ``forward`` method to conform to our
         conventioned for expected inputs/outputs of ``forward`` methods.
         """

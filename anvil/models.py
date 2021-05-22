@@ -9,7 +9,6 @@ to produce sequences of transformations.
 
 """
 from functools import partial
-from typing import List
 
 from reportengine import collect
 
@@ -37,7 +36,7 @@ def _coupling_block(
 def real_nvp(
     size_half: int,
     n_blocks: int,
-    hidden_shape: List[int],
+    hidden_shape: (tuple, list),
     activation: str = "tanh",
     z2_equivar: bool = True,
 ) -> layers.Sequential:
@@ -97,7 +96,7 @@ def real_nvp(
 def nice(
     size_half: int,
     n_blocks: int,
-    hidden_shape: List[int],
+    hidden_shape: (tuple, list),
     activation: str = "tanh",
     z2_equivar: bool = True,
 ) -> layers.Sequential:
@@ -147,9 +146,9 @@ def nice(
 def rational_quadratic_spline(
     size_half: int,
     n_blocks: int,
-    hidden_shape: List[int],
+    hidden_shape: (tuple, list),
     n_segments: int,
-    interval: float = 5,
+    interval: (int, float) = 5,
     activation: str = "tanh",
     z2_equivar: bool = False,
 ) -> layers.Sequential:
@@ -199,7 +198,7 @@ def rational_quadratic_spline(
     return layers.Sequential(*blocks)
 
 
-def batch_norm(scale: float = 1.0) -> layers.Sequential:
+def batch_norm(scale: (int, float) = 1.0) -> layers.Sequential:
     r"""Action which returns an instance of :py:class:`anvil.layers.BatchNormLayer`.
 
     Parameters
@@ -218,7 +217,7 @@ def batch_norm(scale: float = 1.0) -> layers.Sequential:
     return layers.Sequential(layers.BatchNormLayer(scale=scale))
 
 
-def global_rescaling(scale, learnable=True) -> layers.Sequential:
+def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequential:
     r"""Action which returns and instance of :py:class:`anvil.layers.GlobalRescaling`.
 
     Parameters

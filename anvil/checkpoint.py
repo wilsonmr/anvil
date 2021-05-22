@@ -61,7 +61,7 @@ def loaded_scheduler(
     return sched_instance
 
 
-def train_range(loaded_checkpoint, epochs):
+def train_range(loaded_checkpoint, epochs: int) -> tuple:
     """Returns tuple containing the indices of the next and last training iterations.
 
     If training from scratch, this will look like ``(0, epochs)`` where ``epochs``.

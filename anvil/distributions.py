@@ -5,13 +5,6 @@ distributions.py
 
 Module containing classes corresponding to different probability distributions.
 """
-from __future__ import annotations
-from typing import TYPE_CHECKING, Dict
-
-if TYPE_CHECKING:
-    from anvil.geometry import Geometry2D
-    from anvil.utils import LayerInOut
-
 import torch.distributions
 
 
@@ -38,7 +31,7 @@ class Gaussian(torch.distributions.Normal):
         super().__init__(loc, scale)
         self.size_out = size_out
 
-    def __call__(self, sample_size: int) -> LayerInOut:
+    def __call__(self, sample_size: int):
         """Return a sample of variables drawn from the normal distribution,
         dimensions ``(sample_size, self.size_out)``.
 
@@ -152,7 +145,7 @@ class PhiFourScalar:
 
     def __init__(
         self,
-        geometry: Geometry2D,
+        geometry,
         ising_coefficient: float,
         quadratic_coefficient: float,
         quartic_coefficient: float,
@@ -163,9 +156,7 @@ class PhiFourScalar:
         self.c_quartic = quartic_coefficient
 
     @classmethod
-    def from_standard(
-        cls, geometry: Geometry2D, *, m_sq: float, g: float
-    ) -> PhiFourScalar:
+    def from_standard(cls, geometry, *, m_sq: float, g: float):
         """
         Standard parameterisation.
 
@@ -179,9 +170,7 @@ class PhiFourScalar:
         return cls(geometry, -1, (4 + m_sq) / 2, g / 24)
 
     @classmethod
-    def from_bosetti2015(
-        cls, geometry: Geometry2D, *, beta: float, lam: float
-    ) -> PhiFourScalar:
+    def from_bosetti2015(cls, geometry, *, beta: float, lam: float):
         """
         Parameterisation used in Bosetti et al. (2015),
         https://arxiv.org/abs/1506.08587
@@ -196,9 +185,7 @@ class PhiFourScalar:
         return cls(geometry, -beta, 1 - 2 * lam, lam)
 
     @classmethod
-    def from_albergo2019(
-        cls, geometry: Geometry2D, *, m_sq: float, lam: float
-    ) -> PhiFourScalar:
+    def from_albergo2019(cls, geometry, *, m_sq: float, lam: float):
         """
         Parameterisation used in Albergo et al. (2019),
         https://arxiv.org/abs/1904.12072
@@ -213,9 +200,7 @@ class PhiFourScalar:
         return cls(geometry, -2, 4 + m_sq, lam)
 
     @classmethod
-    def from_nicoli2020(
-        cls, geometry: Geometry2D, *, kappa: float, lam: float
-    ) -> PhiFourScalar:
+    def from_nicoli2020(cls, geometry, *, kappa: float, lam: float):
         """
         Parameterisation used in Nicoli et al. (2020),
         https://arxiv.org/abs/2007.07115
@@ -261,14 +246,16 @@ class PhiFourScalar:
         return -self.action(phi)
 
 
-def gaussian(lattice_size, loc: float = 0, sigma: float = 1) -> Gaussian:
+def gaussian(lattice_size, loc: (int, float) = 0, sigma: (int, float) = 1) -> Gaussian:
     """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
     return Gaussian(lattice_size, loc=loc, scale=sigma)
 
 
 def phi_four(
-    geometry, parameterisation: str, couplings: Dict[str, float]
-) -> PhiFourScalar:
+    geometry,
+    parameterisation: str,
+    couplings: dict,
+):
     """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
     constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
     return constructor(geometry, **couplings)

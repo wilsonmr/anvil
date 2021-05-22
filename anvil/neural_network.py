@@ -7,7 +7,6 @@ Module containing neural networks which are used as part of transformation
 layers, found in :py:mod:`anvil.layers`.
 
 """
-from typing import List
 import torch
 import torch.nn as nn
 
@@ -29,7 +28,7 @@ class DenseNeuralNetwork(nn.Module):
     size_out
         Number of nodes in the output layer
     hidden_shape
-        List specifying the number of nodes in the intermediate layers
+        Tuple specifying the number of nodes in the intermediate layers
     activation
         Key representing the activation function used for each layer
         except the final one. Valid options can be found in
@@ -48,7 +47,7 @@ class DenseNeuralNetwork(nn.Module):
         self,
         size_in: int,
         size_out: int,
-        hidden_shape: List[int],
+        hidden_shape: (tuple, list),
         activation: str,
         bias: bool = True,
     ):

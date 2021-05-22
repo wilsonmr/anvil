@@ -8,9 +8,6 @@ from math import ceil
 import torch
 import sys
 import torch
-from typing import Tuple, NewType
-
-LayerInOut = NewType("LayerInOut", Tuple[torch.Tensor, torch.Tensor])
 
 
 class Multiprocessing:
@@ -19,9 +16,9 @@ class Multiprocessing:
 
     Parameters
     ----------
-    func: function/method
+    func
         the function to be executed multiple times
-    generator: function/method
+    generator
         something which, when called, returns a generator object that contains
         the parameters for the function.
 
@@ -33,7 +30,7 @@ class Multiprocessing:
 
     """
 
-    def __init__(self, func, generator, use_multiprocessing):
+    def __init__(self, func, generator, use_multiprocessing: bool):
         self.func = func
         self.generator = generator
 
@@ -46,7 +43,7 @@ class Multiprocessing:
 
         self.max_chunk = ceil(self.n_iters / self.n_cores)
 
-    def target(self, k, output_dict):
+    def target(self, k: int, output_dict: dict) -> None:
         """Function to be executed for each process."""
         generator_k = islice(
             self.generator(),
@@ -56,9 +53,8 @@ class Multiprocessing:
         i_glob = k * self.max_chunk  # global index
         for i, args in enumerate(generator_k):
             output_dict[i_glob + i] = self.func(args)
-        return
 
-    def __call__(self):
+    def __call__(self) -> dict:
         """Returns a dictionary containing the function outputs for each
         set of parameters taken from the generator. The dictionary keys are
         integers which label the order of parameter sets in the generator."""
@@ -89,7 +85,32 @@ class Multiprocessing:
         return output_dict
 
 
-def bootstrap_sample(data, bootstrap_sample_size, seed=None):
+def bootstrap_sample(data: np.ndarray, bootstrap_sample_size: int, seed=None) -> np.ndarray:
+    """Resample a provided array to generate a bootstrap sample.
+
+    The last dimension of the array will be one that is bootstrapped, and each
+    member of the bootstrap sample will have the same shape: ``data.shape`` .
+
+    The boostrap dimension will be inserted at position ``[-2]`` in the output
+    array.
+
+    Parameters
+    ----------
+    data
+        Array containing the data to be resampled.
+    bootstrap_sample_size
+        Size of the bootstrap sample, i.e. number of times to resample the data.
+    seed
+        Optional seed for the rng which generates the bootstrap indices, for
+        reproducibility purposes and to allow different terms in a single
+        expression to be passed to this function independently.
+
+    Returns
+    -------
+    np.ndarray
+        Array containing the bootstrap sample, dimensions
+        ``(*data.shape[:-1], bootstrap_sample_size, data.shape[-1])`` .
+    """
     rng = np.random.default_rng(seed=seed)
     *dims, data_size = data.shape
 
@@ -101,10 +122,10 @@ def bootstrap_sample(data, bootstrap_sample_size, seed=None):
     return np.stack(sample, axis=-2)
 
 
-def get_num_parameters(model):
-    """Return the number of trainable parameters in a model.
+def get_num_parameters(model) -> int:
+    """Returns the number of trainable parameters in a model.
 
-    Taken from github.com/bayesiains/nflows
+    Reference: github.com/bayesiains/nflows
     """
     num = 0
     for parameter in model.parameters():
@@ -112,7 +133,7 @@ def get_num_parameters(model):
     return num
 
 
-def handler(signum, frame):
+def handler(signum, frame) -> None:
     """Handles keyboard interruptions and terminations and exits in such a way that,
     if the program is currently inside a try-except-finally block, the finally clause
     will be executed."""

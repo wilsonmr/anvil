@@ -18,7 +18,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from typing import Dict
 
 from reportengine import collect
 from reportengine.figure import figure
@@ -29,7 +28,7 @@ from anvil.checks import check_trained_with_free_theory
 
 
 def free_scalar_theory(
-    couplings: Dict[str, float], lattice_length: int
+    couplings: dict, lattice_length: int
 ) -> anvil.free_scalar.FreeScalarEigenmodes:
     """Returns instance of FreeScalarEigenmodes with specific mass and lattice size."""
     # TODO: load target and extract m_sq from target.c2 - indep or parameterisation?
@@ -39,9 +38,7 @@ def free_scalar_theory(
     )
 
 
-def fourier_transform(
-    configs: torch.Tensor, training_geometry: anvil.geometry.Geometry2D
-) -> torch.Tensor:
+def fourier_transform(configs: torch.Tensor, training_geometry) -> torch.Tensor:
     """Takes the Fourier transform of a sample of field configurations.
 
     Parameters
@@ -81,7 +78,7 @@ def fourier_transform(
 
 
 def eigvals_from_sample(
-    fourier_transform: torch.Tensor, training_geometry: anvil.geometry.Geometry2D
+    fourier_transform: torch.Tensor, training_geometry
 ) -> np.ndarray:
     """Returns a prediction for the eigenvalues of the kinetic operator.
 

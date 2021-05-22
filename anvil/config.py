@@ -12,13 +12,12 @@ from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
 from anvil.geometry import Geometry2D
-from anvil.checkpoint import TrainingOutput, Checkpoint
+from anvil.checkpoint import TrainingOutput
 from anvil.models import LAYER_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
 
 from random import randint
 from sys import maxsize
-from typing import Dict, Optional
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ class ConfigParser(Config):
             raise ConfigError("Lattice size is expected to be an even number")
         return int(lattice_size / 2)
 
-    def produce_geometry(self, lattice_length: int) -> Geometry2D:
+    def produce_geometry(self, lattice_length: int):
         """Returns the geometry object defining the lattice."""
         return Geometry2D(lattice_length)
 
@@ -80,7 +79,7 @@ class ConfigParser(Config):
         """The standard deviation of a normal distribution."""
         return sigma
 
-    def parse_couplings(self, couplings: Dict[str, float]) -> Dict[str, float]:
+    def parse_couplings(self, couplings: dict) -> dict:
         """A dict containing the couplings for the target field theory."""
         return couplings  # TODO: obviously need to be more fool-proof about this
 
@@ -110,21 +109,21 @@ class ConfigParser(Config):
         return save_int
 
     @element_of("training_outputs")
-    def parse_training_output(self, path: str) -> TrainingOutput:
+    def parse_training_output(self, path: str):
         """Given a path to a training directory, returns an object that interfaces with
         this directory."""
         return TrainingOutput(path)
 
     @element_of("cp_ids")
-    def parse_cp_id(self, cp: Optional[int]) -> Optional[int]:
+    def parse_cp_id(self, cp: (int, type(None))) -> (int, None):
         return cp
 
     @element_of("checkpoints")
     def produce_checkpoint(
         self,
-        cp_id: Optional[int] = None,
-        training_output: Optional[TrainingOutput] = None,
-    ) -> Optional[Checkpoint]:
+        cp_id: (int, type(None)),
+        training_output,
+    ):
         """Attempts to return a checkpoint object extracted from a training output.
 
         - If ``cp_id == None``, no checkpoint is returned.
@@ -140,13 +139,13 @@ class ConfigParser(Config):
         # get index from training_output class
         return training_output.checkpoints[training_output.cp_ids.index(cp_id)]
 
-    def produce_training_context(self, training_output: TrainingOutput) -> dict:
+    def produce_training_context(self, training_output) -> dict:
         """Given a training output, produces the context of that training as a dict."""
         # NOTE: This seems a bit hacky, exposing the entire training configuration
         # file - hopefully doesn't cause any issues..
         return training_output.as_input()
 
-    def produce_training_geometry(self, training_context: dict) -> Geometry2D:
+    def produce_training_geometry(self, training_context: dict):
         """Produces the geometry object used in training."""
         with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
@@ -190,7 +189,7 @@ class ConfigParser(Config):
         """The number of configurations in the output sample."""
         return size
 
-    def parse_thermalization(self, therm: Optional[int]) -> Optional[int]:
+    def parse_thermalization(self, therm: (int, type(None))) -> (int, type(None)):
         """A number of Markov chain steps to be discarded before beginning to select
         configurations for the output sample."""
         if therm is None:
@@ -202,7 +201,7 @@ class ConfigParser(Config):
             )
         return therm
 
-    def parse_sample_interval(self, interval: Optional[int]) -> Optional[int]:
+    def parse_sample_interval(self, interval: (int, type(None))) -> (int, type(None)):
         """A number of Markov chain steps to discard between configurations that are
         selected for the output sample.
 
@@ -225,7 +224,7 @@ class ConfigParser(Config):
         log.warning(f"Using user specified bootstrap sample size: {n_boot}")
         return n_boot
 
-    def produce_bootstrap_seed(self, manual_bootstrap_seed: Optional[int] = None):
+    def produce_bootstrap_seed(self, manual_bootstrap_seed: (int, None) = None) -> int:
         """Optional seed for the random number generator which generates the bootstrap
         sample, for the purpose of reproducibility."""
         if manual_bootstrap_seed is None:

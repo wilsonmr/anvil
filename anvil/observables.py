@@ -3,12 +3,6 @@
 """
 observables.py
 """
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from anvil.geometry import Geometry2D
-
 import numpy as np
 import scipy.signal, scipy.optimize
 import scipy.optimize as optim
@@ -231,7 +225,7 @@ def _two_point_correlator(
 
 def two_point_correlator(
     configs: np.ndarray,
-    training_geometry: Geometry2D,
+    training_geometry,
     bootstrap_sample_size: int,
     bootstrap_seed: int,
     use_multiprocessing: bool,
