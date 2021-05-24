@@ -62,7 +62,8 @@ def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
     """Tabulate the correlation length and magnetization estimates resulting from the
     fitting of a cosh to the correlation function.
     
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -93,7 +94,8 @@ def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
 def table_two_point_scalars(ising_energy, susceptibility):
     """Table of scalar observables derived from the two point correlation function.
     
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -127,7 +129,8 @@ def table_two_point_scalars(ising_energy, susceptibility):
 def table_magnetization(abs_magnetization_sq, magnetic_susceptibility):
     """Table containing quantities derived from the sample-averaged magnetization.
 
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -169,7 +172,8 @@ def table_correlation_length(
 ):
     """Table containing four estimates of correlation length.
 
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Also displays the number of correlation lengths that can fit on the lattice, i.e.
     :math:`\xi / L` where :math:`\xi` is the correlation length and :math:`L` is the
@@ -238,7 +242,8 @@ def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     """Table containing values of the two point correlation function in time-momentum
     representation at zero momentum, for each separation.
 
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -273,7 +278,8 @@ def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
 def table_effective_pole_mass(effective_pole_mass, training_geometry):
     """Table containing values of the effective pole mass for each separation.
 
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -308,7 +314,8 @@ def table_two_point_correlator(two_point_correlator, training_geometry):
     """Table containing values of the two point correlation function for each
     two-dimensional separation.
 
-    Values and errors are means and standard deviations over a bootstrap ensemble.
+    Values and errors are means and standard deviations over a bootstrap ensemble
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------

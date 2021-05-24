@@ -31,7 +31,8 @@ def plot_zero_momentum_correlator(
     referred to as the two point correlator at zero spatial momentum, as a function of
     time.
 
-    Points and errorbars are means and standard deviations across a boostrap ensemble.
+    Points and errorbars are means and standard deviations across a boostrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Optionally plots a :math:`1\sigma` confidence interval for a pure-exponential (cosh)
     fit performed for each member of the bootstrap sample in
@@ -104,7 +105,8 @@ def plot_zero_momentum_correlator(
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     """Plots the (effective) pole mass as a function of 'time' separation.
     
-    Points and errorbars are means and standard deviations across a boostrap ensemble.
+    Points and errorbars are means and standard deviations across a boostrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
 
     Parameters
     ----------
@@ -149,7 +151,8 @@ def plot_correlation_length(
             :py:func:`effective_pole_mass` (evaluated at each separation, :math:`x_2`. 
         3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
 
-    Points and errorbars are means and standard deviations across a boostrap ensemble.
+    Points and errorbars are means and standard deviations across a boostrap ensemble,
+    which is assumed to be the last (``-1``) dimension of input arrays.
     
     Parameters
     ----------
@@ -223,6 +226,8 @@ def plot_two_point_correlator(two_point_correlator):
     normalised so that :math:`G(0, 0) = 1`. The colour axis is scaled using a symmetric
     log scale, with a linear region spanning :math:`[-0.01, 0.01]`.
     
+    The bootstrap dimension is assumed to be the last (``-1``) dimension of input arrays.
+    
     Parameters
     ----------
     two_point_correlator
@@ -270,6 +275,8 @@ def plot_two_point_correlator_error(two_point_correlator):
     The error is computed as the standard deviation over the bootstrap sample. The
     data shown is this error divided by the mean of the bootstrap sample, i.e. the
     fractional error.
+    
+    The bootstrap dimension is assumed to be the last (``-1``) dimension of input arrays.
     
     Parameters
     ----------
