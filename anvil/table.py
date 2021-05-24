@@ -15,11 +15,11 @@ from reportengine.table import table
 @table
 def table_autocorrelation(
     magnetization_integrated_autocorr,
-    magnetization_optimal_window,
-    tau_chain,
-    acceptance,
+    magnetization_optimal_window: int,
+    tau_chain: float,
+    acceptance: float,
 ):
-    """
+    r"""
     Tabulate some information related to the statistical efficiency of the Metropolis-
     Hastings sampling phase.
 
@@ -45,6 +45,7 @@ def table_autocorrelation(
 
     See Also
     --------
+    :py:func:`anvil.observables.optimal_window`
     :py:func:`anvil.sample.calc_tau_chain`
     """
     tau_mag = magnetization_integrated_autocorr[magnetization_optimal_window]
@@ -59,7 +60,7 @@ def table_autocorrelation(
 
 @table
 def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
-    """Tabulate the correlation length and magnetization estimates resulting from the
+    r"""Tabulate the correlation length and magnetization estimates resulting from the
     fitting of a cosh to the correlation function.
     
     Values and errors are means and standard deviations over a bootstrap ensemble,
@@ -92,7 +93,7 @@ def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
 
 @table
 def table_two_point_scalars(ising_energy, susceptibility):
-    """Table of scalar observables derived from the two point correlation function.
+    r"""Table of scalar observables derived from the two point correlation function.
     
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
@@ -127,7 +128,7 @@ def table_two_point_scalars(ising_energy, susceptibility):
 
 @table
 def table_magnetization(abs_magnetization_sq, magnetic_susceptibility):
-    """Table containing quantities derived from the sample-averaged magnetization.
+    r"""Table containing quantities derived from the sample-averaged magnetization.
 
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
@@ -170,7 +171,7 @@ def table_correlation_length(
     correlation_length_from_fit,
     training_geometry,
 ):
-    """Table containing four estimates of correlation length.
+    r"""Table containing four estimates of correlation length.
 
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
@@ -239,7 +240,7 @@ def table_correlation_length(
 
 @table
 def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
-    """Table containing values of the two point correlation function in time-momentum
+    r"""Table containing values of the two point correlation function in time-momentum
     representation at zero momentum, for each separation.
 
     Values and errors are means and standard deviations over a bootstrap ensemble,
@@ -276,7 +277,7 @@ def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
 
 @table
 def table_effective_pole_mass(effective_pole_mass, training_geometry):
-    """Table containing values of the effective pole mass for each separation.
+    r"""Table containing values of the effective pole mass for each separation.
 
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
@@ -311,7 +312,7 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry):
 
 @table
 def table_two_point_correlator(two_point_correlator, training_geometry):
-    """Table containing values of the two point correlation function for each
+    r"""Table containing values of the two point correlation function for each
     two-dimensional separation.
 
     Values and errors are means and standard deviations over a bootstrap ensemble

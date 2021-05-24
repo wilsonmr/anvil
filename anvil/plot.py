@@ -24,8 +24,8 @@ def plot_zero_momentum_correlator(
     zero_momentum_correlator,
     training_geometry,
     fit_zero_momentum_correlator,
-    cosh_fit_window,
-    plot_cosh_fit=True,
+    cosh_fit_window: type(slice),
+    plot_cosh_fit: bool = True,
 ):
     r"""Plots the correlation function for pairs of one-dimensional 'slices', otherwise
     referred to as the two point correlator at zero spatial momentum, as a function of
@@ -103,7 +103,7 @@ def plot_zero_momentum_correlator(
 
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
-    """Plots the (effective) pole mass as a function of 'time' separation.
+    r"""Plots the (effective) pole mass as a function of 'time' separation.
     
     Points and errorbars are means and standard deviations across a boostrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
@@ -142,7 +142,7 @@ def plot_correlation_length(
     low_momentum_correlation_length,
     correlation_length_from_fit,
 ):
-    """Plots three estimates of correlation length.
+    r"""Plots three estimates of correlation length.
     
     These are:
         1. Estimate from fitting a cosh function to the correlation between
@@ -220,7 +220,7 @@ def plot_correlation_length(
 
 @figure
 def plot_two_point_correlator(two_point_correlator):
-    """Represents the two point correlator as a heatmap.
+    r"""Represents the two point correlator as a heatmap.
 
     The data shown is the mean of a bootstrap sample of correlation functions, and is
     normalised so that :math:`G(0, 0) = 1`. The colour axis is scaled using a symmetric
@@ -270,7 +270,7 @@ def plot_two_point_correlator(two_point_correlator):
 
 @figure
 def plot_two_point_correlator_error(two_point_correlator):
-    """Heatmap of the error in the two point correlator for each separation.
+    r"""Heatmap of the error in the two point correlator for each separation.
 
     The error is computed as the standard deviation over the bootstrap sample. The
     data shown is this error divided by the mean of the bootstrap sample, i.e. the
@@ -320,7 +320,7 @@ def plot_two_point_correlator_error(two_point_correlator):
 
 @figure
 def plot_magnetization(magnetization_series):
-    """Plots a histogram of the magnetization of each configuration in the Markov
+    r"""Plots a histogram of the magnetization of each configuration in the Markov
     chain resulting from the Metropolis-Hastings sampling phase.
 
     Parameters
@@ -348,7 +348,7 @@ def plot_magnetization(magnetization_series):
 
 @figure
 def plot_magnetization_series(magnetization_series, sample_interval):
-    """Plots the magnetization of each configuration in the Markov chain over the
+    r"""Plots the magnetization of each configuration in the Markov chain over the
     course of the Metropolis-Hastings sampling phase.
     
     Parameters
@@ -393,9 +393,9 @@ def plot_magnetization_series(magnetization_series, sample_interval):
 
 @figure
 def plot_magnetization_autocorr(
-    magnetization_autocorr, magnetization_optimal_window, sample_interval
+        magnetization_autocorr, magnetization_optimal_window: int, sample_interval: int
 ):
-    """Plots the autocorrelation function for the magnetization of the sequence of
+    r"""Plots the autocorrelation function for the magnetization of the sequence of
     configurations generated in the Metropolis-Hastings sampling phase.
 
     The x-axis corresponds to a number of steps separating pairs of configurations
@@ -419,6 +419,7 @@ def plot_magnetization_autocorr(
 
     See also
     --------
+    :py:func:`anvil.observables.optimal_window`
     :py:func:`anvil.plot.plot_magnetization_integrated_autocorr`.
     """
     cut = max(10, 2 * magnetization_optimal_window)
@@ -458,10 +459,10 @@ def plot_magnetization_autocorr(
 @figure
 def plot_magnetization_integrated_autocorr(
     magnetization_integrated_autocorr,
-    magnetization_optimal_window,
-    sample_interval,
+    magnetization_optimal_window: int,
+    sample_interval: int,
 ):
-    """Plots the integrated autocorrelation function for the magnetization of the
+    r"""Plots the integrated autocorrelation function for the magnetization of the
     sequence of configurations generated in the Metropolis-Hastings sampling phase.
     
     The x axis represents the size of the 'window' in which the summation is performed,
@@ -486,6 +487,7 @@ def plot_magnetization_integrated_autocorr(
 
     See also
     --------
+    :py:func:`anvil.observables.optimal_window`
     :py:func:`anvil.plot.plot_magnetization_autocorr`.
     """
     cut = max(10, 2 * np.max(magnetization_optimal_window))
