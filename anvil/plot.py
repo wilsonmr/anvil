@@ -35,6 +35,30 @@ def plot_zero_momentum_correlator(
     Optionally plots a :math:`1\sigma` confidence interval for a pure-exponential (cosh)
     fit performed for each member of the bootstrap sample in
     :py:func:`fit_zero_momentum_correlator`.
+
+    Parameters
+    ---------
+    zero_momentum_correlator
+        Array containing bootstrapped correlation function
+    training_geometry
+        Geometry object defining the lattice
+    fit_zero_momentum_correlator
+        The parameters resulting from a least-squares fit of a cosh function to the
+        correlator
+    cosh_fit_window
+        Slice object which indexes the lattice separations that were used to perform
+        the cosh fit to the correlation function
+    plot_cosh_fit
+        If False, only plot the correlation function, and not the result of the fit
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See Also
+    --------
+    :py:func:`anvil.observables.zero_momentum_correlator`
+    :py:func:`anvil.observables.fit_zero_momentum_correlator`
     """
     fig, ax = plt.subplots()
 
@@ -80,6 +104,22 @@ def plot_zero_momentum_correlator(
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     """Plots the (effective) pole mass as a function of 'time' separation. Points and
     error bars are means and standard deviations across a bootstrap sample.
+
+    Parameters
+    ----------
+    training_geometry
+        Geometry object defining the lattice.
+    effective_pole_mass
+        Array containing bootstrap ensemble of effective pole mass, for each
+        separation :math:`t = 1, \ldots, T - 1`
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See Also
+    --------
+    :py:func:`anvil.observables.effective_pole_mass`
     """
     fig, ax = plt.subplots()
     ax.errorbar(
@@ -99,19 +139,39 @@ def plot_correlation_length(
     low_momentum_correlation_length,
     correlation_length_from_fit,
 ):
-    """Plots three estimates of correlation length.
+    """Plots three estimates of correlation length. Points and error bars are means
+    and standard deviations taken across a bootstrap ensemble.
 
     These are:
         1. Estimate from fitting a cosh function to the correlation between
             1-dimensional slices, using py:func:`correlation_length_from_fit`
         2. Reciprocal of the effective pole mass estimator, using
-            :py:func:`effective_pole_mass`
+            :py:func:`effective_pole_mass` (evaluated at each separation, :math:`x_2`. 
         3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
 
-    2. is evaluated at a specific value of the separation, x_2.
+    
+    Parameters
+    ----------
+    effective_pole_mass
+        Array containing estimate of the effective pole mass, for each separation
+        and each member of the bootstrap ensemble
+    low_momentum_correlation_length
+        Array containing a low-momentum estimate of the correlation length for
+        each member of the bootstrap ensemble.
+    correlation_length_from_fit
+        Array containing an estimate of the correlation length from a cosh fit
+        to the correlation function, for each member of the bootstrap
+        ensemble.
 
-    Points and error bars are means and standard deviations taken across a bootstrap
-    sample.
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See Also
+    --------
+    :py:func:`anvil.observables.effective_pole_mass`
+    :py:func:`anvil.observables.low_momentum_correlation_length`
+    :py:func:`anvil.observables.fit_zero_momentum_correlator`
     """
     xi_arcosh = np.reciprocal(effective_pole_mass)
 
@@ -157,10 +217,26 @@ def plot_correlation_length(
 
 @figure
 def plot_two_point_correlator(two_point_correlator):
-    """Represents the two point correlator as a heatmap. The data shown is the mean
-    of a bootstrap sample of correlation functions, and is normalised so that
-    G(0, 0) = 1. The colour axis is scaled using a symmetric log scale, with a linear
-    region spanning [-0.01, 0.01].
+    """Represents the two point correlator as a heatmap.
+
+    The data shown is the mean of a bootstrap sample of correlation functions, and is
+    normalised so that :math:`G(0, 0) = 1`. The colour axis is scaled using a symmetric
+    log scale, with a linear region spanning :math:`[-0.01, 0.01]`.
+    
+    Parameters
+    ----------
+    two_point_correlator
+        Array containing two point correlation function for each two-dimensional
+        separation :math:`(x_1, x_2)`, for each member of a bootstrap ensemble.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See Also
+    --------
+    :py:func:`anvil.observables.two_point_correlator`
+    :py:func:`anvil.plot.plot_two_point_correlator_error`
     """
     corr = two_point_correlator.mean(axis=-1)
     corr /= corr[0, 0]
@@ -189,10 +265,26 @@ def plot_two_point_correlator(two_point_correlator):
 
 @figure
 def plot_two_point_correlator_error(two_point_correlator):
-    """Heatmap of the error in the two point correlator for each separation (x_1, x_2).
-    The error is computed as the standard deviation over the bootstrap sample. The data
-    shown is this error divided by the mean of the bootstrap sample, i.e. the
+    """Heatmap of the error in the two point correlator for each separation.
+
+    The error is computed as the standard deviation over the bootstrap sample. The
+    data shown is this error divided by the mean of the bootstrap sample, i.e. the
     fractional error.
+    
+    Parameters
+    ----------
+    two_point_correlator
+        Array containing two point correlation function for each two-dimensional
+        separation :math:`(x_1, x_2)`, for each member of a bootstrap ensemble.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See Also
+    --------
+    :py:func:`anvil.observables.two_point_correlator`
+    :py:func:`anvil.plot.plot_two_point_correlator`
     """
     corr = two_point_correlator.mean(axis=-1)
     error = two_point_correlator.std(axis=-1)
@@ -224,10 +316,19 @@ def plot_magnetization(magnetization_series):
     """Plots a histogram of the magnetization of each configuration in the Markov
     chain resulting from the Metropolis-Hastings sampling phase.
 
+    Parameters
+    ----------
+    magnetization_series
+        Array containing the magnetization for each configuration in the output
+        sample from the Metropolis-Hastings sampling phase.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
     See also
     --------
-    :py:func:`plot_magnetization_series` displays the same data as a sequence,
-    i.e. in order of their appearance in the Markov chain.
+    :py:func:`plot_magnetization_series`
     """
     fig, ax = plt.subplots()
     ax.set_title("Magnetization")
@@ -241,10 +342,23 @@ def plot_magnetization(magnetization_series):
 def plot_magnetization_series(magnetization_series, sample_interval):
     """Plots the magnetization of each configuration in the Markov chain over the
     course of the Metropolis-Hastings sampling phase.
+    
+    Parameters
+    ----------
+    magnetization_series
+        Array containing the magnetization for each configuration in the output
+        sample from the Metropolis-Hastings sampling phase.
+    sample_interval
+        The number of Metropolis updates which were discarded between each
+        configuration appearing in the input series.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
 
     See also
     --------
-    :py:func:`plot_magnetization` displays the same data as a histogram.
+    :py:func:`plot_magnetization`.
     """
     n_rows = 5
     if magnetization_series.size % n_rows != 0:
@@ -273,9 +387,32 @@ def plot_magnetization_autocorr(
     magnetization_autocorr, magnetization_optimal_window, sample_interval
 ):
     """Plots the autocorrelation function for the magnetization of the sequence of
-    configurations generated in the Metropolis-Hastings sampling phase. The x-axis
-    corresponds to a number of steps separating pairs of configurations in the
-    sequence.
+    configurations generated in the Metropolis-Hastings sampling phase.
+
+    The x-axis corresponds to a number of steps separating pairs of configurations
+    in the sequence.
+    
+    Parameters
+    ----------
+    magnetization_autocorr
+        Array containing the autocorrelation function of the magnetization for each
+        configuration in the output sample from the Metropolis-Hastings sampling phase.
+    magnetization_optimal_window
+        The size of the window in which the integrated autocorrelation time is to be
+        computed such that the total error is minimized.
+    sample_interval
+        The number of Metropolis updates which were discarded between each
+        configuration appearing in the input series.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See also
+    --------
+    :py:func:`anvil.observables.magnetization_autocorr`
+    :py:func:`anvil.observables.magnetization_optimal_window`
+    :py:func:`anvil.plot.plot_magnetization_integrated_autocorr`.
     """
     cut = max(10, 2 * magnetization_optimal_window)
     chain_indices = np.arange(cut) * sample_interval
@@ -319,8 +456,32 @@ def plot_magnetization_integrated_autocorr(
 ):
     """Plots the integrated autocorrelation function for the magnetization of the
     sequence of configurations generated in the Metropolis-Hastings sampling phase.
+    
     The x axis represents the size of the 'window' in which the summation is performed,
     i.e. the point at which the autocorrelation function is truncated.
+    
+    Parameters
+    ----------
+    magnetization_integrated_autocorr
+        Array containing the cumulative sum of the autocorrelation function of the
+        magnetization for each configuration in the output sample from the Metropolis-
+        Hastings sampling phase.
+    magnetization_optimal_window
+        The size of the window in which the integrated autocorrelation time is to be
+        computed such that the total error is minimized.
+    sample_interval
+        The number of Metropolis updates which were discarded between each
+        configuration appearing in the input series.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    See also
+    --------
+    :py:func:`anvil.observables.magnetization_integrated_autocorr`
+    :py:func:`anvil.observables.magnetization_optimal_window`
+    :py:func:`anvil.plot.plot_magnetization_autocorr`.
     """
     cut = max(10, 2 * np.max(magnetization_optimal_window))
     chain_indices = np.arange(cut) * sample_interval
