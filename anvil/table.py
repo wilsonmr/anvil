@@ -19,6 +19,34 @@ def table_autocorrelation(
     tau_chain,
     acceptance,
 ):
+    """
+    Tabulate some information related to the statistical efficiency of the Metropolis-
+    Hastings sampling phase.
+
+    Parameters
+    ----------
+    magnetization_integrated_autocorr
+        Array containing the cumulative sum of the autocorrelation function of the
+        magnetization for each configuration in the sample output by the Metropolis-
+        Hastings sampling phase.
+    magnetization_optimal_window
+        Integer corresponding to a window size in which the autocorrelation function
+        should be summed, such that the resulting estimate of the integrated
+        autocorrelation has the smallest possible total error.
+    tau_chain
+        Estimate of the integrated autocorrelation using the accept-reject statistics
+        of the sampling phase.
+    acceptance
+        Fraction of proposals which were accepted in the sampling phase.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.sample.calc_tau_chain`
+    """
     tau_mag = magnetization_integrated_autocorr[magnetization_optimal_window]
 
     df = pd.DataFrame(
@@ -31,6 +59,24 @@ def table_autocorrelation(
 
 @table
 def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
+    """Tabulate the correlation length and magnetization estimates resulting from the
+    fitting of a cosh to the correlation function.
+    
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    correlation_length_from_fit
+    abs_magnetization_sq_from_fit
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.observables.fit_zero_momentum_correlator`
+    """
     res = [
         [correlation_length_from_fit.mean(), correlation_length_from_fit.std()],
         [abs_magnetization_sq_from_fit.mean(), abs_magnetization_sq_from_fit.std()],
@@ -45,8 +91,25 @@ def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
 
 @table
 def table_two_point_scalars(ising_energy, susceptibility):
-    """Table of the ising observables, with mean and standard deviation taken
-    across boostrap samples
+    """Table of scalar observables derived from the two point correlation function.
+    
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    ising_energy
+        Nearest-neighbour iteraction energy.
+    susceptibility
+        Magnetic susceptibility defined by the sum of the correlation function.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.observables.ising_energy`
+    :py:func:`anvil.observables.susceptibility`
     """
     res = [
         [ising_energy.mean(), ising_energy.std()],
@@ -62,6 +125,28 @@ def table_two_point_scalars(ising_energy, susceptibility):
 
 @table
 def table_magnetization(abs_magnetization_sq, magnetic_susceptibility):
+    """Table containing quantities derived from the sample-averaged magnetization.
+
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    abs_magnetization_sq
+        Array containing the sample mean of the absolute magnetization, squared, for each
+        member of the bootstrap ensemble.
+    magnetic_susceptibility
+        Array containing the susceptibility for each member of the bootstrap ensemble.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.tables.table_two_point_scalars`
+    :py:func:`anvil.tables.table_fit`
+    """
+
     res = [
         [abs_magnetization_sq.mean(), abs_magnetization_sq.std()],
         [magnetic_susceptibility.mean(), magnetic_susceptibility.std()],
@@ -82,8 +167,39 @@ def table_correlation_length(
     correlation_length_from_fit,
     training_geometry,
 ):
-    """Tabulate four estimates of correlation length, with values and errors
-    taken as the mean and standard deviation of the bootstrap sample.
+    """Table containing four estimates of correlation length.
+
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Also displays the number of correlation lengths that can fit on the lattice, i.e.
+    :math:`\xi / L` where :math:`\xi` is the correlation length and :math:`L` is the
+    linear extent of the lattice.
+
+    Parameters
+    ----------
+    effective_pole_mass
+        Array containing estimate of the effective pole mass, for each separation
+        and each member of the bootstrap ensemble
+    second_moment_correlation_length
+        Estimate of the correlation length based on the second moment of the
+        two point correlation function, for each member of the bootstrap ensemble.
+    low_momentum_correlation_length
+        Array containing a low-momentum estimate of the correlation length for each
+        member of the bootstrap ensemble.
+    correlation_length_from_fit
+        Array containing an estimate of the correlation length from a cosh fit to
+        the correlation function, for each member of the bootstrap ensemble.
+    training_geometry
+        Geometry object defining the lattice.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.observables.fit_zero_momentum_correlator`
+    :py:func:`anvil.plot.plot_correlation_length`
     """
     # Take the mean of the arcosh estimator over "large" separations
     x0 = training_geometry.length // 4
@@ -119,8 +235,26 @@ def table_correlation_length(
 
 @table
 def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
-    """Table of zero_momentum_correlator, with mean and standard deviation
-    from bootstrap
+    """Table containing values of the two point correlation function in time-momentum
+    representation at zero momentum, for each separation.
+
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    zero_momentum_correlator
+        Array containing the correlation function for each 1-d separation, for each
+        member of the bootstrap ensemble.
+    training_geometry
+        Geometry object defining the lattice.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.plot.plot_zero_momentum_correlator`
     """
     means = zero_momentum_correlator.mean(axis=-1)[:, np.newaxis]
     stds = zero_momentum_correlator.std(axis=-1)[:, np.newaxis]
@@ -137,8 +271,25 @@ def table_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
 
 @table
 def table_effective_pole_mass(effective_pole_mass, training_geometry):
-    """Table of effective_pole_mass, with mean and standard deviation
-    from bootstrap
+    """Table containing values of the effective pole mass for each separation.
+
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    effective_pole_mass
+        Array containing the effective pole mass for each separation, for each
+        member of the bootstrap ensemble.
+    training_geometry
+        Geometry object defining the lattice.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.plot.plot_effective_pole_mass`
     """
     means = effective_pole_mass.mean(axis=-1)[:, np.newaxis]
     stds = effective_pole_mass.std(axis=-1)[:, np.newaxis]
@@ -153,9 +304,28 @@ def table_effective_pole_mass(effective_pole_mass, training_geometry):
 
 
 @table
-def table_two_point_correlator(training_geometry, two_point_correlator):
-    """For each x and t, tabulate the mean and standard deviation of the two
-    point function, estimated from bootstrap sample
+def table_two_point_correlator(two_point_correlator, training_geometry):
+    """Table containing values of the two point correlation function for each
+    two-dimensional separation.
+
+    Values and errors are means and standard deviations over a bootstrap ensemble.
+
+    Parameters
+    ----------
+    two_point_correlator
+        Array containing the correlation function for each 2-d separation, for each
+        member of the bootstrap ensemble.
+    training_geometry
+        Geometry object defining the lattice.
+
+    Returns
+    -------
+    pandas.core.frame.DataFrame
+
+    See Also
+    --------
+    :py:func:`anvil.plot.plot_two_point_correlator`
+    :py:func:`anvil.plot.plot_two_point_correlator_error`
     """
     corr = []
     index = []

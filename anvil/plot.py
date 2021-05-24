@@ -29,8 +29,9 @@ def plot_zero_momentum_correlator(
 ):
     r"""Plots the correlation function for pairs of one-dimensional 'slices', otherwise
     referred to as the two point correlator at zero spatial momentum, as a function of
-    time. Points and errorbars are means and standard deviations across a boostrap
-    sample.
+    time.
+
+    Points and errorbars are means and standard deviations across a boostrap ensemble.
 
     Optionally plots a :math:`1\sigma` confidence interval for a pure-exponential (cosh)
     fit performed for each member of the bootstrap sample in
@@ -57,8 +58,7 @@ def plot_zero_momentum_correlator(
 
     See Also
     --------
-    :py:func:`anvil.observables.zero_momentum_correlator`
-    :py:func:`anvil.observables.fit_zero_momentum_correlator`
+    :py:func:`anvil.table.table_zero_momentum_correlator`
     """
     fig, ax = plt.subplots()
 
@@ -102,8 +102,9 @@ def plot_zero_momentum_correlator(
 
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
-    """Plots the (effective) pole mass as a function of 'time' separation. Points and
-    error bars are means and standard deviations across a bootstrap sample.
+    """Plots the (effective) pole mass as a function of 'time' separation.
+    
+    Points and errorbars are means and standard deviations across a boostrap ensemble.
 
     Parameters
     ----------
@@ -119,7 +120,7 @@ def plot_effective_pole_mass(training_geometry, effective_pole_mass):
 
     See Also
     --------
-    :py:func:`anvil.observables.effective_pole_mass`
+    :py:func:`anvil.table.table_effective_pole_mass`
     """
     fig, ax = plt.subplots()
     ax.errorbar(
@@ -139,9 +140,8 @@ def plot_correlation_length(
     low_momentum_correlation_length,
     correlation_length_from_fit,
 ):
-    """Plots three estimates of correlation length. Points and error bars are means
-    and standard deviations taken across a bootstrap ensemble.
-
+    """Plots three estimates of correlation length.
+    
     These are:
         1. Estimate from fitting a cosh function to the correlation between
             1-dimensional slices, using py:func:`correlation_length_from_fit`
@@ -149,6 +149,7 @@ def plot_correlation_length(
             :py:func:`effective_pole_mass` (evaluated at each separation, :math:`x_2`. 
         3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
 
+    Points and errorbars are means and standard deviations across a boostrap ensemble.
     
     Parameters
     ----------
@@ -169,9 +170,8 @@ def plot_correlation_length(
 
     See Also
     --------
-    :py:func:`anvil.observables.effective_pole_mass`
-    :py:func:`anvil.observables.low_momentum_correlation_length`
     :py:func:`anvil.observables.fit_zero_momentum_correlator`
+    :py:func:`anvil.table.table_correlation_length`
     """
     xi_arcosh = np.reciprocal(effective_pole_mass)
 
@@ -235,8 +235,8 @@ def plot_two_point_correlator(two_point_correlator):
 
     See Also
     --------
-    :py:func:`anvil.observables.two_point_correlator`
     :py:func:`anvil.plot.plot_two_point_correlator_error`
+    :py:func:`anvil.table.table_two_point_correlator`
     """
     corr = two_point_correlator.mean(axis=-1)
     corr /= corr[0, 0]
@@ -283,8 +283,8 @@ def plot_two_point_correlator_error(two_point_correlator):
 
     See Also
     --------
-    :py:func:`anvil.observables.two_point_correlator`
     :py:func:`anvil.plot.plot_two_point_correlator`
+    :py:func:`anvil.table.table_two_point_correlator`
     """
     corr = two_point_correlator.mean(axis=-1)
     error = two_point_correlator.std(axis=-1)
@@ -328,7 +328,8 @@ def plot_magnetization(magnetization_series):
 
     See also
     --------
-    :py:func:`plot_magnetization_series`
+    :py:func:`anvil.plot.plot_magnetization_series`
+    :py:func:`anvil.table.table_magnetization`
     """
     fig, ax = plt.subplots()
     ax.set_title("Magnetization")
@@ -358,7 +359,8 @@ def plot_magnetization_series(magnetization_series, sample_interval):
 
     See also
     --------
-    :py:func:`plot_magnetization`.
+    :py:func:`anvil.plot.plot_magnetization`.
+    :py:func:`anvil.table.table_magnetization`
     """
     n_rows = 5
     if magnetization_series.size % n_rows != 0:
@@ -410,8 +412,6 @@ def plot_magnetization_autocorr(
 
     See also
     --------
-    :py:func:`anvil.observables.magnetization_autocorr`
-    :py:func:`anvil.observables.magnetization_optimal_window`
     :py:func:`anvil.plot.plot_magnetization_integrated_autocorr`.
     """
     cut = max(10, 2 * magnetization_optimal_window)
@@ -479,8 +479,6 @@ def plot_magnetization_integrated_autocorr(
 
     See also
     --------
-    :py:func:`anvil.observables.magnetization_integrated_autocorr`
-    :py:func:`anvil.observables.magnetization_optimal_window`
     :py:func:`anvil.plot.plot_magnetization_autocorr`.
     """
     cut = max(10, 2 * np.max(magnetization_optimal_window))
