@@ -170,10 +170,15 @@ sample variance with the theory prediction.</p>
 is made so that we don’t get unexpected results</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.checkpoint.Checkpoint">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.checkpoint.</span></span><span class="sig-name descname"><span class="pre">Checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.Checkpoint" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.checkpoint.</span></span><span class="sig-name descname"><span class="pre">Checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.Checkpoint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Class which saves and loads checkpoints and allows checkpoints to be
 sorted</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.checkpoint.Checkpoint.load">
 <span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.Checkpoint.load" title="Permalink to this definition">¶</a></dt>
@@ -196,10 +201,15 @@ sorted</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.checkpoint.TrainingOutput">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.checkpoint.</span></span><span class="sig-name descname"><span class="pre">TrainingOutput</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.TrainingOutput" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.checkpoint.</span></span><span class="sig-name descname"><span class="pre">TrainingOutput</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.TrainingOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Class which acts as container for training output, which is a directory
 containing training configuration, checkpoints and training logs</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.checkpoint.TrainingOutput.as_input">
 <span class="sig-name descname"><span class="pre">as_input</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#anvil.checkpoint.TrainingOutput.as_input" title="Permalink to this definition">¶</a></dt>
@@ -279,131 +289,236 @@ phi^4 means that lambda = 0</p>
 objects</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_bootstrap_sample_size">
-<span class="sig-name descname"><span class="pre">parse_bootstrap_sample_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_boot</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_bootstrap_sample_size" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_bootstrap_sample_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_boot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_bootstrap_sample_size" title="Permalink to this definition">¶</a></dt>
 <dd><p>Size of the bootstrap sample.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>n_boot</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_checkpoints">
-<span class="sig-name descname"><span class="pre">parse_checkpoints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_checkpoints" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_checkpoints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_checkpoints" title="Permalink to this definition">¶</a></dt>
 <dd><p>A list of None objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param</strong> (<em>list</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_couplings">
-<span class="sig-name descname"><span class="pre">parse_couplings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">couplings</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_couplings" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_couplings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">couplings</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_couplings" title="Permalink to this definition">¶</a></dt>
 <dd><p>Couplings for field theory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>couplings</strong> (<em>dict</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_cp_id">
-<span class="sig-name descname"><span class="pre">parse_cp_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">cp:</span> <span class="pre">(&lt;class</span> <span class="pre">'int'&gt;</span></em>, <em class="sig-param"><span class="pre">&lt;class</span> <span class="pre">'NoneType'&gt;)</span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_cp_id" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_cp_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_cp_id" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>cp</strong> (<em>(</em><em>&lt;class 'int'&gt;</em><em>, </em><em>&lt;class 'NoneType'&gt;</em><em>)</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_cp_ids">
-<span class="sig-name descname"><span class="pre">parse_cp_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_cp_ids" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_cp_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_cp_ids" title="Permalink to this definition">¶</a></dt>
 <dd><p>A list of cp_id objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param</strong> (<em>list</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_epochs">
-<span class="sig-name descname"><span class="pre">parse_epochs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_epochs" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_epochs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epochs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_epochs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of epochs to train. Equivalent to number of passes
 multiplied by the batch size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>epochs</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_lattice_dimension">
-<span class="sig-name descname"><span class="pre">parse_lattice_dimension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_lattice_dimension" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_lattice_dimension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_lattice_dimension" title="Permalink to this definition">¶</a></dt>
 <dd><p>Parse lattice dimension from runcard</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>dim</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_lattice_length">
-<span class="sig-name descname"><span class="pre">parse_lattice_length</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">length</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_lattice_length" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_lattice_length</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">length</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_lattice_length" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>length</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_n_batch">
-<span class="sig-name descname"><span class="pre">parse_n_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_n_batch" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_n_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_n_batch" title="Permalink to this definition">¶</a></dt>
 <dd><p>Batch size for training.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>nb</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_optimizer">
-<span class="sig-name descname"><span class="pre">parse_optimizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_optimizer" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_optimizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_optimizer" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>optimizer</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_optimizer_params">
-<span class="sig-name descname"><span class="pre">parse_optimizer_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_optimizer_params" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_optimizer_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_optimizer_params" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>params</strong> (<em>dict</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_parameterisation">
-<span class="sig-name descname"><span class="pre">parse_parameterisation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_parameterisation" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_parameterisation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_parameterisation" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_sample_interval">
-<span class="sig-name descname"><span class="pre">parse_sample_interval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">interval:</span> <span class="pre">(&lt;class</span> <span class="pre">'int'&gt;</span></em>, <em class="sig-param"><span class="pre">&lt;class</span> <span class="pre">'NoneType'&gt;)</span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sample_interval" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_sample_interval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interval</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sample_interval" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of Markov chain steps to discard between appending configurations
 to the sample. Should be large enough so that configurations have become
 decorrelated.</p>
 <p>Can be specified by the user in the runcard, or left to an automatic
 calculation based on the acceptance rate of the Metropolis-Hastings algorith.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>interval</strong> (<em>(</em><em>&lt;class 'int'&gt;</em><em>, </em><em>&lt;class 'NoneType'&gt;</em><em>)</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_sample_size">
-<span class="sig-name descname"><span class="pre">parse_sample_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sample_size" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_sample_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sample_size" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of configurations in output sample.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>size</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_save_interval">
-<span class="sig-name descname"><span class="pre">parse_save_interval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_int</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_save_interval" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_save_interval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_save_interval" title="Permalink to this definition">¶</a></dt>
 <dd><p>Interval at which the model state is saved, in units of epochs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>save_int</strong> (<em>int</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_scheduler">
-<span class="sig-name descname"><span class="pre">parse_scheduler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scheduler</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_scheduler" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_scheduler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scheduler</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_scheduler" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>scheduler</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_scheduler_params">
-<span class="sig-name descname"><span class="pre">parse_scheduler_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_scheduler_params" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_scheduler_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_scheduler_params" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>params</strong> (<em>dict</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_sigma">
-<span class="sig-name descname"><span class="pre">parse_sigma</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">sigma:</span> <span class="pre">(&lt;class</span> <span class="pre">'float'&gt;</span></em>, <em class="sig-param"><span class="pre">&lt;class</span> <span class="pre">'int'&gt;)</span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sigma" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_sigma</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sigma</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_sigma" title="Permalink to this definition">¶</a></dt>
 <dd><p>Standard deviation of normal distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>sigma</strong> (<em>(</em><em>&lt;class 'float'&gt;</em><em>, </em><em>&lt;class 'int'&gt;</em><em>)</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_thermalization">
-<span class="sig-name descname"><span class="pre">parse_thermalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">therm:</span> <span class="pre">(&lt;class</span> <span class="pre">'int'&gt;</span></em>, <em class="sig-param"><span class="pre">&lt;class</span> <span class="pre">'NoneType'&gt;)</span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_thermalization" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_thermalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">therm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_thermalization" title="Permalink to this definition">¶</a></dt>
 <dd><p>Number of Markov chain steps to discard to allow the chain to
 reach an approximately stationary distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>therm</strong> (<em>(</em><em>&lt;class 'int'&gt;</em><em>, </em><em>&lt;class 'NoneType'&gt;</em><em>)</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_training_output">
-<span class="sig-name descname"><span class="pre">parse_training_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_training_output" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">parse_training_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_training_output" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_training_outputs">
-<span class="sig-name descname"><span class="pre">parse_training_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_training_outputs" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_training_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_training_outputs" title="Permalink to this definition">¶</a></dt>
 <dd><p>A list of training_output objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param</strong> (<em>list</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_window">
-<span class="sig-name descname"><span class="pre">parse_window</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_window" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_window</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_window" title="Permalink to this definition">¶</a></dt>
 <dd><p>A numerical factor featuring in the calculation of the optimal ‘window’
 size, which is then used to measure the integrated autocorrelation time of
 observables.</p>
@@ -411,24 +526,44 @@ observables.</p>
 checking that the integrated autocorrelation has approximately plateaued
 at the optimal window size.</p>
 <p>See <cite>automatic_windowing_function</cite> in the observables module for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>window</strong> (<em>float</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.parse_windows">
-<span class="sig-name descname"><span class="pre">parse_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_windows" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parse_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.parse_windows" title="Permalink to this definition">¶</a></dt>
 <dd><p>A list of window objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param</strong> (<em>list</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.produce_base_dist">
-<span class="sig-name descname"><span class="pre">produce_base_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_base_dist" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">produce_base_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_base_dist" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the action which loads appropriate base distribution</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>base</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.produce_bootstrap_seed">
-<span class="sig-name descname"><span class="pre">produce_bootstrap_seed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">manual_bootstrap_seed:</span> <span class="pre">(&lt;class</span> <span class="pre">'int'&gt;</span></em>, <em class="sig-param"><span class="pre">&lt;class</span> <span class="pre">'NoneType'&gt;)</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_bootstrap_seed" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<span class="sig-name descname"><span class="pre">produce_bootstrap_seed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">manual_bootstrap_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_bootstrap_seed" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>manual_bootstrap_seed</strong> (<em>(</em><em>&lt;class 'int'&gt;</em><em>, </em><em>&lt;class 'NoneType'&gt;</em><em>)</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.produce_checkpoint">
@@ -448,8 +583,13 @@ at the optimal window size.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.config.ConfigParser.produce_model_action">
-<span class="sig-name descname"><span class="pre">produce_model_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_model_action" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">produce_model_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.config.ConfigParser.produce_model_action" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a string, return the flow model action indexed by that string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>model</strong> (<em>str</em>) – </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -503,6 +643,13 @@ of lattice_size/2 which is the size of the input vector for each coupling layer.
 <dt>mean: float</dt><dd><p>Mean for the distribution.</p>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="anvil.distributions.Gaussian.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.distributions.Gaussian.__call__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a sample of variables drawn from the normal distribution,
+with dimensions (sample_size, lattice_size).</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.distributions.Gaussian.log_density">
 <span class="sig-name descname"><span class="pre">log_density</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.distributions.Gaussian.log_density" title="Permalink to this definition">¶</a></dt>
@@ -618,7 +765,7 @@ for a sample of field configurations.</p>
 trained to free scalar theory</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.free_scalar.FreeScalarEigenmodes">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.free_scalar.</span></span><span class="sig-name descname"><span class="pre">FreeScalarEigenmodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">m_sq</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lattice_length</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.free_scalar.FreeScalarEigenmodes" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.free_scalar.</span></span><span class="sig-name descname"><span class="pre">FreeScalarEigenmodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">m_sq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lattice_length</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.free_scalar.FreeScalarEigenmodes" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>The action for the theory of a free scalar on a lattice is</p>
 <blockquote>
@@ -646,6 +793,14 @@ for the variables <a href="#id5"><span class="problematic" id="id6">|\tilde\phi(
 </div></blockquote>
 <p>This means we can sample from this probability distribution in Fourier
 space by simply generating Gaussian random numbers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m_sq</strong> (<em>int</em>) – </p></li>
+<li><p><strong>lattice_length</strong> (<em>int</em>) – </p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.free_scalar.FreeScalarEigenmodes.gen_complex_normal">
 <em class="property"><span class="pre">static</span> </em><span class="sig-name descname"><span class="pre">gen_complex_normal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_sample</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">real</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.free_scalar.FreeScalarEigenmodes.gen_complex_normal" title="Permalink to this definition">¶</a></dt>
@@ -720,7 +875,7 @@ entries correspond to the sites that are left unchanged.</p>
 representation of the field a ‘split’ representation.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.geometry.Geometry2D.get_shift">
-<span class="sig-name descname"><span class="pre">get_shift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shifts</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">tuple</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">(1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">tuple</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">(0,</span> <span class="pre">1)</span></span></em><span class="sig-paren">)</span> &#x2192; <span class="pre">torch.Tensor</span><a class="headerlink" href="#anvil.geometry.Geometry2D.get_shift" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_shift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shifts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">1)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.geometry.Geometry2D.get_shift" title="Permalink to this definition">¶</a></dt>
 <dd><p>Provided with a set of <cite>shifts</cite> and <cite>dims</cite> which are tuples of equal
 length N, the number of shifts. For the given system length used to
 instance Geometry2D, which refers to size of a 2D state (length * length)
@@ -851,7 +1006,7 @@ the Jacobian determinant of this transformation.</p></li>
 </div></blockquote>
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.layers.AdditiveLayer">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">AdditiveLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AdditiveLayer" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">AdditiveLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AdditiveLayer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#anvil.layers.CouplingLayer" title="anvil.layers.CouplingLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">anvil.layers.CouplingLayer</span></code></a></p>
 <p>Extension to <cite>nn.Module</cite> for an additive coupling layer.</p>
 <p>The additive transformation is given by</p>
@@ -862,10 +1017,26 @@ the Jacobian determinant of this transformation.</p></li>
 <blockquote>
 <div><p>log det J = 0</p>
 </div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size_half</strong> (<em>int</em>) – </p></li>
+<li><p><strong>hidden_shape</strong> (<em>list</em>) – </p></li>
+<li><p><strong>activation</strong> (<em>str</em>) – </p></li>
+<li><p><strong>z2_equivar</strong> (<em>bool</em>) – </p></li>
+<li><p><strong>even_sites</strong> (<em>bool</em>) – </p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.layers.AdditiveLayer.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">unused</span></span></em><span class="sig-paren">)</span> &#x2192; <span class="pre">torch.Tensor</span><a class="headerlink" href="#anvil.layers.AdditiveLayer.forward" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">unused</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AdditiveLayer.forward" title="Permalink to this definition">¶</a></dt>
 <dd><p>Forward pass of affine transformation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>torch.Tensor</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py attribute">
@@ -877,7 +1048,7 @@ the Jacobian determinant of this transformation.</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.layers.AffineLayer">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">AffineLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AffineLayer" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">AffineLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AffineLayer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#anvil.layers.CouplingLayer" title="anvil.layers.CouplingLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">anvil.layers.CouplingLayer</span></code></a></p>
 <p>Extension to <cite>nn.Module</cite> for an affine coupling layer.</p>
 <p>The affine transformation is given by</p>
@@ -889,10 +1060,26 @@ the Jacobian determinant of this transformation.</p></li>
 <div><p>log det J = sum_x s_x(v^P)</p>
 </div></blockquote>
 <p>where x are the lattice sites in the active partition.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size_half</strong> (<em>int</em>) – </p></li>
+<li><p><strong>hidden_shape</strong> (<em>list</em>) – </p></li>
+<li><p><strong>activation</strong> (<em>str</em>) – </p></li>
+<li><p><strong>z2_equivar</strong> (<em>bool</em>) – </p></li>
+<li><p><strong>even_sites</strong> (<em>bool</em>) – </p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.layers.AffineLayer.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">unused</span></span></em><span class="sig-paren">)</span> &#x2192; <span class="pre">torch.Tensor</span><a class="headerlink" href="#anvil.layers.AffineLayer.forward" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">unused</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.AffineLayer.forward" title="Permalink to this definition">¶</a></dt>
 <dd><p>Forward pass of affine transformation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>torch.Tensor</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py attribute">
@@ -927,7 +1114,7 @@ the Jacobian determinant of this transformation.</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.layers.CouplingLayer">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">CouplingLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.CouplingLayer" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">CouplingLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.CouplingLayer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
 <p>Base class for coupling layers.</p>
 <p>A generic coupling layer takes the form</p>
@@ -1048,7 +1235,7 @@ registered hooks while the latter silently ignores them.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.layers.RationalQuadraticSplineLayer">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">RationalQuadraticSplineLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_segments</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.RationalQuadraticSplineLayer" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">RationalQuadraticSplineLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size_half</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_segments</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z2_equivar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">even_sites</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.RationalQuadraticSplineLayer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#anvil.layers.CouplingLayer" title="anvil.layers.CouplingLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">anvil.layers.CouplingLayer</span></code></a></p>
 <p>A coupling transformation from a finite interval to itself based on a piecewise
 rational quadratic spline function.</p>
@@ -1070,6 +1257,19 @@ generated by a neural network. d_0 and d_K are set to 1.</p>
 </dd>
 </dl>
 </div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size_half</strong> (<em>int</em>) – </p></li>
+<li><p><strong>interval</strong> (<em>int</em>) – </p></li>
+<li><p><strong>n_segments</strong> (<em>int</em>) – </p></li>
+<li><p><strong>hidden_shape</strong> (<em>list</em>) – </p></li>
+<li><p><strong>activation</strong> (<em>str</em>) – </p></li>
+<li><p><strong>z2_equivar</strong> (<em>bool</em>) – </p></li>
+<li><p><strong>even_sites</strong> (<em>bool</em>) – </p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.layers.RationalQuadraticSplineLayer.forward">
 <span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">negative_mag</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.RationalQuadraticSplineLayer.forward" title="Permalink to this definition">¶</a></dt>
@@ -1489,7 +1689,7 @@ from bootstrap</p>
 <p>Module containing functions required to train model</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="anvil.train.reverse_kl">
-<span class="sig-prename descclassname"><span class="pre">anvil.train.</span></span><span class="sig-name descname"><span class="pre">reverse_kl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_log_density</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_log_density</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">torch.Tensor</span></span></em><span class="sig-paren">)</span> &#x2192; <span class="pre">torch.Tensor</span><a class="headerlink" href="#anvil.train.reverse_kl" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">anvil.train.</span></span><span class="sig-name descname"><span class="pre">reverse_kl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_log_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_log_density</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.train.reverse_kl" title="Permalink to this definition">¶</a></dt>
 <dd><p>Estimate of the reverse Kullbach-Leibler divergence between the model
 and the target density, obtained by averaging over a batch of configurations
 generated by the model.</p>
@@ -1557,6 +1757,14 @@ the parameters for the function.</p></li>
 <p>Does not rely on multiprocessing.Pool since that does not work with
 instance methods without considerable extra effort (it cannot pickle them).
 This means that the multiprocessing is not supported on Mac.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="anvil.utils.Multiprocessing.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#anvil.utils.Multiprocessing.__call__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a dictionary containing the function outputs for each
+set of parameters taken from the generator. The dictionary keys are
+integers which label the order of parameter sets in the generator.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="anvil.utils.Multiprocessing.target">
 <span class="sig-name descname"><span class="pre">target</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.utils.Multiprocessing.target" title="Permalink to this definition">¶</a></dt>
