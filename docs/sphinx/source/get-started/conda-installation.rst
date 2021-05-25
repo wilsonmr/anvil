@@ -13,7 +13,7 @@ We highly recommend setting up a separate ``conda`` environment for use with
 
 .. code::
 
-    $ conda create -n anvil python-3.8
+    $ conda create -n anvil python=3.8
 
 This will create a new environment with the supported version of ``python``.
 In order to install the code and all of its dependencies simply run:
