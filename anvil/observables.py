@@ -229,7 +229,7 @@ def magnetic_susceptibility(
 
 def magnetization_series(configs: np.ndarray) -> np.ndarray:
     """Returns the configuration-wise magnetization for a sample of configurations."""
-    return configs.sum(axis=1)
+    return configs.sum(axis=1).numpy()
 
 
 def magnetization_autocorr(magnetization_series: np.ndarray) -> np.ndarray:
