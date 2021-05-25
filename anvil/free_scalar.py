@@ -147,8 +147,8 @@ class FreeScalarEigenmodes:
 
         Returns
         -------
-        out: numpy.ndarray
-            complex array of shape (n_sample, ``*`` sigma.shape)
+        numpy.ndarray
+            complex array of shape ``(n_sample, *sigma.shape)``
         """
         shape_out = np.zeros((n_sample, *(sigma.shape)))
         if real:
@@ -172,8 +172,8 @@ class FreeScalarEigenmodes:
 
         Returns
         -------
-        eigenmodes: numpy.ndarray
-            complex array of eigenmodes with shape (n_sample, L, L)
+        numpy.ndarray
+            complex array of eigenmodes with shape ``(n_sample, L, L)``
             where L is the side length of the square lattice.
         """
         eigenmodes = np.empty(
@@ -221,8 +221,8 @@ class FreeScalarEigenmodes:
 
         Returns
         -------
-        fields: numpy.ndarray
-            real array of real-space fields, with shape (n_sample, L, L),
+        numpy.ndarray
+            real array of real-space fields, with shape ``(n_sample, L, L)``,
             where L is the side-length of the square lattice.
         """
         eigenmodes = self.gen_eigenmodes(n_sample)
