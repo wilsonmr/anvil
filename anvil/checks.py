@@ -17,6 +17,6 @@ def check_trained_with_free_theory(training_target_dist):
     """
     if training_target_dist.c_quartic != 0:
         raise CheckError(
-            f"Theory parameters do not correspond to free theory with lam = {lam} "
-            "(should be 0)"
+            f"Theory parameters do not correspond to free theory. Quartic term "
+            f"should be 0 and is instead = {training_target_dist.c_quartic}."
         )
