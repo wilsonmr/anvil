@@ -16,7 +16,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import LAYER_OPTIONS
-from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
+from anvil.distributions import PhiFourScalar, Gaussian
 
 log = logging.getLogger(__name__)
 
@@ -54,25 +54,21 @@ class ConfigParser(Config):
         """Returns the geometry object defining the lattice."""
         return Geometry2D(lattice_length)
 
-    @explicit_node
-    def produce_target_dist(self, target: str):
-        """Returns the function which initialises the correct action"""
+    def produce_target_dist(
+        self, geometry, parameterisation: str, couplings: dict):
+        """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
         try:
-            return TARGET_OPTIONS[target]
-        except KeyError:
+            constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
+        except AttributeError as e:
             raise ConfigError(
-                f"invalid target distribution {target}", target, TARGET_OPTIONS.keys()
+                f"Invalid parametrisation: {parameterisation}", parameterisation
             )
+        return constructor(geometry, **couplings)
 
-    @explicit_node
-    def produce_base_dist(self, base: str):
-        """Returns the action which loads appropriate base distribution"""
-        try:
-            return BASE_OPTIONS[base]
-        except KeyError:
-            raise ConfigError(
-                f"Invalid base distribution {base}", base, BASE_OPTIONS.keys()
-            )
+    def produce_base_dist(
+        self, lattice_size, loc: (int, float) = 0, sigma: (int, float) = 1) -> Gaussian:
+        """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
+        return Gaussian(lattice_size, loc=loc, scale=sigma)
 
     def parse_sigma(self, sigma: float) -> float:
         """The standard deviation of a normal distribution."""
@@ -149,6 +145,18 @@ class ConfigParser(Config):
         with self.set_context(ns=self._curr_ns.new_child(training_context)):
             _, geometry = self.parse_from_(None, "geometry", write=False)
         return geometry
+
+    def produce_training_target_dist(self, training_context: dict):
+        """Produces the target distribution object used in training."""
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
+            _, target = self.parse_from_(None, "target_dist", write=False)
+        return target
+
+    def produce_training_base_dist(self, training_context: dict):
+        """Produces the base distribution object used in training."""
+        with self.set_context(ns=self._curr_ns.new_child(training_context)):
+            _, base = self.parse_from_(None, "base_dist", write=False)
+        return base
 
     def parse_optimizer(self, optimizer: str) -> str:
         """A label for the optimization algorithm to use during training.

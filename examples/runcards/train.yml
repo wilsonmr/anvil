@@ -3,14 +3,10 @@ lattice_length: 6
 lattice_dimension: 2
 
 # Target
-target: phi_four
 parameterisation: albergo2019
 couplings:
     m_sq: -4
     lam: 6.975
-
-# Model
-base: gaussian
 
 model:
  - layer: real_nvp
@@ -45,4 +41,3 @@ optimizer_params:
 scheduler: CosineAnnealingLR
 scheduler_params:
     T_max: 2000
-

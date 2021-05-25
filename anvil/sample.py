@@ -8,12 +8,9 @@ Module containing functions related to sampling from a trained model
 from math import exp, isfinite, ceil
 import logging
 from random import random
+
 from tqdm import tqdm
-
-import numpy as np
 import torch
-
-from reportengine import collect
 
 log = logging.getLogger(__name__)
 
@@ -177,8 +174,8 @@ def metropolis_test(current_log_ratio, proposal_log_ratio) -> float:
 @torch.no_grad()
 def metropolis_hastings(
     loaded_model,
-    base_dist,
-    target_dist,
+    training_base_dist,
+    training_target_dist,
     sample_size: int,
     thermalization: (int, type(None)),
     sample_interval: (int, type(None)),
@@ -191,10 +188,10 @@ def metropolis_hastings(
     loaded_model
         Trained model which generates candidate configurations by passing latent
         variables through its layers.
-    base_dist
+    training_base_dist
         Distribution objet that generates latent variables and an associated
         (log) probability density.
-    target_dist
+    training_target_dist
         The distribution from which we would like to sample using the Metropolis-
         Hastings algorithm.
     sample_size
@@ -218,7 +215,7 @@ def metropolis_hastings(
 
     """
     # Draw starting configs
-    phi, log_ratio = gen_candidates(loaded_model, base_dist, target_dist, num=1)
+    phi, log_ratio = gen_candidates(loaded_model, training_base_dist, training_target_dist, num=1)
     current = phi[0]
     current_log_ratio = log_ratio[0]
 
@@ -227,8 +224,8 @@ def metropolis_hastings(
         for proposal, proposal_log_ratio in zip(
             *gen_candidates(
                 loaded_model,
-                base_dist,
-                target_dist,
+                training_base_dist,
+                training_target_dist,
                 num=thermalization,
             )
         ):
@@ -241,8 +238,8 @@ def metropolis_hastings(
         for proposal, proposal_log_ratio in zip(
             *gen_candidates(
                 loaded_model,
-                base_dist,
-                target_dist,
+                training_base_dist,
+                training_target_dist,
                 num=BATCH_SIZE,
             )
         ):
@@ -261,7 +258,7 @@ def metropolis_hastings(
     log.info(f"Using sampling interval: {sample_interval}")
 
     # Generate representative sample
-    configs_out = torch.empty((sample_size, base_dist.size_out), dtype=torch.float32)
+    configs_out = torch.empty((sample_size, training_base_dist.size_out), dtype=torch.float32)
     history = []
 
     batches = [BATCH_SIZE for _ in range((sample_size * sample_interval) // BATCH_SIZE)]
@@ -274,8 +271,8 @@ def metropolis_hastings(
         for proposal, proposal_log_ratio in zip(
             *gen_candidates(
                 loaded_model,
-                base_dist,
-                target_dist,
+                training_base_dist,
+                training_target_dist,
                 num=batch,
             )
         ):
@@ -301,22 +298,19 @@ def metropolis_hastings(
 
     return configs_out, tau, acceptance
 
-
-_metropolis_hastings = collect("metropolis_hastings", ("training_context",))
-
-
-def configs(_metropolis_hastings):
+# TODO: remove??
+def configs(metropolis_hastings):
     """Returns sample of configurations from the Metropolis-Hastings simulation."""
-    return _metropolis_hastings[0][0]
+    return metropolis_hastings[0]
 
 
-def tau_chain(_metropolis_hastings):
+def tau_chain(metropolis_hastings):
     """Returns estimate of the integrated autocorrelation time from the Metropolis-
     Hastings simulation."""
-    return _metropolis_hastings[0][1]
+    return metropolis_hastings[1]
 
 
-def acceptance(_metropolis_hastings):
+def acceptance(metropolis_hastings):
     """Returns the fraction of proposals that were accepted during the Metropolis-
     Hastings simulation."""
-    return _metropolis_hastings[0][2]
+    return metropolis_hastings[2]

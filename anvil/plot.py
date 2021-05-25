@@ -6,15 +6,14 @@ plot.py
 module containing all actions for plotting observables
 
 """
-import torch
+
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+from matplotlib.colors import SymLogNorm
 from matplotlib.font_manager import FontProperties
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 from reportengine.figure import figure, figuregen
-from reportengine import collect
 
 from anvil.observables import cosh_shift
 
@@ -261,7 +260,7 @@ def plot_two_point_correlator(two_point_correlator):
     ax.set_xticklabels(tick_labels)
     ax.set_yticklabels(tick_labels)
 
-    norm = mpl.colors.SymLogNorm(linthresh=0.01, base=10)
+    norm = SymLogNorm(linthresh=0.01, base=10)
     im = ax.imshow(corr, norm=norm)
     fig.colorbar(im, ax=ax, pad=0.01)
 

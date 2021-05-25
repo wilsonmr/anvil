@@ -244,26 +244,3 @@ class PhiFourScalar:
         See :py:mod:`anvil.distributions.PhiFourScalar.action`
         """
         return -self.action(phi)
-
-
-def gaussian(lattice_size, loc: (int, float) = 0, sigma: (int, float) = 1) -> Gaussian:
-    """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
-    return Gaussian(lattice_size, loc=loc, scale=sigma)
-
-
-def phi_four(
-    geometry,
-    parameterisation: str,
-    couplings: dict,
-):
-    """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
-    constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
-    return constructor(geometry, **couplings)
-
-
-BASE_OPTIONS = {
-    "gaussian": gaussian,
-}
-TARGET_OPTIONS = {
-    "phi_four": phi_four,
-}
