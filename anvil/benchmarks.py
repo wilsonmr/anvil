@@ -19,7 +19,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from reportengine import collect
 from reportengine.figure import figure
 from reportengine.table import table
 
@@ -27,14 +26,15 @@ import anvil.free_scalar
 from anvil.checks import check_trained_with_free_theory
 
 
+@check_trained_with_free_theory
 def free_scalar_theory(
-    couplings: dict, lattice_length: int
+    training_target_dist, training_geometry
 ) -> anvil.free_scalar.FreeScalarEigenmodes:
     """Returns instance of FreeScalarEigenmodes with specific mass and lattice size."""
-    # TODO: load target and extract m_sq from target.c2 - indep or parameterisation?
-    m_sq = couplings["m_sq"]
+    # load target and extract m_sq from target
+    m_sq = training_target_dist.c_quadratic * 2 - 4
     return anvil.free_scalar.FreeScalarEigenmodes(
-        m_sq=m_sq, lattice_length=lattice_length
+        m_sq=m_sq, lattice_length=training_geometry.length
     )
 
 
@@ -102,21 +102,8 @@ def eigvals_from_sample(
     return eigvals.numpy()
 
 
-free_theory_from_training_ = collect("free_scalar_theory", ("training_context",))
-
-# TODO: work out way to not have to do this.. However it allows us to use check
-# @check_trained_with_free_theory
-def free_theory_from_training(free_theory_from_training_, training_context):
-    """Returns free_scalar_theory but with m_sq and lattice_length extracted
-    from a training config.
-
-    """
-    (res,) = free_theory_from_training_
-    return res
-
-
 @table
-def table_real_space_variance(configs, free_theory_from_training):
+def table_real_space_variance(configs, free_scalar_theory):
     """Compare the sample variance of the generated configurations with the
     theoretical prediction based on the free scalar theory.
 
@@ -124,7 +111,7 @@ def table_real_space_variance(configs, free_theory_from_training):
     same Gaussian distribution. We therefore compare the lattice-average of the
     sample variance with the theory prediction.
     """
-    predic = np.reciprocal(free_theory_from_training.eigenvalues).mean()
+    predic = np.reciprocal(free_scalar_theory.eigenvalues).mean()
     sample_var = configs.var(dim=0)
     pc_diff = (sample_var.mean() - predic) / predic * 100
     data = [
@@ -141,20 +128,20 @@ def table_real_space_variance(configs, free_theory_from_training):
 
 
 @table
-def table_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
+def table_kinetic_eigenvalues(eigvals_from_sample, free_scalar_theory):
     """Compare the eigenvalues of the kinetic operator inferrered from the
     sample of generated configurations with the theoretical predictions based
     on the free scalar theory.
     """
     pc_diff = (
-        (eigvals_from_sample - free_theory_from_training.eigenvalues)
-        / free_theory_from_training.eigenvalues
+        (eigvals_from_sample - free_scalar_theory.eigenvalues)
+        / free_scalar_theory.eigenvalues
         * 100
     )
     data = [
         [float(vt), float(vs), float(vd)]
         for vt, vs, vd in zip(
-            free_theory_from_training.eigenvalues.flatten(),
+            free_scalar_theory.eigenvalues.flatten(),
             eigvals_from_sample.flatten(),
             pc_diff.flatten(),
         )
@@ -164,7 +151,7 @@ def table_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
 
 
 @figure
-def plot_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
+def plot_kinetic_eigenvalues(eigvals_from_sample, free_scalar_theory):
     """Plot the eigenvalues of the kinetic operator inferred from the sample
     of generated field configurations with the theoretical predictions based
     on the free scalar theory.
@@ -182,15 +169,15 @@ def plot_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
     ax2.set_ylabel("$p_2$")
 
     pc_diff = (
-        (eigvals_from_sample - free_theory_from_training.eigenvalues)
-        / free_theory_from_training.eigenvalues
+        (eigvals_from_sample - free_scalar_theory.eigenvalues)
+        / free_scalar_theory.eigenvalues
         * 100
     )
     extent = [
-        free_theory_from_training.momenta[0],
-        free_theory_from_training.momenta[-1],
-        free_theory_from_training.momenta[-1],
-        free_theory_from_training.momenta[0],
+        free_scalar_theory.momenta[0],
+        free_scalar_theory.momenta[-1],
+        free_scalar_theory.momenta[-1],
+        free_scalar_theory.momenta[0],
     ]
 
     im1 = ax1.imshow(eigvals_from_sample, extent=extent)

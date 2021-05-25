@@ -55,12 +55,12 @@ def test_model_construction(layer_idx, n_blocks, lattice_length_half, hidden_sha
     }
     # might help with memory.
     with torch.no_grad():
-        API.model_to_load(**params)
+        API.explicit_model(**params)
 
 
 def layer_independence_test(model_spec):
     """Check that each layer's parameters are updated independently."""
-    model = iter(API.model_to_load(**model_spec))
+    model = iter(API.explicit_model(**model_spec))
     model_copy = deepcopy(model)
 
     # Update parameters in first layer

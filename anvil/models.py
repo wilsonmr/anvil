@@ -238,10 +238,10 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
 
-_normalising_flow = collect("layer_action", ("model",))
+# collect layers from copied runcard
+_normalizing_flow = collect("layer_action", ("training_context", "model",))
 
-
-def model_to_load(_normalising_flow) -> layers.Sequential:
+def model_to_load(_normalizing_flow) -> layers.Sequential:
     """action which wraps a list of layers in
     :py:class:`anvil.layers.Sequential`. This allows the user to specify an
     arbitrary combination of layers as the model.
@@ -287,13 +287,40 @@ def model_to_load(_normalising_flow) -> layers.Sequential:
     ``anvil-train`` will also provide the same information.
 
     """
-    # assume that _normalising_flow is a list of layers, each layer
+    # assume that _normalizing_flow is a list of layers, each layer
     # is a sequential of blocks, each block is a pair of transformations
     # which transforms the entire input state - flatten this out, so output
     # is Sequential of blocks
-    flow_flat = [block for layer in _normalising_flow for block in layer]
+    flow_flat = [block for layer in _normalizing_flow for block in layer]
     return layers.Sequential(*flow_flat)
 
+# annoyingly, the api may not have a training output. In which case
+# load model from explicitly declared params.
+_api_normalizing_flow = collect("layer_action", ("model",))
+
+def explicit_model(_api_normalizing_flow):
+    """Action to be called from the API. Build model from an explicit
+    specification, with same input as a training runcard config.
+
+    Examples
+    --------
+
+    >>> from anvil.api import API
+    >>> model_spec = {
+    ...     "model": [
+    ...         {"layer": "global_rescaling", "scale": 1.0},
+    ...         {"layer": "global_rescaling", "scale": 1.0},
+    ...     ]
+    ... }
+    >>> API.explicit_model(**model_spec)
+    Sequential(
+      (0): GlobalRescaling()
+      (1): GlobalRescaling()
+    )
+
+    """
+    # Note: use same action as train/sample apps, so that tests can cover these.
+    return model_to_load(_api_normalizing_flow)
 
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
