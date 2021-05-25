@@ -14,8 +14,8 @@ Documentation: [![Documentation - Build and Deploy](https://github.com/wilsonmr/
 
 # Using and Citing our code
 
-We hope to provide a DOI for this code soon, and would really appreciate it
-if you'd cite that DOI if you use this code.
+Please cite our DOI when using our code:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4792249.svg)](https://doi.org/10.5281/zenodo.4792249)
 
 `anvil` was developed by Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio
 to provide a framework for training and analysing normalising flows used to
