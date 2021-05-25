@@ -3,10 +3,12 @@
 """
 observables.py
 """
+import logging
+
+import torch
 import numpy as np
 import scipy.signal
 import scipy.optimize
-import logging
 
 from anvil.utils import bootstrap_sample, Multiprocessing
 
@@ -182,7 +184,7 @@ def optimal_window(integrated: np.ndarray, mult: float = 2.0) -> int:
 
 
 def magnetization(
-    configs: np.ndarray, bootstrap_sample_size: int, bootstrap_seed: int
+    configs: torch.Tensor, bootstrap_sample_size: int, bootstrap_seed: int
 ) -> np.ndarray:
     """Configuration-wise magnetization for a bootstrapped sample of configurations.
 
@@ -227,7 +229,7 @@ def magnetic_susceptibility(
     return (magnetization ** 2).mean(axis=-1) - abs_magnetization_sq
 
 
-def magnetization_series(configs: np.ndarray) -> np.ndarray:
+def magnetization_series(configs: torch.Tensor) -> np.ndarray:
     """Returns the configuration-wise magnetization for a sample of configurations."""
     return configs.sum(axis=1).numpy()
 
@@ -257,28 +259,8 @@ def magnetization_optimal_window(
     return optimal_window(magnetization_integrated_autocorr)
 
 
-# Version without multiprocessing!
-# TODO: use or discard?
-def _two_point_correlator(
-    configs, training_geometry, bootstrap_sample_size, bootstrap_seed
-):
-    correlator = np.empty((training_geometry.volume, bootstrap_sample_size))
-    for i, shift in enumerate(training_geometry.two_point_iterator()):
-        correlator[i] = bootstrap_sample(
-            (configs[:, shift] * configs).mean(axis=1),  # volume average
-            bootstrap_sample_size,
-            seed=bootstrap_seed,
-        ).mean(
-            axis=-1  # sample average
-        )
-
-    return correlator.reshape(
-        (training_geometry.length, training_geometry.length, -1)
-    ).numpy()
-
-
 def two_point_correlator(
-    configs: np.ndarray,
+    configs: torch.Tensor,
     training_geometry,
     bootstrap_sample_size: int,
     bootstrap_seed: int,
@@ -345,7 +327,7 @@ def two_point_connected_correlator(
 ) -> np.ndarray:
     """Connected two point correlation function, obtained by subtracting the expected
     value of the absolute magnetization, squared."""
-    return two_point_correlator - abs_magnetization_sq.view(1, 1, -1)
+    return two_point_correlator - abs_magnetization_sq.reshape(1, 1, -1)
 
 
 def zero_momentum_correlator(two_point_correlator: np.ndarray) -> np.ndarray:
