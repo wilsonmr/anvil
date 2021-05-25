@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="anvil",
-    version="0.1",
+    version="0.9",
     description="Normalising flow model on the lattice",
     author="Michael Wilson",
     author_email="michael.wilson@ed.ac.uk",

@@ -1,6 +1,6 @@
 package:
   name: anvil
-  version: "0.1+{{ GIT_DESCRIBE_HASH }}"
+  version: "0.9+{{ GIT_DESCRIBE_HASH }}"
 
 source:
   git_url: ../
