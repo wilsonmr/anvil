@@ -294,6 +294,33 @@ def model_to_load(_normalizing_flow) -> layers.Sequential:
     flow_flat = [block for layer in _normalizing_flow for block in layer]
     return layers.Sequential(*flow_flat)
 
+# annoyingly, the api may not have a training output. In which case
+# load model from explicitly declared params.
+_api_normalizing_flow = collect("layer_action", ("model",))
+
+def explicit_model(_api_normalizing_flow):
+    """Action to be called from the API. Build model from an explicit
+    specification, with same input as a training runcard config.
+
+    Examples
+    --------
+
+    >>> from anvil.api import API
+    >>> model_spec = {
+    ...     "model": [
+    ...         {"layer": "global_rescaling", "scale": 1.0},
+    ...         {"layer": "global_rescaling", "scale": 1.0},
+    ...     ]
+    ... }
+    >>> API.explicit_model(**model_spec)
+    Sequential(
+      (0): GlobalRescaling()
+      (1): GlobalRescaling()
+    )
+
+    """
+    # Note: use same action as train/sample apps, so that tests can cover these.
+    return model_to_load(_api_normalizing_flow)
 
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
