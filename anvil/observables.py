@@ -69,7 +69,7 @@ def fit_zero_momentum_correlator(
     xi, A, c = [], [], []
     for correlator in zero_momentum_correlator.transpose():
         try:
-            popt, pcov = optim.curve_fit(
+            popt, pcov = scipy.optimize.curve_fit(
                 cosh_shift,
                 xdata=t[cosh_fit_window],
                 ydata=correlator[cosh_fit_window],
@@ -214,17 +214,17 @@ def magnetization(
     )
 
 
-def abs_magnetization_squared(magnetization: np.ndarray) -> np.ndarray:
+def abs_magnetization_sq(magnetization: np.ndarray) -> np.ndarray:
     """Returns the sample mean of the absolute magnetization, squared, for each member
     of a bootstap ensemble."""
     return np.abs(magnetization).mean(axis=-1) ** 2  # <|m|>^2
 
 
 def magnetic_susceptibility(
-    magnetization: np.ndarray, abs_magnetization_squared: np.ndarray
+    magnetization: np.ndarray, abs_magnetization_sq: np.ndarray
 ) -> np.ndarray:
     """Returns the magnetic susceptibility for each member of a bootstrap ensemble."""
-    return (magnetization ** 2).mean(axis=-1) - abs_magnetization_squared
+    return (magnetization ** 2).mean(axis=-1) - abs_magnetization_sq
 
 
 def magnetization_series(configs: np.ndarray) -> np.ndarray:
@@ -341,11 +341,11 @@ def two_point_correlator(
 
 
 def two_point_connected_correlator(
-    two_point_correlator: np.ndarray, abs_magnetization_squared: np.ndarray
+    two_point_correlator: np.ndarray, abs_magnetization_sq: np.ndarray
 ) -> np.ndarray:
     """Connected two point correlation function, obtained by subtracting the expected
     value of the absolute magnetization, squared."""
-    return two_point_correlator - abs_magnetization_squared.view(1, 1, -1)
+    return two_point_correlator - abs_magnetization_sq.view(1, 1, -1)
 
 
 def zero_momentum_correlator(two_point_correlator: np.ndarray) -> np.ndarray:

@@ -307,7 +307,7 @@ _metropolis_hastings = collect("metropolis_hastings", ("training_context",))
 
 def configs(_metropolis_hastings):
     """Returns sample of configurations from the Metropolis-Hastings simulation."""
-    return _metropolis_hastings[0][0]
+    return _metropolis_hastings[0][0].numpy()
 
 
 def tau_chain(_metropolis_hastings):
