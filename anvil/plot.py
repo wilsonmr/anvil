@@ -24,7 +24,7 @@ def plot_zero_momentum_correlator(
     zero_momentum_correlator,
     training_geometry,
     fit_zero_momentum_correlator,
-    cosh_fit_window: type(slice),
+    cosh_fit_window: slice,
     plot_cosh_fit: bool = True,
 ):
     r"""Plots the correlation function for pairs of one-dimensional 'slices', otherwise
