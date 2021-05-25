@@ -4,8 +4,8 @@
 observables.py
 """
 import numpy as np
-import scipy.signal, scipy.optimize
-import scipy.optimize as optim
+import scipy.signal
+import scipy.optimize
 import logging
 
 from anvil.utils import bootstrap_sample, Multiprocessing
@@ -37,7 +37,7 @@ def fit_zero_momentum_correlator(zero_momentum_correlator, training_geometry):
     yerr = zero_momentum_correlator.std(axis=-1)
 
     try:
-        popt, pcov = optim.curve_fit(
+        popt, pcov = scipy.optimize.curve_fit(
             cosh_shift,
             xdata=t[window] - T // 2,
             ydata=y[window],

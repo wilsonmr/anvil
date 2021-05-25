@@ -5,7 +5,8 @@ geometry.py
 
 Module containing transformations related to geometry.
 """
-import itertools as it
+import itertools
+
 import torch
 
 
@@ -49,9 +50,7 @@ class Geometry2D:
         """
         splitcart = torch.zeros((self.length, self.length), dtype=torch.long)
         n_a = self.checkerboard.sum().item()
-        splitcart[self.checkerboard] = torch.arange(
-            n_a, dtype=torch.long
-        )
+        splitcart[self.checkerboard] = torch.arange(n_a, dtype=torch.long)
         splitcart[~self.checkerboard] = torch.arange(
             n_a, self.length ** 2, dtype=torch.long
         )
@@ -198,6 +197,5 @@ class Geometry2D:
         The order in which the shifts are generated is defined by the lexicographical
         order of the Cartesian product of one-dimensional shifts. See :py:func:`itertools.product`.
         """
-        for shift_cart in it.product(range(self.length), range(self.length)):
+        for shift_cart in itertools.product(range(self.length), range(self.length)):
             yield self.get_shift((shift_cart,), ((0, 1),)).flatten()
-

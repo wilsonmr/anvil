@@ -5,6 +5,8 @@ config.py
 
 Module to parse runcards
 """
+from random import randint
+from sys import maxsize
 import logging
 import platform
 
@@ -15,9 +17,6 @@ from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import LAYER_OPTIONS
 from anvil.distributions import BASE_OPTIONS, TARGET_OPTIONS
-
-from random import randint
-from sys import maxsize
 
 log = logging.getLogger(__name__)
 

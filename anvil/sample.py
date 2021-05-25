@@ -5,13 +5,13 @@ sample.py
 
 Module containing functions related to sampling from a trained model
 """
-
 from math import exp, isfinite, ceil
 import logging
 from random import random
+from tqdm import tqdm
+
 import numpy as np
 import torch
-from tqdm import tqdm
 
 from reportengine import collect
 

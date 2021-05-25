@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
-import numpy as np
-import multiprocessing as mp
+from sys import exit
 from itertools import islice
 from functools import wraps
 from math import ceil
-import torch
-import sys
+import multiprocessing as mp
+
+import numpy as np
 import torch
 
 
@@ -85,7 +85,9 @@ class Multiprocessing:
         return output_dict
 
 
-def bootstrap_sample(data: np.ndarray, bootstrap_sample_size: int, seed=None) -> np.ndarray:
+def bootstrap_sample(
+    data: np.ndarray, bootstrap_sample_size: int, seed=None
+) -> np.ndarray:
     """Resample a provided array to generate a bootstrap sample.
 
     The last dimension of the array will be one that is bootstrapped, and each
@@ -137,4 +139,4 @@ def handler(signum, frame) -> None:
     """Handles keyboard interruptions and terminations and exits in such a way that,
     if the program is currently inside a try-except-finally block, the finally clause
     will be executed."""
-    sys.exit(1)
+    exit(1)

@@ -7,7 +7,6 @@ module containing the FreeScalarEigenmodes class used to compare with model
 trained to free scalar theory
 
 """
-
 from math import pi
 import numpy as np
 
@@ -21,7 +20,7 @@ class FreeScalarEigenmodes:
         S(\phi) = \frac{1}{2} \sum_x \sum_y \phi(x) K(x, y) \phi(y)
 
     The eigenmodes of the matrix
-    
+
     .. math:
         K(x, y) = \box(x, y) + m^2 \delta(x - y)
 
