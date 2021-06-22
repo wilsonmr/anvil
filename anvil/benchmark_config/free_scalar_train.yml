@@ -3,22 +3,31 @@ lattice_length: 6
 lattice_dimension: 2
 
 # Target
-target: phi_four
-m_sq: 4
-lam: 0
-use_arxiv_version: false
+parameterisation: standard
+couplings:
+    m_sq: 4
+    g: 0
 
-# Model
-base: standard_normal
-model: real_nvp
-model_spec:
-    n_affine: 2
+model:
+  - layer: nice
+    n_blocks: 2
+    hidden_shape: [36]
+    activation: tanh
+    z2_equivar: True
+  - layer: global_rescaling
+    scale: 1
+    learnable: True
 
 # Training length
-n_batch: 1000
-epochs: 3000
+n_batch: 2000
+epochs: 2000
 save_interval: 1000
 
 # Optimizer
-optimizer: adam
-learning_rate: 0.001
+optimizer: Adam
+optimizer_params:
+    lr: 0.01
+
+scheduler: CosineAnnealingLR
+scheduler_params:
+    T_max: 2000

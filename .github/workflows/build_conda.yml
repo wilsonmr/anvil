@@ -1,0 +1,32 @@
+name: Build conda package
+
+on: [push]
+
+jobs:
+    build:
+
+        runs-on: ubuntu-latest
+
+        steps:
+          - uses: actions/checkout@v2
+            with:
+                fetch-depth: 0
+
+          - uses: conda-incubator/setup-miniconda@v2
+            with:
+              auto-update-conda: true
+              python-version: "3.8"
+
+          - name: Do Build
+            shell: bash -l {0}
+            run: |
+                conda install conda-build --yes
+                conda build conda-recipe -c pytorch -c https://packages.nnpdf.science/conda
+          - name: Upload
+            if: github.ref == 'refs/heads/master'
+            shell: bash -l {0}
+            env:
+                ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+            run: |
+                conda install anaconda-client --yes
+                anaconda -t "$ANACONDA_TOKEN" upload ${CONDA_PREFIX}/conda-bld/noarch/anvil-*.tar.bz2

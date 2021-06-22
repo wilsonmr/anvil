@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 """
 free_scalar.py
 
@@ -5,7 +7,6 @@ module containing the FreeScalarEigenmodes class used to compare with model
 trained to free scalar theory
 
 """
-
 from math import pi
 import numpy as np
 
@@ -14,15 +15,20 @@ class FreeScalarEigenmodes:
     r"""
     The action for the theory of a free scalar on a lattice is
 
+    .. math::
+
         S(\phi) = \frac{1}{2} \sum_x \sum_y \phi(x) K(x, y) \phi(y)
 
     The eigenmodes of the matrix
 
+    .. math:
         K(x, y) = \box(x, y) + m^2 \delta(x - y)
 
     (which is referred to here as the kinetic operator) are the momentum
-    states \tilde\phi(p), and the associated eigenvalues in two dimensions
+    states :math:`\tilde\phi(p)`, and the associated eigenvalues in two dimensions
     are
+
+    .. math:
 
         \lambda(p) = m^2 + 4 \sin^2(p1 / 2) + 4 \sin^2(p2 / 2)
 
@@ -30,10 +36,14 @@ class FreeScalarEigenmodes:
 
     It can be shown that the action can be written in Fourier space as
 
+    .. math:
+
         S(\tilde\phi) = \frac{1}{2V} \lambda(p) |\tilde\phi(p)|^2
 
     and hence the partition function is a product of Gaussian distributions
-    for the variables |\tilde\phi(p)|, with variances
+    for the variables :math:`|\tilde\phi(p)|`, with variances
+
+    .. math:
 
         \sigma^2(p) = V / \lambda(p)
 
@@ -125,8 +135,8 @@ class FreeScalarEigenmodes:
         """Returns a stack of complex arrays where real and imaginary components
         are drawn from a Gaussian distribution with the same width.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
         sigma: numpy.ndarray
@@ -135,10 +145,10 @@ class FreeScalarEigenmodes:
             (optional) flag. If True, the imaginary component is set to
             zero, but a complex array is still returned.
 
-        Returns:
-        --------
-        out: numpy.ndarray
-            complex array of shape (n_sample, *sigma.shape)
+        Returns
+        -------
+        numpy.ndarray
+            complex array of shape ``(n_sample, *sigma.shape)``
         """
         shape_out = np.zeros((n_sample, *(sigma.shape)))
         if real:
@@ -155,15 +165,15 @@ class FreeScalarEigenmodes:
         Gaussian distributions with variances given by the eigenvalues of the
         kinetic operator - see _variance() method above.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
 
-        Returns:
-        --------
-        eigenmodes: numpy.ndarray
-            complex array of eigenmodes with shape (n_sample, L, L)
+        Returns
+        -------
+        numpy.ndarray
+            complex array of eigenmodes with shape ``(n_sample, L, L)``
             where L is the side length of the square lattice.
         """
         eigenmodes = np.empty(
@@ -204,15 +214,15 @@ class FreeScalarEigenmodes:
     def gen_real_space_fields(self, n_sample):
         """Returns the inverse fourier transform of a sample of eigenmodes.
 
-        Inputs:
-        -------
+        Parameters
+        ----------
         n_sample: int
             sample size
 
-        Returns:
-        --------
-        fields: numpy.ndarray
-            real array of real-space fields, with shape (n_sample, L, L),
+        Returns
+        -------
+        numpy.ndarray
+            real array of real-space fields, with shape ``(n_sample, L, L)``,
             where L is the side-length of the square lattice.
         """
         eigenmodes = self.gen_eigenmodes(n_sample)

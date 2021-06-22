@@ -18,4 +18,4 @@ template_text: |
  {@table_kinetic_eigenvalues@}
 
 actions_:
-  - report(main=True)
+  - report

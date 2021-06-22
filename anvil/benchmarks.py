@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 """
 benchmarks.py
 
@@ -14,38 +16,42 @@ a sample of generated field configurations.
 
 import torch
 import numpy as np
-
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from reportengine import collect
 from reportengine.figure import figure
 from reportengine.table import table
 
-from anvil.free_scalar import FreeScalarEigenmodes
+import anvil.free_scalar
 from anvil.checks import check_trained_with_free_theory
 
 
-def free_scalar_theory(m_sq, lattice_length):
-    """Returns instance of FreeScalarEigenmodes class with specific
-    mass and lattice size.
-    """
-    return FreeScalarEigenmodes(m_sq=m_sq, lattice_length=lattice_length)
+@check_trained_with_free_theory
+def free_scalar_theory(
+    training_target_dist, training_geometry
+) -> anvil.free_scalar.FreeScalarEigenmodes:
+    """Returns instance of FreeScalarEigenmodes with specific mass and lattice size."""
+    # load target and extract m_sq from target
+    m_sq = training_target_dist.c_quadratic * 2 - 4
+    return anvil.free_scalar.FreeScalarEigenmodes(
+        m_sq=m_sq, lattice_length=training_geometry.length
+    )
 
 
-def fourier_transform(sample_training_output, training_geometry):
+def fourier_transform(configs: torch.Tensor, training_geometry) -> torch.Tensor:
     """Takes the Fourier transform of a sample of field configurations.
 
-    Inputs
-    ------
-    sample_training_output: torch.tensor
+    Parameters
+    ----------
+    configs
         A (hopefully decorrelated) sample of field configurations in the
         split representation. Shape: (sample_size, lattice_size)
-    training_geometry: geometry object
+    training_geometry
+        The geometry object corresponding to the lattice.
 
     Returns
     -------
-    phi_tilde: torch.tensor
+    torch.Tensor
         The Fourier transform of the sample in the Cartesian representation.
         Defined such that the momenta increase monotonically with the index
         on each axis.
@@ -61,43 +67,43 @@ def fourier_transform(sample_training_output, training_geometry):
     )
 
     # Put the sample back in Cartesian form
-    phi = torch.empty_like(sample_training_output).view(-1, L, L)
-    phi[:, x_split, y_split] = sample_training_output
+    phi = torch.empty_like(configs).view(-1, L, L)
+    phi[:, x_split, y_split] = configs
 
-    phi_tilde = torch.rfft(phi, signal_ndim=2, onesided=False).roll(
+    phi_tilde = torch.fft.fft2(phi).roll(
         (L // 2 - 1, L // 2 - 1), (1, 2)
     )  # so we have monotonically increasing momenta on each axis
 
     return phi_tilde
 
 
-def eigvals_from_sample(fourier_transform, training_geometry):
-    """Returns a prediction for the eigenvalues of the kinetic operator
-    for the free theory, based on the sample variance of the fourier
-    transformed fields.
+def eigvals_from_sample(
+    fourier_transform: torch.Tensor, training_geometry
+) -> np.ndarray:
+    """Returns a prediction for the eigenvalues of the kinetic operator.
 
-    The output is converted to an (L x L) numpy.ndarray.
+    The prediction is based on the sample variance of the field configurations in
+    Fourier space.
+
+    Parameters
+    ----------
+    fourier_transform
+        Sample of field configurations in Fourier space.
+    training_geometry
+        Geometry object corresponding to the lattice.
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of dimensions (L, L) containing the eigenvalues.
     """
-    variance = torch.var(fourier_transform, dim=0).sum(dim=-1)  # sum real + imag
+    variance = fourier_transform.real.var(dim=0) + fourier_transform.imag.var(dim=0)
     eigvals = training_geometry.length ** 2 * torch.reciprocal(variance)
     return eigvals.numpy()
 
 
-free_theory_from_training_ = collect("free_scalar_theory", ("training_context",))
-
-# TODO: work out way to not have to do this.. However it allows us to use check
-@check_trained_with_free_theory
-def free_theory_from_training(free_theory_from_training_, training_context):
-    """Returns free_scalar_theory but with m_sq and lattice_length extracted
-    from a training config.
-
-    """
-    (res,) = free_theory_from_training_
-    return res
-
-
 @table
-def table_real_space_variance(sample_training_output, free_theory_from_training):
+def table_real_space_variance(configs, free_scalar_theory):
     """Compare the sample variance of the generated configurations with the
     theoretical prediction based on the free scalar theory.
 
@@ -105,8 +111,8 @@ def table_real_space_variance(sample_training_output, free_theory_from_training)
     same Gaussian distribution. We therefore compare the lattice-average of the
     sample variance with the theory prediction.
     """
-    predic = np.reciprocal(free_theory_from_training.eigenvalues).mean()
-    sample_var = sample_training_output.var(dim=0)
+    predic = np.reciprocal(free_scalar_theory.eigenvalues).mean()
+    sample_var = configs.var(dim=0)
     pc_diff = (sample_var.mean() - predic) / predic * 100
     data = [
         [
@@ -122,20 +128,20 @@ def table_real_space_variance(sample_training_output, free_theory_from_training)
 
 
 @table
-def table_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
+def table_kinetic_eigenvalues(eigvals_from_sample, free_scalar_theory):
     """Compare the eigenvalues of the kinetic operator inferrered from the
-    sample of generated configurations with the theoretical predictions based 
+    sample of generated configurations with the theoretical predictions based
     on the free scalar theory.
     """
     pc_diff = (
-        (eigvals_from_sample - free_theory_from_training.eigenvalues)
-        / free_theory_from_training.eigenvalues
+        (eigvals_from_sample - free_scalar_theory.eigenvalues)
+        / free_scalar_theory.eigenvalues
         * 100
     )
     data = [
         [float(vt), float(vs), float(vd)]
         for vt, vs, vd in zip(
-            free_theory_from_training.eigenvalues.flatten(),
+            free_scalar_theory.eigenvalues.flatten(),
             eigvals_from_sample.flatten(),
             pc_diff.flatten(),
         )
@@ -145,7 +151,7 @@ def table_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
 
 
 @figure
-def plot_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
+def plot_kinetic_eigenvalues(eigvals_from_sample, free_scalar_theory):
     """Plot the eigenvalues of the kinetic operator inferred from the sample
     of generated field configurations with the theoretical predictions based
     on the free scalar theory.
@@ -163,15 +169,15 @@ def plot_kinetic_eigenvalues(eigvals_from_sample, free_theory_from_training):
     ax2.set_ylabel("$p_2$")
 
     pc_diff = (
-        (eigvals_from_sample - free_theory_from_training.eigenvalues)
-        / free_theory_from_training.eigenvalues
+        (eigvals_from_sample - free_scalar_theory.eigenvalues)
+        / free_scalar_theory.eigenvalues
         * 100
     )
     extent = [
-        free_theory_from_training.momenta[0],
-        free_theory_from_training.momenta[-1],
-        free_theory_from_training.momenta[-1],
-        free_theory_from_training.momenta[0],
+        free_scalar_theory.momenta[0],
+        free_scalar_theory.momenta[-1],
+        free_scalar_theory.momenta[-1],
+        free_scalar_theory.momenta[0],
     ]
 
     im1 = ax1.imshow(eigvals_from_sample, extent=extent)

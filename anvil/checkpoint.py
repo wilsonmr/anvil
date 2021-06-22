@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 """
 checkpoint.py
 
@@ -7,23 +9,66 @@ is made so that we don't get unexpected results
 """
 from pathlib import Path
 from glob import glob
+from copy import deepcopy
 
 import torch
 
 from reportengine.compat import yaml
-from copy import deepcopy
-
-from reportengine import collect
 
 
 def loaded_checkpoint(checkpoint):
+    """Returns a loaded checkpoint containing the state of a model."""
     if checkpoint is None:
         return None
     cp_loaded = checkpoint.load()
     return cp_loaded
 
 
-def train_range(loaded_checkpoint, epochs):
+def loaded_model(loaded_checkpoint, model_to_load):
+    """Loads state from checkpoint if provided, returns instantiated model."""
+    new_model = deepcopy(
+        model_to_load
+    )  # need to copy model so we don't get weird results
+    if loaded_checkpoint is not None:
+        new_model.load_state_dict(loaded_checkpoint["model_state_dict"])
+    return new_model
+
+
+def loaded_optimizer(
+    loaded_model,
+    loaded_checkpoint,
+    optimizer,
+    optimizer_params,
+):
+    """Loads state from checkpoint if provided, returns instantiated optimizer."""
+    optim_class = getattr(torch.optim, optimizer)
+    optim_instance = optim_class(loaded_model.parameters(), **optimizer_params)
+    if loaded_checkpoint is not None:
+        optim_instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
+    return optim_instance
+
+
+def loaded_scheduler(
+    loaded_optimizer,
+    loaded_checkpoint,
+    scheduler,
+    scheduler_params,
+):
+    """Loads state from checkpoint if provided, returns instantiated scheduler."""
+    sched_class = getattr(torch.optim.lr_scheduler, scheduler)
+    sched_instance = sched_class(loaded_optimizer, **scheduler_params)
+    if loaded_checkpoint is not None:
+        sched_instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
+    return sched_instance
+
+
+def train_range(loaded_checkpoint, epochs: int) -> tuple:
+    """Returns tuple containing the indices of the next and last training iterations.
+
+    If training from scratch, this will look like ``(0, epochs)`` where ``epochs``.
+    If loading from a checkpoint, it will instead look like ``(i_cp, epochs)``
+    where ``i_cp`` indexes the iteration at which the checkpoint was saved.
+    """
     if loaded_checkpoint is not None:
         cp_epoch = loaded_checkpoint["epoch"]
         train_range = (cp_epoch, epochs)
@@ -32,14 +77,9 @@ def train_range(loaded_checkpoint, epochs):
     return train_range
 
 
-def loaded_model(loaded_checkpoint, model_to_load):
-    new_model = deepcopy(model_to_load)  # need to copy model so we don't get weird results
-    if loaded_checkpoint is not None:
-        new_model.load_state_dict(loaded_checkpoint["model_state_dict"])
-    return new_model
-
-
 def current_loss(loaded_checkpoint):
+    """Returns the current value of the loss function from a loaded checkpoint, or
+    ``None`` if no checkpoint is provided."""
     if loaded_checkpoint is None:
         return None
     return loaded_checkpoint["loss"]

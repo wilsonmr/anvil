@@ -1,0 +1,35 @@
+package:
+  name: anvil
+  version: "0.9+{{ GIT_DESCRIBE_HASH }}"
+
+source:
+  git_url: ../
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python =3.8 # pin to python 3.8
+    - tqdm
+    - reportengine
+    - matplotlib
+    - pytorch
+    - scipy
+    - pandas
+    - numpy
+
+build:
+  noarch: python
+  script: python -m pip install --no-deps .
+
+test:
+  requires:
+    - pytest
+    - hypothesis
+  commands:
+    - pytest --pyargs anvil
+
+about:
+  home: https://github.com/wilsonmr/anvil

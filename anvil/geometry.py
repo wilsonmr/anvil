@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 """
 geometry.py
 
 Module containing transformations related to geometry.
 """
-from math import ceil
-from itertools import product
+import itertools
 
 import torch
 
@@ -20,7 +21,7 @@ class Geometry2D:
     that are updated by the affine transformation, and the remaining Nb
     entries correspond to the sites that are left unchanged.
 
-    phi = |... phiA ...|... phiB ...|
+    ``phi = |... phiA ...|... phiB ...|``
 
     using the notation in https://arxiv.org/pdf/2003.06413.pdf We call this
     representation of the field a 'split' representation.
@@ -49,9 +50,7 @@ class Geometry2D:
         """
         splitcart = torch.zeros((self.length, self.length), dtype=torch.long)
         n_a = self.checkerboard.sum().item()
-        splitcart[self.checkerboard] = torch.arange(
-            n_a, dtype=torch.long
-        )
+        splitcart[self.checkerboard] = torch.arange(n_a, dtype=torch.long)
         splitcart[~self.checkerboard] = torch.arange(
             n_a, self.length ** 2, dtype=torch.long
         )
@@ -108,13 +107,13 @@ class Geometry2D:
 
         Parameters
         ----------
-        shifts: tuple
+        shifts
             a tuple of shifts to be applied. Each element represents a shift and can
             either be an integer (if the shift is in a single dimension) or a tuple
             if the shift is applied simultaneously in multiple dimensions (see
             Examples).
 
-        dims: tuple
+        dims
             a tuple of dimensions to apply `shifts` to. As with shift, each element
             in dim can itself be a tuple which indicates that multiple shifts will
             be applied in multiple dimensions simultaneously. Note that
@@ -123,7 +122,7 @@ class Geometry2D:
 
         Returns
         -------
-        shift: torch.Tensor
+        torch.Tensor
             Tensor which can be used to index split states such that
 
                 state = tensor([\phiA, \phiB]),
@@ -188,12 +187,15 @@ class Geometry2D:
     def two_point_iterator(self):
         """Generator which yields all the lattice shifts as one-dimensional tensors.
 
+        Yields
+        ------
+        torch.Tensor
+            one-dimensional tensor containing the shift indices for each lattice shift.
+
         Notes
         -----
         The order in which the shifts are generated is defined by the lexicographical
-        order of the Cartesian product of one-dimensional shifts. See the documentation
-        for itertools.product for details.
+        order of the Cartesian product of one-dimensional shifts. See :py:func:`itertools.product`.
         """
-        for shift_cart in product(range(self.length), range(self.length)):
+        for shift_cart in itertools.product(range(self.length), range(self.length)):
             yield self.get_shift((shift_cart,), ((0, 1),)).flatten()
-

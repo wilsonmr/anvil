@@ -1,11 +1,13 @@
-import numpy as np
-import multiprocessing as mp
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
+from sys import exit
 from itertools import islice
 from functools import wraps
 from math import ceil
-import torch
+import multiprocessing as mp
 
-USE_MULTIPROCESSING = True
+import numpy as np
+import torch
 
 
 class Multiprocessing:
@@ -14,9 +16,9 @@ class Multiprocessing:
 
     Parameters
     ----------
-    func: function/method
+    func
         the function to be executed multiple times
-    generator: function/method
+    generator
         something which, when called, returns a generator object that contains
         the parameters for the function.
 
@@ -24,19 +26,24 @@ class Multiprocessing:
     -----
     Does not rely on multiprocessing.Pool since that does not work with
     instance methods without considerable extra effort (it cannot pickle them).
+    This means that the multiprocessing is not supported on Mac.
+
     """
 
-    def __init__(self, func, generator):
+    def __init__(self, func, generator, use_multiprocessing: bool):
         self.func = func
         self.generator = generator
 
         self.n_iters = sum(1 for _ in generator())
-        self.n_cores = mp.cpu_count()
-        if not USE_MULTIPROCESSING:
+
+        if not use_multiprocessing:
             self.n_cores = 1
+        else:
+            self.n_cores = mp.cpu_count()
+
         self.max_chunk = ceil(self.n_iters / self.n_cores)
 
-    def target(self, k, output_dict):
+    def target(self, k: int, output_dict: dict) -> None:
         """Function to be executed for each process."""
         generator_k = islice(
             self.generator(),
@@ -46,29 +53,66 @@ class Multiprocessing:
         i_glob = k * self.max_chunk  # global index
         for i, args in enumerate(generator_k):
             output_dict[i_glob + i] = self.func(args)
-        return
 
-    def __call__(self):
+    def __call__(self) -> dict:
         """Returns a dictionary containing the function outputs for each
         set of parameters taken from the generator. The dictionary keys are
         integers which label the order of parameter sets in the generator."""
-        manager = mp.Manager()
-        output_dict = manager.dict()
+        # don't use mp if single core.
+        if self.n_cores == 1:
+            output_dict = dict()
+            self.target(0, output_dict)
+        else:
+            manager = mp.Manager()
+            output_dict = manager.dict()
 
-        procs = []
-        for k in range(self.n_cores):
-            p = mp.Process(target=self.target, args=(k, output_dict,),)
-            procs.append(p)
-            p.start()
+            procs = []
+            for k in range(self.n_cores):
+                p = mp.Process(
+                    target=self.target,
+                    args=(
+                        k,
+                        output_dict,
+                    ),
+                )
+                procs.append(p)
+                p.start()
 
-        # Kill the zombies
-        for p in procs:
-            p.join()
+            # Kill the zombies
+            for p in procs:
+                p.join()
 
         return output_dict
 
 
-def bootstrap_sample(data, bootstrap_sample_size, seed=None):
+def bootstrap_sample(
+    data: np.ndarray, bootstrap_sample_size: int, seed=None
+) -> np.ndarray:
+    """Resample a provided array to generate a bootstrap sample.
+
+    The last dimension of the array will be one that is bootstrapped, and each
+    member of the bootstrap sample will have the same shape: ``data.shape`` .
+
+    The boostrap dimension will be inserted at position ``[-2]`` in the output
+    array.
+
+    Parameters
+    ----------
+    data
+        Array containing the data to be resampled.
+    bootstrap_sample_size
+        Size of the bootstrap sample, i.e. number of times to resample the data.
+    seed
+        Optional seed for the rng which generates the bootstrap indices, for
+        reproducibility purposes and to allow different terms in a single
+        expression to be passed to this function independently.
+
+    Returns
+    -------
+    np.ndarray
+        Array containing the bootstrap sample, dimensions
+        ``(*data.shape[:-1], bootstrap_sample_size, data.shape[-1])`` .
+    """
     rng = np.random.default_rng(seed=seed)
     *dims, data_size = data.shape
 
@@ -80,63 +124,19 @@ def bootstrap_sample(data, bootstrap_sample_size, seed=None):
     return np.stack(sample, axis=-2)
 
 
-def spher_to_eucl(coords):
-    """Converts a set (N-1) angles to a set of N-component euclidean unit vectors.
+def get_num_parameters(model) -> int:
+    """Returns the number of trainable parameters in a model.
 
-    # TODO
-    The order of the (N-1) angles [\phi^0, ..., \phi^{N-1}] is taken to match some
-    convention.
-
-    Parameters
-    ----------
-    coords: numpy.ndarray
-        The spherical coordinates (angles). The (N-1) angles are expected on the 1st
-        dimension. Dimension (lattice.volume, (N-1), *).
-
-    Returns
-    -------
-    out: numpy.ndarray
-        The Euclidean representation of the angles, dimension (lattice.volume, N, *).
-
-    Notes
-    -----
-    See REF
-    """
-    output_shape = list(coords.shape)
-    output_shape[1] += 1
-
-    output = np.ones(output_shape)
-    output[:, :-1] = np.cos(coords)
-    output[:, 1:] *= np.cumprod(np.sin(coords), axis=1)
-    return output
-
-
-class unit_norm:
-    class UnitNormError(Exception):
-        pass
-
-    def __init__(self, dim=1, atol=1e-6):
-        self._dim = dim
-        self._atol = atol
-
-    def __call__(self, setter):
-        @wraps(setter)
-        def wrapper(instance, array_in):
-            if not np.allclose(
-                np.linalg.norm(array_in, axis=self._dim), 1, atol=self._atol
-            ):
-                raise self.UnitNormError(
-                    f"Array contains elements with a norm along dimension {self.dim} that deviates from unity by more than {self.atol}."
-                )
-
-            setter(instance, array_in)
-
-def get_num_parameters(model):
-    """Return the number of trainable parameters in a model.
-
-    Taken from github.com/bayesiains/nflows
+    Reference: github.com/bayesiains/nflows
     """
     num = 0
     for parameter in model.parameters():
         num += torch.numel(parameter)
     return num
+
+
+def handler(signum, frame) -> None:
+    """Handles keyboard interruptions and terminations and exits in such a way that,
+    if the program is currently inside a try-except-finally block, the finally clause
+    will be executed."""
+    exit(1)
