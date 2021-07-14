@@ -139,9 +139,7 @@ class AdditiveLayer(CouplingLayer):
             bias=not z2_equivar,
         )
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -200,9 +198,7 @@ class AffineLayer(CouplingLayer):
         )
         self.z2_equivar = z2_equivar
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -446,9 +442,7 @@ class GlobalAffineLayer(nn.Module):
         self.scale = scale
         self.shift = shift
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the global affine transformation."""
         return self.scale * v_in + self.shift, log_density
 
@@ -485,9 +479,7 @@ class BatchNormLayer(nn.Module):
         super().__init__()
         self.gamma = scale
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the batch normalisation transformation."""
         mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
@@ -523,9 +515,7 @@ class GlobalRescaling(nn.Module):
         if learnable:
             self.scale = nn.Parameter(self.scale)
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the global rescaling layer."""
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
@@ -544,3 +534,18 @@ class Sequential(nn.Sequential):
         for module in self:
             v, log_density = module(v, log_density, *args)
         return v, log_density
+
+
+class ElementWiseRescaling(nn.Module):
+    r"""Performs an element-wise rescaling of the inputs."""
+
+    def __init__(self, scale: torch.Tensor):
+        super().__init__()
+        self.scale = torch.Tensor(scale)
+
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
+        """Forward pass of the element-wise rescaling layer."""
+        v_out = self.scale * v_in
+        log_density -= torch.log(self.scale).sum()
+        return v_out, log_density
+
