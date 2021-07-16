@@ -9,10 +9,23 @@ to produce sequences of transformations.
 
 """
 from functools import partial
+import numpy as np
 
 from reportengine import collect
 
 import anvil.layers as layers
+import anvil.free_scalar
+
+
+def fourier_to_real(geometry):
+    m_sq = 16 / geometry.volume
+    fs = anvil.free_scalar.FreeScalarEigenmodes(m_sq, geometry.length)
+    variance = fs._variance()
+    scale = np.roll(variance, (-fs.ip0, -fs.ip0), (-2, -1)).flatten()
+
+    return layers.Sequential(
+        layers.ElementWiseRescaling(scale), layers.FourierTransform(geometry)
+    )
 
 
 def _coupling_block(
@@ -239,7 +252,14 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
 
 
 # collect layers from copied runcard
-_normalizing_flow = collect("layer_action", ("training_context", "model",))
+_normalizing_flow = collect(
+    "layer_action",
+    (
+        "training_context",
+        "model",
+    ),
+)
+
 
 def model_to_load(_normalizing_flow) -> layers.Sequential:
     """action which wraps a list of layers in
@@ -294,9 +314,11 @@ def model_to_load(_normalizing_flow) -> layers.Sequential:
     flow_flat = [block for layer in _normalizing_flow for block in layer]
     return layers.Sequential(*flow_flat)
 
+
 # annoyingly, the api may not have a training output. In which case
 # load model from explicitly declared params.
 _api_normalizing_flow = collect("layer_action", ("model",))
+
 
 def explicit_model(_api_normalizing_flow):
     """Action to be called from the API. Build model from an explicit
@@ -322,6 +344,7 @@ def explicit_model(_api_normalizing_flow):
     # Note: use same action as train/sample apps, so that tests can cover these.
     return model_to_load(_api_normalizing_flow)
 
+
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
     "nice": nice,
@@ -329,4 +352,5 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
+    "fourier_to_real": fourier_to_real,
 }

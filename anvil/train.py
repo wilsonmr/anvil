@@ -21,7 +21,9 @@ signal.signal(signal.SIGTERM, handler)  # termination
 signal.signal(signal.SIGINT, handler)  # keyboard interrupt
 
 
-def save_checkpoint(outpath: str, epoch: int, loss: float, model, optimizer, scheduler) -> None:
+def save_checkpoint(
+    outpath: str, epoch: int, loss: float, model, optimizer, scheduler
+) -> None:
     """Saves a the state of the model, optimizer and scheduler as a checkpoint file
     for later reloading."""
     torch.save(
@@ -153,7 +155,7 @@ def train(
 ):
     """Loop over training updates, periodically saving checkpoints.
 
-    Repeatedly calls :py:func:`anvil.train.training_update` and 
+    Repeatedly calls :py:func:`anvil.train.training_update` and
     :py:func:`anvil.train.save_checkpoint` , until a prescribed number of training
     updates have been performed.
 
@@ -190,7 +192,7 @@ def train(
     Returns
     -------
     loaded_model
-        
+
     """
 
     # Let the user know the total number of model parameters

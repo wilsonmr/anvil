@@ -15,6 +15,7 @@ ACTIVATION_LAYERS = {
     "leaky_relu": nn.LeakyReLU,
     "tanh": nn.Tanh,
     None: nn.Identity,
+    "none": nn.Identity,
 }
 
 

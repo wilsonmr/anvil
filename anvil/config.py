@@ -54,8 +54,7 @@ class ConfigParser(Config):
         """Returns the geometry object defining the lattice."""
         return Geometry2D(lattice_length)
 
-    def produce_target_dist(
-        self, geometry, parameterisation: str, couplings: dict):
+    def produce_target_dist(self, geometry, parameterisation: str, couplings: dict):
         """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
         try:
             constructor = getattr(PhiFourScalar, f"from_{parameterisation}")
@@ -66,7 +65,8 @@ class ConfigParser(Config):
         return constructor(geometry, **couplings)
 
     def produce_base_dist(
-        self, lattice_size, loc: (int, float) = 0, sigma: (int, float) = 1) -> Gaussian:
+        self, lattice_size, loc: (int, float) = 0, sigma: (int, float) = 1
+    ) -> Gaussian:
         """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
         return Gaussian(lattice_size, loc=loc, scale=sigma)
 

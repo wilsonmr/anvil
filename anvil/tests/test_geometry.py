@@ -24,9 +24,7 @@ def test_checkerboard():
 
 
 def test_splitcart():
-    assert torch.allclose(
-        TESTING_GEOMETRY.splitcart, torch.tensor([[0, 2], [3, 1]])
-    )
+    assert torch.allclose(TESTING_GEOMETRY.splitcart, torch.tensor([[0, 2], [3, 1]]))
 
 
 def test_splitlexi():
@@ -34,8 +32,7 @@ def test_splitlexi():
 
 
 def test_indexing():
-    """Tests that the indexing example of get_shift is reproduced.
-    """
+    """Tests that the indexing example of get_shift is reproduced."""
     phi = torch.tensor([0, 3, 1, 2])
     shift = TESTING_GEOMETRY.get_shift()
     assert torch.allclose(phi[shift], torch.tensor([[2, 1, 3, 0], [1, 2, 0, 3]]))

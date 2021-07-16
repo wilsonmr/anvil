@@ -62,7 +62,7 @@ def table_autocorrelation(
 def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
     r"""Tabulate the correlation length and magnetization estimates resulting from the
     fitting of a cosh to the correlation function.
-    
+
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
 
@@ -94,7 +94,7 @@ def table_fit(correlation_length_from_fit, abs_magnetization_sq_from_fit):
 @table
 def table_two_point_scalars(ising_energy, susceptibility):
     r"""Table of scalar observables derived from the two point correlation function.
-    
+
     Values and errors are means and standard deviations over a bootstrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
 

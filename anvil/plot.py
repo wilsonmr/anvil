@@ -103,7 +103,7 @@ def plot_zero_momentum_correlator(
 @figure
 def plot_effective_pole_mass(training_geometry, effective_pole_mass):
     r"""Plots the (effective) pole mass as a function of 'time' separation.
-    
+
     Points and errorbars are means and standard deviations across a boostrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
 
@@ -142,17 +142,17 @@ def plot_correlation_length(
     correlation_length_from_fit,
 ):
     r"""Plots three estimates of correlation length.
-    
+
     These are:
         1. Estimate from fitting a cosh function to the correlation between
             1-dimensional slices, using py:func:`correlation_length_from_fit`
         2. Reciprocal of the effective pole mass estimator, using
-            :py:func:`effective_pole_mass` (evaluated at each separation, :math:`x_2`. 
+            :py:func:`effective_pole_mass` (evaluated at each separation, :math:`x_2`.
         3. Low momentum estimate, using :py:func:`low_momentum_correlation_length`
 
     Points and errorbars are means and standard deviations across a boostrap ensemble,
     which is assumed to be the last (``-1``) dimension of input arrays.
-    
+
     Parameters
     ----------
     effective_pole_mass
@@ -224,9 +224,9 @@ def plot_two_point_correlator(two_point_correlator):
     The data shown is the mean of a bootstrap sample of correlation functions, and is
     normalised so that :math:`G(0, 0) = 1`. The colour axis is scaled using a symmetric
     log scale, with a linear region spanning :math:`[-0.01, 0.01]`.
-    
+
     The bootstrap dimension is assumed to be the last (``-1``) dimension of input arrays.
-    
+
     Parameters
     ----------
     two_point_correlator
@@ -274,9 +274,9 @@ def plot_two_point_correlator_error(two_point_correlator):
     The error is computed as the standard deviation over the bootstrap sample. The
     data shown is this error divided by the mean of the bootstrap sample, i.e. the
     fractional error.
-    
+
     The bootstrap dimension is assumed to be the last (``-1``) dimension of input arrays.
-    
+
     Parameters
     ----------
     two_point_correlator
@@ -349,7 +349,7 @@ def plot_magnetization(magnetization_series):
 def plot_magnetization_series(magnetization_series, sample_interval):
     r"""Plots the magnetization of each configuration in the Markov chain over the
     course of the Metropolis-Hastings sampling phase.
-    
+
     Parameters
     ----------
     magnetization_series
@@ -392,14 +392,14 @@ def plot_magnetization_series(magnetization_series, sample_interval):
 
 @figure
 def plot_magnetization_autocorr(
-        magnetization_autocorr, magnetization_optimal_window: int, sample_interval: int
+    magnetization_autocorr, magnetization_optimal_window: int, sample_interval: int
 ):
     r"""Plots the autocorrelation function for the magnetization of the sequence of
     configurations generated in the Metropolis-Hastings sampling phase.
 
     The x-axis corresponds to a number of steps separating pairs of configurations
     in the sequence.
-    
+
     Parameters
     ----------
     magnetization_autocorr
@@ -463,10 +463,10 @@ def plot_magnetization_integrated_autocorr(
 ):
     r"""Plots the integrated autocorrelation function for the magnetization of the
     sequence of configurations generated in the Metropolis-Hastings sampling phase.
-    
+
     The x axis represents the size of the 'window' in which the summation is performed,
     i.e. the point at which the autocorrelation function is truncated.
-    
+
     Parameters
     ----------
     magnetization_integrated_autocorr
