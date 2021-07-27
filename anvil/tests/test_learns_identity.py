@@ -9,7 +9,7 @@ from anvil.distributions import Gaussian, FreeScalar
 from anvil.geometry import Geometry2D
 import anvil.train
 
-L = 4
+L = 8
 PARAMS = {"lattice_length": L, "lattice_dimension": 2}
 GEOMETRY = Geometry2D(L)
 GAUSSIAN = Gaussian(GEOMETRY.volume)

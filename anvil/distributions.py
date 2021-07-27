@@ -6,7 +6,7 @@ distributions.py
 Module containing classes corresponding to different probability distributions.
 """
 from functools import cached_property
-from math import pi
+from math import pi, sqrt
 
 import torch
 import torch.distributions
@@ -231,9 +231,11 @@ class FreeScalar:
             eigenmodes[:, -1, i0 + 1 : -1].conj(), dims=(-1,)
         )
 
+        # Let everything have variance 1, not 1/2
+        eigenmodes *= sqrt(2)
+
         # Multiply by standard deviations
-        # Factor of 2 because real/imag components currently have variance 1/2
-        eigenmodes = eigenmodes * (2 * self.variances).sqrt().unsqueeze(dim=0)
+        eigenmodes *= self.variances.sqrt().unsqueeze(dim=0)
 
         return torch.roll(eigenmodes, shifts=(-self.i0, -self.i0), dims=(-2, -1))
 
@@ -271,13 +273,16 @@ class FreeScalar:
         """hi"""
         eigenmodes = self.gen_eigenmodes(sample_size)
 
-        real_space_configs = torch.fft.ifft2(eigenmodes)
-
-        phi = real_space_configs.real.view(-1, self.geometry.volume)
+        real_space_configs = torch.fft.ifft2(eigenmodes, norm="backward")
 
         assert torch.all(real_space_configs.imag.abs() < 1e-9)
 
-        return phi, self.log_density(phi)
+        phi = real_space_configs.real
+
+        # The action takes a split representation, so need to convert!
+        phi_split = phi.view(-1, self.geometry.volume)[:, self.geometry.lexisplit]
+
+        return phi_split, self.log_density(phi_split)
 
 
 class PhiFourScalar:

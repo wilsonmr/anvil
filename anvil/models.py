@@ -352,5 +352,5 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
-    "fourier_to_real": fourier_to_real,
+    #"fourier_to_real": fourier_to_real,
 }
