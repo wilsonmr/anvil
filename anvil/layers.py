@@ -44,10 +44,15 @@ as a single subclass of :py:class:`torch.nn.Module` which performs the
 full normalising flow transformation :math:`f(z)`.
 
 """
+import itertools
+from functools import cached_property
+import math
+
 import torch
 import torch.nn as nn
 
 from anvil.neural_network import DenseNeuralNetwork
+from anvil.free_scalar import FreeScalarMomentumSpace
 
 
 class CouplingLayer(nn.Module):
@@ -541,11 +546,118 @@ class ElementWiseRescaling(nn.Module):
 
     def __init__(self, scale: torch.Tensor):
         super().__init__()
-        self.scale = torch.Tensor(scale)
+        self.scale = scale.unsqueeze(dim=0)
 
     def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the element-wise rescaling layer."""
         v_out = self.scale * v_in
         log_density -= torch.log(self.scale).sum()
         return v_out, log_density
+
+
+class InverseFourierTransform(nn.Module):
+    def __init__(self, geometry, rescale=True, m_sq=None):
+        super().__init__()
+        self.geometry = geometry
+        self.length = geometry.length
+        self.volume = geometry.volume
+        self.i_nyq = self.length // 2  # x/y position for nyquist term
+        self.rescale = rescale
+
+        if rescale:
+            self.scale = torch.roll(
+                (
+                    FreeScalarMomentumSpace(geometry, m_sq)
+                    .variances.sqrt()
+                    .unsqueeze(dim=0)
+                ),
+                (-self.i_nyq + 1, -self.i_nyq + 1),
+                (-2, -1),
+            )
+
+    @cached_property
+    def _rth_mask(self):
+        n = self.i_nyq  # easier on the eye
+
+        init_val = -1
+        mask_real = torch.full(
+            size=(self.length, self.length), fill_value=init_val, dtype=torch.long
+        )
+        mask_imag = torch.full(
+            size=(self.length, self.length), fill_value=init_val, dtype=torch.long
+        )
+
+        counter = 0
+        for i, j in itertools.product(range(self.length), range(self.length)):
+            if mask_real[i, j] == init_val:
+                mask_real[i, j] = counter
+                mask_real[-i, -j] = counter
+                counter += 1
+
+        for i, j in itertools.product(range(self.length), range(self.length)):
+            if mask_imag[i, j] == init_val:
+                # Skip 0 and nyquist terms for imag
+                if (i, j) not in ((0, 0), (0, n), (n, 0), (n, n)):
+                    mask_imag[i, j] = counter
+                    mask_imag[-i, -j] = counter
+                    counter += 1
+
+        assert counter == self.length ** 2
+
+        return mask_real, mask_imag
+
+    @cached_property
+    def _negate_imag(self):
+        n = self.i_nyq
+        mask = torch.ones((self.length, self.length)).to(torch.long)
+        mask[n + 1 :, :] = -1
+        mask[0, n + 1 :] = -1
+        mask[n, n + 1 :] = -1
+        return mask.unsqueeze(dim=0)
+
+    @cached_property
+    def _real_mode_mask(self):
+        mask = torch.zeros((self.length, self.length)).bool()
+        mask[0, 0] = mask[0, self.i_nyq] = mask[self.i_nyq, 0] = mask[
+            self.i_nyq, self.i_nyq
+        ] = True
+        return mask
+
+    def real_to_hermitean(self, v: torch.Tensor):
+        """Take a sample of real-valued inputs in lexicographic representation and
+        map them to complex-valued Hermitean states representing real scalar field
+        configurations in momentum space.
+
+        An inverse Fourier transformation will then produce real-valued field
+        configurations in real space.
+
+        Note that we impose an arbitrary geometry.
+        """
+        mask_real, mask_imag = self._rth_mask
+        real_part = v[:, mask_real]
+        imag_part = v[:, mask_imag] * self._negate_imag
+        imag_part[:, self._real_mode_mask] = 0
+        return torch.complex(real_part, imag_part)
+
+    def forward(self, v: torch.Tensor, log_density: torch.Tensor, *args):
+
+        # Map to Hermitean matrix representing momenta of real scalar
+        v_herm = self.real_to_hermitean(v)
+
+        # Rescale
+        if self.rescale:
+           v_herm *= self.scale
+           log_density -= torch.log(self.scale).sum()
+        
+        # Inverse Fourier transform. Result should be real
+        ift = torch.fft.ifft2(v_herm, norm="backward")
+        log_density -= math.log(self.volume) * self.volume
+
+        assert torch.all(ift.imag.abs() < 1e-9)
+
+        # Convert to split representation so action makes sense!
+        ift_split = ift.real.view(-1, self.volume)[:, self.geometry.lexisplit]
+
+        return ift_split, log_density
+
 

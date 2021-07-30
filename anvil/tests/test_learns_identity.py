@@ -48,7 +48,6 @@ def test_rescaling(dist):
 
     scale = next(iter(model.parameters()))
 
-    print(scale)
     assert abs(scale - 1) < 5 * ETA
 
 
@@ -61,3 +60,18 @@ def test_zero_kl(dist):
     kl = anvil.train.reverse_kl(base_log_density, target.log_density(phi))
 
     assert kl == 0
+
+def test_preprocessing():
+    base = GAUSSIAN
+    target = FREE_SCALAR
+    model_spec = (
+            {"layer": "inverse_fourier"},
+            {"layer": "global_rescaling", "scale": 1, "learnable": True}
+    )
+    model = API.explicit_model(model=model_spec, **PARAMS)
+
+    train(base, target, model)
+
+    scale = next(iter(model.parameters()))
+
+    assert abs(scale - 1) < 5 * ETA

@@ -17,17 +17,6 @@ import anvil.layers as layers
 import anvil.free_scalar
 
 
-def fourier_to_real(geometry):
-    m_sq = 16 / geometry.volume
-    fs = anvil.free_scalar.FreeScalarEigenmodes(m_sq, geometry.length)
-    variance = fs._variance()
-    scale = np.roll(variance, (-fs.ip0, -fs.ip0), (-2, -1)).flatten()
-
-    return layers.Sequential(
-        layers.ElementWiseRescaling(scale), layers.FourierTransform(geometry)
-    )
-
-
 def _coupling_block(
     coupling_layer: layers.CouplingLayer, **kwargs
 ) -> layers.Sequential:
@@ -250,6 +239,9 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     """
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
+def inverse_fourier(geometry, rescale=True, m_sq=None):
+    return layers.Sequential(layers.InverseFourierTransform(geometry, rescale, m_sq))
+
 
 # collect layers from copied runcard
 _normalizing_flow = collect(
@@ -352,5 +344,5 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
-    #"fourier_to_real": fourier_to_real,
+    "inverse_fourier": inverse_fourier,
 }

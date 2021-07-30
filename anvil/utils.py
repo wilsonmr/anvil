@@ -140,3 +140,5 @@ def handler(signum, frame) -> None:
     if the program is currently inside a try-except-finally block, the finally clause
     will be executed."""
     exit(1)
+
+

@@ -16,7 +16,7 @@ from reportengine.configparser import ConfigError, element_of, explicit_node
 from anvil.geometry import Geometry2D
 from anvil.checkpoint import TrainingOutput
 from anvil.models import LAYER_OPTIONS
-from anvil.distributions import PhiFourScalar, Gaussian
+from anvil.distributions import PhiFourScalar, Gaussian, FreeScalar
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +69,9 @@ class ConfigParser(Config):
     ) -> Gaussian:
         """Uses arguments to instantiate :py:class:`anvil.distributions.Gaussian`"""
         return Gaussian(lattice_size, loc=loc, scale=sigma)
+
+    def produce_base_distx(self, geometry, m0sq):
+        return FreeScalar(geometry, m0sq)
 
     def parse_sigma(self, sigma: float) -> float:
         """The standard deviation of a normal distribution."""
