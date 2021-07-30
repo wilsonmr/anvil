@@ -541,12 +541,14 @@ class Sequential(nn.Sequential):
         return v, log_density
 
 
-class ElementWiseRescaling(nn.Module):
+class ElementwiseRescaling(nn.Module):
     r"""Performs an element-wise rescaling of the inputs."""
 
-    def __init__(self, scale: torch.Tensor):
+    def __init__(self, scale: torch.Tensor, learnable: bool):
         super().__init__()
         self.scale = scale.unsqueeze(dim=0)
+        if learnable:
+            self.scale = nn.Parameter(self.scale)
 
     def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the element-wise rescaling layer."""
@@ -646,9 +648,12 @@ class InverseFourierTransform(nn.Module):
 
         # Rescale
         if self.rescale:
-           v_herm *= self.scale
-           log_density -= torch.log(self.scale).sum()
-        
+            v_herm *= self.scale
+            log_density -= torch.log(self.scale).sum()
+        else:
+            # NOTE:variance of real/imag components of complex modes is 1/2 that of real
+            v_herm[:, ~self._real_mode_mask] /= math.sqrt(2)
+
         # Inverse Fourier transform. Result should be real
         ift = torch.fft.ifft2(v_herm, norm="backward")
         log_density -= math.log(self.volume) * self.volume
@@ -659,5 +664,3 @@ class InverseFourierTransform(nn.Module):
         ift_split = ift.real.view(-1, self.volume)[:, self.geometry.lexisplit]
 
         return ift_split, log_density
-
-

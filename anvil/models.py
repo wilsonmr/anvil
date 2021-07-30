@@ -9,7 +9,9 @@ to produce sequences of transformations.
 
 """
 from functools import partial
+
 import numpy as np
+import torch
 
 from reportengine import collect
 
@@ -239,6 +241,12 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     """
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
+
+def elementwise_rescaling(geometry):
+    scale = torch.ones(geometry.volume)
+    return layers.Sequential(layers.ElementwiseRescaling(scale=scale, learnable=True))
+
+
 def inverse_fourier(geometry, rescale=True, m_sq=None):
     return layers.Sequential(layers.InverseFourierTransform(geometry, rescale, m_sq))
 
@@ -344,5 +352,6 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
+    "elementwise_rescaling": elementwise_rescaling,
     "inverse_fourier": inverse_fourier,
 }
