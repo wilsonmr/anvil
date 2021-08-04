@@ -9,7 +9,7 @@ is working correctly.
     
 Notes
 -----
-See the docstring for anvil.free_scalar.FreeScalarEigenmodes for an explanation
+See the docstring for anvil.free_scalar.FreeScalar for an explanation
 of the theoretical predictions and how to match them to quantities derived from
 a sample of generated field configurations.
 """
@@ -29,13 +29,11 @@ from anvil.checks import check_trained_with_free_theory
 @check_trained_with_free_theory
 def free_scalar_theory(
     training_target_dist, training_geometry
-) -> anvil.free_scalar.FreeScalarMomentumSpace:
-    """Returns instance of FreeScalarMomentumSpace with specific mass and lattice size."""
+) -> anvil.free_scalar.FreeScalar:
+    """Returns instance of FreeScalar with specific mass and lattice size."""
     # load target and extract m_sq from target
     m_sq = training_target_dist.c_quadratic * 2 - 4
-    return anvil.free_scalar.FreeScalarMomentumSpace(
-        m_sq=m_sq, geometry=training_geometry
-    )
+    return anvil.free_scalar.FreeScalar(m_sq=m_sq, geometry=training_geometry)
 
 
 def fourier_transform(configs: torch.Tensor, training_geometry) -> torch.Tensor:

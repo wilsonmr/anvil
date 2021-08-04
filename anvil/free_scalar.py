@@ -3,18 +3,17 @@
 """
 free_scalar.py
 
-module containing the FreeScalarMomentumSpace class used to compare with model
+module containing the FreeScalar class used to compare with model
 trained to free scalar theory
 
 """
 from functools import cached_property
-from math import pi
+from math import pi, sqrt
 
-import numpy as np
 import torch
-    
 
-class FreeScalarMomentumSpace:
+
+class FreeScalar:
     r"""Class representing a non-interacting scalar field in momentum space.
 
     The action for the theory of a free scalar on a lattice is
@@ -133,3 +132,149 @@ class FreeScalarMomentumSpace:
 
         return variances
 
+    def rvs_eigenmodes(self, sample_size: int) -> torch.Tensor:
+        r"""Generates a sample of field configurations in momentum space.
+
+        Given ``sample_size``, generates a sample of complex, Hermitean configurations
+        that are distributed according to the Fourier transform of the action of a
+        free scalar theory, that is, a product of uncorrelated one-dimensional
+        Gaussian distributions with variances determined by the ``variances`` method.
+
+        Each configuration returned is a 2D tensor. Going from low to high indices in
+        the two dimensions corresponds to running through integers :math:`n` labeling
+        momentum sates
+
+            .. math:
+
+                k_n = \frac{2\pi}{L} n
+
+        where
+
+            .. math:
+
+                n = 0, 1, ..., L/2-1, -L/2, -L/2+1, ..., -1
+
+        Parameters
+        ----------
+        sample_size
+            Number of configurations to generate
+
+        Returns
+        -------
+        torch.Tensor
+            Complex tensor with shape ``(sample_size, L, L)``. Zero momentum component
+            found at the (0, 0) position.
+        """
+
+        i0 = self.i0  # just easier on the eye
+
+        # Start with L x L complex zeros
+        eigenmodes = torch.complex(
+            torch.zeros((sample_size, self.geometry.length, self.geometry.length)),
+            torch.zeros((sample_size, self.geometry.length, self.geometry.length)),
+        )
+
+        # Generate Gaussian numbers for bottom right square (+, +)
+        # NOTE: var(real + imag) = 1, thus var(real) = var(imag) = 1/2
+        eigenmodes[:, i0:, i0:] = torch.randn_like(eigenmodes[:, i0:, i0:])
+        eigenmodes.imag[:, self._real_mode_mask] = 0  # four of these are real
+
+        # Generate top right square (-, +)
+        eigenmodes[:, :i0, i0 + 1 : -1] = torch.randn_like(
+            eigenmodes[:, :i0, i0 + 1 : -1]
+        )
+
+        # Reflect bottom right (+, +) to top left (-, -)
+        eigenmodes[:, : i0 + 1, : i0 + 1] = torch.flip(
+            eigenmodes[:, i0:-1, i0:-1].conj(), dims=(-2, -1)
+        )
+
+        # Reflect top right (+, -) to bottom left (-, +)
+        eigenmodes[:, i0 + 1 : -1, :i0] = torch.flip(
+            eigenmodes[:, :i0, i0 + 1 : -1].conj(), dims=(-2, -1)
+        )
+
+        # Reflect row/col with k1 = kmax / k2 = kmax
+        eigenmodes[:, :i0, -1] = torch.flip(
+            eigenmodes[:, i0 + 1 : -1, -1].conj(), dims=(-1,)
+        )
+        eigenmodes[:, -1, :i0] = torch.flip(
+            eigenmodes[:, -1, i0 + 1 : -1].conj(), dims=(-1,)
+        )
+
+        # Let everything have variance 1, not 1/2
+        eigenmodes *= sqrt(2)
+
+        # Multiply by standard deviations
+        eigenmodes *= self.variances.sqrt().unsqueeze(dim=0)
+
+        # Roll so that [0,0] indexes the zero momentum component
+        return torch.roll(eigenmodes, shifts=(-self.i0, -self.i0), dims=(-2, -1))
+
+    def action(self, phi: torch.Tensor) -> torch.Tensor:
+        """Action computed for a sample of field configurations.
+
+        Parameters
+        ----------
+        phi
+            Tensor containing sample of configurations, dimensions
+            ``(sample_size, lattice_size)``
+
+        Returns
+        -------
+        torch.Tensor
+            The computed action for each configuration in the sample, dimensions
+            ``(sample_size, 1)``
+        """
+        return (
+            -(phi[:, self.shift] * phi.unsqueeze(dim=1)).sum(dim=1)
+            + (4 + self.m_sq) / 2 * phi.pow(2)
+        ).sum(dim=1, keepdim=True)
+
+    def log_density(self, phi: torch.Tensor) -> torch.Tensor:
+        """The negative action for a sample of field configurations.
+
+        This is equal to the logarithm of the probability density up to an constant
+        arising from unknown normalisation (the partition function).
+
+        See :py:mod:`anvil.distributions.PhiFourScalar.action`
+        """
+        return -self.action(phi)
+
+    def __call__(self, sample_size: int):
+        """Returns a tuple of field configurations and their associated actions.
+
+        The returned configurations are in *real* space, and have been arranged
+        according to the flat-split representation set out in
+        :py:class:`anvil.geometry.Geometry2D` so that actions can be computed in
+        the usual way.
+
+        This allows the class to be used as a 'base' distribution, similarly to
+        :py:class:`anvil.distributions.Gaussian`.
+
+        Parameters
+        ----------
+        sample_size
+            Number of free field configurations to generate.
+
+        Returns
+        -------
+        tuple
+            Sample of field configurations, dimensions ``(sample_size, lattice_size)``
+            Tensor containing the negative actions, dimensions ``(sample_size, 1)``
+        """
+        # Generate Hermitean configs representing configs in Fourier space
+        eigenmodes = self.rvs_eigenmodes(sample_size)
+
+        # Inverse Fourier transform, including normalization by 1/|\Lambda|
+        real_space_configs = torch.fft.ifft2(eigenmodes, norm="backward")
+
+        assert torch.all(real_space_configs.imag.abs() < 1e-9)
+
+        # Convert to real tensor
+        phi = real_space_configs.real
+
+        # The action takes a split representation, so need to convert!
+        phi_split = phi.view(-1, self.geometry.volume)[:, self.geometry.lexisplit]
+
+        return phi_split, self.log_density(phi_split)

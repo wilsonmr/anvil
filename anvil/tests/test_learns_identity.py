@@ -5,7 +5,8 @@ import torch
 import torch.optim
 
 from anvil.api import API
-from anvil.distributions import Gaussian, FreeScalar
+from anvil.distributions import Gaussian
+from anvil.free_scalar import FreeScalar
 from anvil.geometry import Geometry2D
 import anvil.train
 
@@ -61,12 +62,13 @@ def test_zero_kl(dist):
 
     assert kl == 0
 
+
 def test_preprocessing():
     base = GAUSSIAN
     target = FREE_SCALAR
     model_spec = (
-            {"layer": "inverse_fourier"},
-            {"layer": "global_rescaling", "scale": 1, "learnable": True}
+        {"layer": "gauss_to_free"},
+        {"layer": "global_rescaling", "scale": 1, "learnable": True},
     )
     model = API.explicit_model(model=model_spec, **PARAMS)
 

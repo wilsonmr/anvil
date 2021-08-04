@@ -7,7 +7,6 @@ Module containing functions required to train model
 """
 import logging
 import signal
-import sys
 from tqdm import tqdm
 
 import torch

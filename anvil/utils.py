@@ -2,7 +2,6 @@
 # Copywrite © 2021 anvil Michael Wilson, Joe Marsh Rossney, Luigi Del Debbio
 from sys import exit
 from itertools import islice
-from functools import wraps
 from math import ceil
 import multiprocessing as mp
 
@@ -140,5 +139,3 @@ def handler(signum, frame) -> None:
     if the program is currently inside a try-except-finally block, the finally clause
     will be executed."""
     exit(1)
-
-

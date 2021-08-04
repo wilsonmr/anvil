@@ -10,13 +10,9 @@ to produce sequences of transformations.
 """
 from functools import partial
 
-import numpy as np
-import torch
-
 from reportengine import collect
 
 import anvil.layers as layers
-import anvil.free_scalar
 
 
 def _coupling_block(
@@ -242,13 +238,21 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
 
-def elementwise_rescaling(geometry, m_sq=None):
-    scale = torch.ones(geometry.volume)
-    return layers.Sequential(layers.ElementwiseRescaling(geometry, m_sq))
+def gauss_to_free(geometry, m_sq=None):
+    """Action which returns an instance of :py:class:`anvil.layers.GaussToFreeField`.
 
+    Parameters
+    ----------
+    geometry
+        The :py:class:`anvil.geometry.Geometry2D` object representing the lattice
+    m_sq
+        The bare mass squared of the theory
 
-def inverse_fourier(geometry, rescale=True, m_sq=None):
-    return layers.Sequential(layers.InverseFourierTransform(geometry, rescale, m_sq))
+    Returns
+    -------
+    anvil.layers.Sequential
+    """
+    return layers.Sequential(layers.GaussToFreeField(geometry, m_sq))
 
 
 # collect layers from copied runcard
@@ -278,6 +282,7 @@ def model_to_load(_normalizing_flow) -> layers.Sequential:
         - ``rational_quadratic_spline``
         - ``batch_norm``
         - ``global_rescaling``
+        - ``gauss_to_free``
 
     You can see their dependencies using the ``anvil`` provider help, e.g.
     for ``real_nvp``:
@@ -352,6 +357,5 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
-    "elementwise_rescaling": elementwise_rescaling,
-    "inverse_fourier": inverse_fourier,
+    "gauss_to_free": gauss_to_free,
 }
