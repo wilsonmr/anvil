@@ -242,9 +242,9 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
 
-def elementwise_rescaling(geometry):
+def elementwise_rescaling(geometry, m_sq=None):
     scale = torch.ones(geometry.volume)
-    return layers.Sequential(layers.ElementwiseRescaling(scale=scale, learnable=True))
+    return layers.Sequential(layers.ElementwiseRescaling(geometry, m_sq))
 
 
 def inverse_fourier(geometry, rescale=True, m_sq=None):

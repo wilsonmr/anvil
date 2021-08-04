@@ -542,18 +542,32 @@ class Sequential(nn.Sequential):
 
 
 class ElementwiseRescaling(nn.Module):
-    r"""Performs an element-wise rescaling of the inputs."""
+    r"""Performs an element-wise rescaling of the inputs.
 
-    def __init__(self, scale: torch.Tensor, learnable: bool):
+    Assuming the inputs are zero-mean, unit-variance uncorrelated Gaussians,
+    this rescales them such that they represent the real and imaginary parts
+    of the Fourier modes, though the geometry is totally scrambled.
+    """
+
+    def __init__(self, geometry, m_sq=None):
         super().__init__()
-        self.scale = scale.unsqueeze(dim=0)
-        if learnable:
-            self.scale = nn.Parameter(self.scale)
+        self.geometry = geometry
+        self.length = geometry.length
+        self.volume = geometry.volume
+
+        i_nyq = self.length // 2  # x/y position for nyquist term
+        self.scale = (
+            FreeScalarMomentumSpace(geometry, m_sq)
+            .variances.sqrt()
+            .flatten()
+            .unsqueeze(dim=0)
+        )
+        self.shift = torch.log(self.scale).sum()
 
     def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the element-wise rescaling layer."""
         v_out = self.scale * v_in
-        log_density -= torch.log(self.scale).sum()
+        log_density -= self.shift
         return v_out, log_density
 
 
