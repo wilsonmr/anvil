@@ -44,6 +44,7 @@ as a single subclass of :py:class:`torch.nn.Module` which performs the
 full normalising flow transformation :math:`f(z)`.
 
 """
+import logging
 import itertools
 from functools import cached_property
 
@@ -53,58 +54,10 @@ import torch.nn as nn
 from anvil.neural_network import DenseNeuralNetwork
 from anvil.free_scalar import FreeScalar
 
-
-class CouplingLayer(nn.Module):
-    r"""
-    Base class for coupling layers, inheriting from py:class:`torch.nn.Module` but
-    redefining the ``forward`` method so that the Jacobian determinant of the layers
-    are accumulated alongside the activations.
-
-    A generic coupling layer takes the form
-    
-    .. math::
-
-        v^P & \leftarrow v^P \\
-        v^A & \leftarrow C \left( v^A ; \{\mathbf{N}(v^P)\} \right)
-
-    where the :math:`|\Lambda|`-dimensional input configuration :math:`v` has been split
-    into two partitions, labelled by :math:`A` and :math:`P` (active and passive).
-
-    Here, the paritions are split according to a checkerboard (even/odd) scheme, as
-    defined in :py:class:`anvil.geometry.Geometry2D`.
-
-    :math:`\{\mathbf{N}(v^P)\}` is a set of functions of the passive partition that parameterise
-    the coupling layer. These functions are to be modelled by neural networks.
-
-    Parameters
-    ----------
-    size_half: int
-        Half of the configuration size, which is the size of the input vector
-        for the neural networks.
-    even_sites: bool
-        dictates which half of the data is transformed as a and b, since
-        successive affine transformations alternate which half of the data is
-        passed through neural networks.
-    """
-
-    def __init__(self, size_half: int, even_sites: bool):
-        super().__init__()
-
-        if even_sites:
-            # a is first half of input vector
-            self._passive_ind = slice(0, size_half)
-            self._active_ind = slice(size_half, 2 * size_half)
-            self._join_func = torch.cat
-        else:
-            # a is second half of input vector
-            self._passive_ind = slice(size_half, 2 * size_half)
-            self._active_ind = slice(0, size_half)
-            self._join_func = lambda a, *args, **kwargs: torch.cat(
-                (a[1], a[0]), *args, **kwargs
-            )
+log = logging.getLogger(__name__)
 
 
-class AdditiveLayer(CouplingLayer):
+class AdditiveLayer(nn.Module):
     r"""Class implementing additive coupling layers.
 
     The additive transformation is given by
@@ -126,37 +79,53 @@ class AdditiveLayer(CouplingLayer):
 
     def __init__(
         self,
-        size_half: int,
+        mask: torch.BoolTensor,
         *,
         hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
-        even_sites: bool,
     ):
-        super().__init__(size_half, even_sites)
+        super().__init__()
+        # Currently, equal-sized partitions are required
+        assert torch.sum(mask) == torch.sum(~mask)
+        self.mask = mask.flatten()
 
-        self.t_network = DenseNeuralNetwork(
-            size_in=size_half,
-            size_out=size_half,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            bias=not z2_equivar,
-        )
+        half_lattice = int(torch.sum(mask))
+        self.t1, self.t2 = [
+            DenseNeuralNetwork(
+                size_in=half_lattice,
+                size_out=half_lattice,
+                hidden_shape=hidden_shape,
+                activation=activation,
+                bias=not z2_equivar,
+            )
+            for _ in range(2)
+        ]
+
+    def _transform(
+        self, v_active: torch.Tensor, v_passive: torch.Tensor, t_net: DenseNeuralNetwork
+    ):
+        """Transform the active partition."""
+        v_for_net = v_passive / torch.sqrt(v_passive.var() + 1e-6)
+
+        return v_active - t_net(v_for_net)
 
     def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
-        r"""Forward pass of affine transformation."""
-        v_in_passive = v_in[:, self._passive_ind]
-        v_in_active = v_in[:, self._active_ind]
-        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
+        r"""Forward pass of additive transformation."""
+        v_r = v_in[:, self.mask]
+        v_b = v_in[:, ~self.mask]
 
-        t_out = self.t_network(v_for_net)
+        v_r = self._transform(v_r, v_b, self.t1)
+        v_b = self._transform(v_b, v_r, self.t2)
 
-        v_out = self._join_func([v_in_passive, v_in_active - t_out], dim=1)
+        v_out = torch.empty_like(v_in)
+        v_out[:, self.mask] = v_r
+        v_out[:, ~self.mask] = v_b
 
         return v_out, log_density
 
 
-class AffineLayer(CouplingLayer):
+class AffineLayer(nn.Module):
     r"""Class implementing affine coupling layers.
 
     The affine transformation is given by
@@ -177,53 +146,67 @@ class AffineLayer(CouplingLayer):
 
     def __init__(
         self,
-        size_half: int,
+        mask: torch.BoolTensor,
         *,
         hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
-        even_sites: bool,
     ):
-        super().__init__(size_half, even_sites)
+        super().__init__()
+        assert torch.sum(mask) == torch.sum(~mask)
+        self.mask = mask.flatten()
 
-        self.s_network = DenseNeuralNetwork(
-            size_in=size_half,
-            size_out=size_half,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            bias=not z2_equivar,
-        )
-        self.t_network = DenseNeuralNetwork(
-            size_in=size_half,
-            size_out=size_half,
-            hidden_shape=hidden_shape,
-            activation=activation,
-            bias=not z2_equivar,
-        )
-        self.z2_equivar = z2_equivar
+        half_lattice = int(torch.sum(mask))
+        self.s1, self.s2, self.t1, self.t2 = [
+            DenseNeuralNetwork(
+                size_in=half_lattice,
+                size_out=half_lattice,
+                hidden_shape=hidden_shape,
+                activation=activation,
+                bias=not z2_equivar,
+            )
+            for _ in range(4)
+        ]
+        if z2_equivar:
+            self.s_func = torch.abs
+        else:
+            self.s_func = lambda s: s
+
+    def _transform(
+        self,
+        v_active: torch.Tensor,
+        v_passive: torch.Tensor,
+        log_density: torch.Tensor,
+        s_net: DenseNeuralNetwork,
+        t_net: DenseNeuralNetwork,
+    ):
+        """Transform the active partition."""
+        v_for_net = v_passive / torch.sqrt(v_passive.var() + 1e-6)
+
+        s = self.s_func(s_net(v_for_net))
+        t = t_net(v_for_net)
+
+        v_active = (v_active - t) * torch.exp(-s)
+        log_density += s.sum(dim=1, keepdim=True)
+
+        return v_active, log_density
 
     def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         r"""Forward pass of affine transformation."""
-        v_in_passive = v_in[:, self._passive_ind]
-        v_in_active = v_in[:, self._active_ind]
-        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
+        v_r = v_in[:, self.mask]
+        v_b = v_in[:, ~self.mask]
 
-        s_out = self.s_network(v_for_net)
-        t_out = self.t_network(v_for_net)
+        v_r, log_density = self._transform(v_r, v_b, log_density, self.s1, self.t1)
+        v_b, log_density = self._transform(v_b, v_r, log_density, self.s2, self.t2)
 
-        # If enforcing C(-v) = -C(v), we want to use |s(v)| in affine transf.
-        if self.z2_equivar:
-            s_out = torch.abs(s_out)
-
-        v_out = self._join_func(
-            [v_in_passive, (v_in_active - t_out) * torch.exp(-s_out)], dim=1
-        )
-        log_density += s_out.sum(dim=1, keepdim=True)
+        v_out = torch.empty_like(v_in)
+        v_out[:, self.mask] = v_r
+        v_out[:, ~self.mask] = v_b
 
         return v_out, log_density
 
 
-class RationalQuadraticSplineLayer(CouplingLayer):
+class RationalQuadraticSplineLayer(nn.Module):
     r"""Class implementing rational quadratic spline coupling layers.
 
     The transformation maps a finite interval :math:`[-a, a]` to itself and is defined
@@ -279,57 +262,54 @@ class RationalQuadraticSplineLayer(CouplingLayer):
 
     def __init__(
         self,
-        size_half: int,
+        mask: torch.BoolTensor,
+        *,
         interval: int,
         n_segments: int,
         hidden_shape: (tuple, list),
         activation: str,
         z2_equivar: bool,
-        even_sites: bool,
     ):
-        super().__init__(size_half, even_sites)
-        self.size_half = size_half
+        super().__init__()
+        assert torch.sum(mask) == torch.sum(~mask)
+        self.mask = mask.flatten()
+        self.half_lattice = int(torch.sum(mask))
         self.n_segments = n_segments
-
-        self.network = DenseNeuralNetwork(
-            size_in=size_half,
-            size_out=size_half * (3 * n_segments - 1),
-            hidden_shape=hidden_shape,
-            activation=activation,
-            bias=True,
-        )
-
-        self.norm_func = nn.Softmax(dim=1)
-        self.softplus = nn.Softplus()
-
-        self.B = interval
-
+        self.half_interval = interval
         self.z2_equivar = z2_equivar
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, negative_mag: torch.Tensor
+        self.net1, self.net2 = [
+            DenseNeuralNetwork(
+                size_in=self.half_lattice,
+                size_out=self.half_lattice * (3 * n_segments - 1),
+                hidden_shape=hidden_shape,
+                activation=activation,
+                bias=True,
+            )
+            for _ in range(2)
+        ]
+        self.norm_func = nn.Softmax(dim=2)
+        self.softplus = nn.Softplus()
+
+    def _transform(
+        self,
+        v_active: torch.Tensor,
+        v_passive: torch.Tensor,
+        log_density: torch.Tensor,
+        net: DenseNeuralNetwork,
+        negative_mag: torch.Tensor,
     ):
-        """Forward pass of the rational quadratic spline layer."""
-        v_in_passive = v_in[:, self._passive_ind]
-        v_in_active = v_in[:, self._active_ind]
-        v_for_net = v_in_passive / torch.sqrt(v_in_passive.var() + 1e-6)
+        """Transform the active partition."""
+        v_in = v_active  # makes things more intuitive to read
+        v_for_net = v_passive / torch.sqrt(v_passive.var() + 1e-6)
 
         # Naively enforce C(-v) = -C(v)
         if self.z2_equivar:
             v_for_net[negative_mag] = -v_for_net[negative_mag]
 
-        v_out_b = torch.zeros_like(v_in_active)
-        gradient = torch.ones_like(v_in_active).unsqueeze(dim=-1)
-
-        # Apply mask for linear tails
-        # NOTE potentially a waste of time since we NEVER want to map out <- Id(in)
-        inside_interval_mask = torch.abs(v_in_active) <= self.B
-        v_in_b_inside_interval = v_in_active[inside_interval_mask]
-        v_out_b[~inside_interval_mask] = v_in_active[~inside_interval_mask]
-
         h_net, w_net, d_net = (
-            self.network(v_for_net)
-            .view(-1, self.size_half, 3 * self.n_segments - 1)
+            net(v_for_net)
+            .view(-1, self.half_lattice, 3 * self.n_segments - 1)
             .split(
                 (self.n_segments, self.n_segments, self.n_segments - 1),
                 dim=2,
@@ -341,88 +321,112 @@ class RationalQuadraticSplineLayer(CouplingLayer):
             w_net[negative_mag] = torch.flip(w_net[negative_mag], dims=(2,))
             d_net[negative_mag] = torch.flip(d_net[negative_mag], dims=(2,))
 
-        h_norm = self.norm_func(h_net[inside_interval_mask]) * 2 * self.B
-        w_norm = self.norm_func(w_net[inside_interval_mask]) * 2 * self.B
-        d_pad = nn.functional.pad(
-            self.softplus(d_net)[inside_interval_mask], (1, 1), "constant", 1
-        )
+        h_norm = self.norm_func(h_net) * 2 * self.half_interval
+        w_norm = self.norm_func(w_net) * 2 * self.half_interval
+        d_pad = nn.functional.pad(self.softplus(d_net), (1, 1), "constant", 1)
 
         knots_xcoords = (
             torch.cat(
                 (
-                    torch.zeros(w_norm.shape[0], 1),
-                    torch.cumsum(w_norm, dim=1),
+                    torch.zeros_like(v_in).unsqueeze(dim=-1),
+                    torch.cumsum(w_norm, dim=2),
                 ),
-                dim=1,
+                dim=2,
             )
-            - self.B
+            - self.half_interval
         )
         knots_ycoords = (
             torch.cat(
                 (
-                    torch.zeros(h_norm.shape[0], 1),
-                    torch.cumsum(h_norm, dim=1),
+                    torch.zeros_like(v_in).unsqueeze(dim=-1),
+                    torch.cumsum(h_norm, dim=2),
                 ),
-                dim=1,
+                dim=2,
             )
-            - self.B
+            - self.half_interval
         )
         k_this_segment = (
             torch.searchsorted(
                 knots_xcoords,
-                v_in_b_inside_interval.view(-1, 1),
+                v_in.unsqueeze(dim=-1),
             )
             - 1
         ).clamp(0, self.n_segments - 1)
+        # Note that derivative for clamped inputs is still 1, so log density is unaffected
 
-        w_at_lower_knot = torch.gather(w_norm, 1, k_this_segment)
-        h_at_lower_knot = torch.gather(h_norm, 1, k_this_segment)
-        s_at_lower_knot = h_at_lower_knot / w_at_lower_knot
-        d_at_lower_knot = torch.gather(d_pad, 1, k_this_segment)
-        d_at_upper_knot = torch.gather(d_pad, 1, k_this_segment + 1)
+        # Build tensors of shape (n_batch, half_lattice, 1) to parametrise transf
+        w_this_segment = torch.gather(w_norm, 2, k_this_segment)
+        h_this_segment = torch.gather(h_norm, 2, k_this_segment)
+        s_this_segment = h_this_segment / w_this_segment
+        d_at_lower_knot = torch.gather(d_pad, 2, k_this_segment)
+        d_at_upper_knot = torch.gather(d_pad, 2, k_this_segment + 1)
+        v_in_at_lower_knot = torch.gather(knots_xcoords, 2, k_this_segment)
+        v_out_at_lower_knot = torch.gather(knots_ycoords, 2, k_this_segment)
 
-        v_in_at_lower_knot = torch.gather(knots_xcoords, 1, k_this_segment)
-        v_out_at_lower_knot = torch.gather(knots_ycoords, 1, k_this_segment)
+        alpha = (v_in.unsqueeze(dim=-1) - v_in_at_lower_knot) / w_this_segment
 
-        alpha = (
-            v_in_b_inside_interval.unsqueeze(dim=-1) - v_in_at_lower_knot
-        ) / w_at_lower_knot
-
-        v_out_b[inside_interval_mask] = (
+        v_out = (
             v_out_at_lower_knot
             + (
-                h_at_lower_knot
+                h_this_segment
                 * (
-                    s_at_lower_knot * alpha.pow(2)
+                    s_this_segment * alpha.pow(2)
                     + d_at_lower_knot * alpha * (1 - alpha)
                 )
             )
             / (
-                s_at_lower_knot
-                + (d_at_upper_knot + d_at_lower_knot - 2 * s_at_lower_knot)
+                s_this_segment
+                + (d_at_upper_knot + d_at_lower_knot - 2 * s_this_segment)
                 * alpha
                 * (1 - alpha)
             )
         ).squeeze()
 
-        gradient[inside_interval_mask] = (
-            s_at_lower_knot.pow(2)
+        gradient = (
+            s_this_segment.pow(2)
             * (
                 d_at_upper_knot * alpha.pow(2)
-                + 2 * s_at_lower_knot * alpha * (1 - alpha)
+                + 2 * s_this_segment * alpha * (1 - alpha)
                 + d_at_lower_knot * (1 - alpha).pow(2)
             )
         ) / (
-            s_at_lower_knot
-            + (d_at_upper_knot + d_at_lower_knot - 2 * s_at_lower_knot)
+            s_this_segment
+            + (d_at_upper_knot + d_at_lower_knot - 2 * s_this_segment)
             * alpha
             * (1 - alpha)
         ).pow(
             2
         )
-
-        v_out = self._join_func([v_in_passive, v_out_b], dim=1)
         log_density -= torch.log(gradient).sum(dim=1)
+
+        return v_out, log_density
+
+    def forward(
+        self, v_in: torch.Tensor, log_density: torch.Tensor, negative_mag: torch.Tensor
+    ):
+        """Forward pass of the rational quadratic spline layer."""
+        # Immediately deal with mask for linear tails
+        outside_interval_mask = torch.abs(v_in) >= self.half_interval
+        if torch.sum(outside_interval_mask) > 0.001 * len(v_in.view(-1)):
+            log.warning(
+                "fraction of spline inputs falling outside interval exceeded 1/1000. "
+                + f"Perhaps the interval [-{self.half_interval},{self.half_interval}] is too small?"
+            )
+
+        v_r = v_in[:, self.mask]
+        v_b = v_in[:, ~self.mask]
+
+        v_r, log_density = self._transform(
+            v_r, v_b, log_density, self.net1, negative_mag
+        )
+        v_b, log_density = self._transform(
+            v_b, v_r, log_density, self.net2, negative_mag
+        )
+
+        v_out = torch.empty_like(v_in)
+        v_out[:, self.mask] = v_r
+        v_out[:, ~self.mask] = v_b
+        v_out[outside_interval_mask] = v_in[outside_interval_mask]
 
         return v_out, log_density
 
@@ -706,7 +710,6 @@ class GaussToFreeField(nn.Module):
 
         assert torch.all(ift.imag.abs() < 1e-9)
 
-        # Convert to split representation so action makes sense!
-        ift_split = ift.real.view(-1, self.volume)[:, self.geometry.lexisplit]
+        ift = ift.real.view(-1, self.volume)
 
-        return ift_split, log_density
+        return ift, log_density

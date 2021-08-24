@@ -15,26 +15,8 @@ from reportengine import collect
 import anvil.layers as layers
 
 
-def _coupling_block(
-    coupling_layer: layers.CouplingLayer, **kwargs
-) -> layers.Sequential:
-    """Helper function which wraps a pair of coupling layers from
-    :py:mod:`anvil.layers` in the module container
-    :py:class`anvil.layers.Sequential`. The first transformation layer acts on
-    the even sites and the second transformation acts on the odd sites, so one
-    of these blocks ensures all sites are transformed as part of an
-    active partition.
-
-    """
-    coupling_transformation = partial(coupling_layer, **kwargs)
-    return layers.Sequential(
-        coupling_transformation(even_sites=True),
-        coupling_transformation(even_sites=False),
-    )
-
-
 def real_nvp(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
@@ -50,9 +32,9 @@ def real_nvp(
 
     Parameters
     ----------
-    size_half
-        Inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
@@ -81,9 +63,8 @@ def real_nvp(
     :py:mod:`anvil.neural_network`
     """
     blocks = [
-        _coupling_block(
-            layers.AffineLayer,
-            size_half=size_half,
+        layers.AffineLayer(
+            mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
             z2_equivar=z2_equivar,
@@ -94,7 +75,7 @@ def real_nvp(
 
 
 def nice(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
@@ -106,9 +87,9 @@ def nice(
 
     Parameters
     ----------
-    size_half
-        Inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
@@ -131,9 +112,8 @@ def nice(
 
     """
     blocks = [
-        _coupling_block(
-            layers.AdditiveLayer,
-            size_half=size_half,
+        layers.AdditiveLayer(
+            mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
             z2_equivar=z2_equivar,
@@ -144,7 +124,7 @@ def nice(
 
 
 def rational_quadratic_spline(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     n_segments: int,
@@ -158,9 +138,9 @@ def rational_quadratic_spline(
 
     Parameters
     ----------
-    size_half
-        inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations. For RQS this is set to 1.
@@ -184,9 +164,8 @@ def rational_quadratic_spline(
     """
 
     blocks = [
-        _coupling_block(
-            layers.RationalQuadraticSplineLayer,
-            size_half=size_half,
+        layers.RationalQuadraticSplineLayer(
+            mask=mask,
             interval=interval,
             n_segments=n_segments,
             hidden_shape=hidden_shape,

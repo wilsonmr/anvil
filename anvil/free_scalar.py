@@ -271,10 +271,7 @@ class FreeScalar:
 
         assert torch.all(real_space_configs.imag.abs() < 1e-9)
 
-        # Convert to real tensor
-        phi = real_space_configs.real
+        # Convert to real tensor and reshape
+        phi = real_space_configs.real.view(-1, self.geometry.volume)
 
-        # The action takes a split representation, so need to convert!
-        phi_split = phi.view(-1, self.geometry.volume)[:, self.geometry.lexisplit]
-
-        return phi_split, self.log_density(phi_split)
+        return phi, self.log_density(phi)

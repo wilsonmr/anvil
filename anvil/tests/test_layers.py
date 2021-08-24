@@ -8,29 +8,24 @@ import numpy as np
 import pytest
 import torch
 
+from anvil.geometry import Geometry2D
 import anvil.layers as layers
 from anvil.distributions import Gaussian
 
 N_BATCH = 100
-SIZE = 36
-SIZE_HALF = SIZE // 2
+LENGTH = 6
+SIZE = LENGTH ** 2
 HIDDEN_SHAPE = [36]
 ACTIVATION = "tanh"
 
-
-@given(integers(min_value=0, max_value=2 ** 16), booleans())
-def test_coupling_init(size_half, even_sites):
-    """Hypothesis test the initialisation of the base class in layers"""
-    layers.CouplingLayer(size_half, even_sites)
-
+MASK = Geometry2D(LENGTH).checkerboard.flatten()
 
 def test_additive_layers():
     equivar_additive = layers.AdditiveLayer(
-        size_half=SIZE_HALF,
+        mask=MASK,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=True,
-        even_sites=True,
     )
     input_tensor = torch.zeros((N_BATCH, SIZE))
     with torch.no_grad():
@@ -73,38 +68,34 @@ def gaussian_input():
 
 @pytest.mark.parametrize("layer_class", [layers.AdditiveLayer, layers.AffineLayer])
 @pytest.mark.parametrize("z2_equivar", [True, False])
-@pytest.mark.parametrize("even_sites", [True, False])
 @torch.no_grad()
-def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, even_sites):
+def test_affine_like_basic(gaussian_input, layer_class, z2_equivar):
     """Apply :py:func:`basic_layer_test` to layers with same initialisation
     parameters as :py:class:`anvil.layers.AffineLayer`.
 
     """
     layer = layer_class(
-        size_half=SIZE_HALF,
+        mask=MASK,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=z2_equivar,
-        even_sites=even_sites,
     )
     basic_layer_test(layer, *gaussian_input)
 
 
 @pytest.mark.parametrize("z2_equivar", [True, False])
-@pytest.mark.parametrize("even_sites", [True, False])
 @torch.no_grad()
-def test_rqs_basic(gaussian_input, z2_equivar, even_sites):
+def test_rqs_basic(gaussian_input, z2_equivar):
     """Apply :py:func:`basic_layer_test` to
     :py:class:`anvil.layers.RationalQuadraticSplineLayer`.
     """
     layer = layers.RationalQuadraticSplineLayer(
-        size_half=SIZE_HALF,
+        mask=MASK,
         interval=5,
         n_segments=4,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=z2_equivar,
-        even_sites=even_sites,
     )
     negative_mag = gaussian_input[0].sum(dim=1) < 0
     basic_layer_test(layer, *gaussian_input, negative_mag)
@@ -129,14 +120,11 @@ def test_scaling_layer_basic(gaussian_input, layer_class):
 def test_sequential_basic(gaussian_input):
     inner_layers = [
         layers.AffineLayer(
-            size_half=SIZE_HALF,
+            mask=MASK,
             hidden_shape=HIDDEN_SHAPE,
             activation=ACTIVATION,
             z2_equivar=False,
-            even_sites=bool(i % 2),
-        )
-        for i in range(8)
-    ]
+        ) for i in range(4)]
     layer = layers.Sequential(*inner_layers)
     basic_layer_test(layer, *gaussian_input)
 

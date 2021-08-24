@@ -10,6 +10,8 @@ from sys import maxsize
 import logging
 import platform
 
+import torch
+
 from reportengine.report import Config
 from reportengine.configparser import ConfigError, element_of, explicit_node
 
@@ -50,9 +52,14 @@ class ConfigParser(Config):
             raise ConfigError("Lattice size is expected to be an even number")
         return int(lattice_size / 2)
 
-    def produce_geometry(self, lattice_length: int):
+    def produce_geometry(self, lattice_length: int) -> Geometry2D:
         """Returns the geometry object defining the lattice."""
         return Geometry2D(lattice_length)
+
+    def produce_mask(self, geometry: Geometry2D) -> torch.BoolTensor:
+        """Returns the checkerboard mask required by coupling layers."""
+        # NOTE: should ideally be more flexible
+        return geometry.checkerboard
 
     def produce_target_dist(self, geometry, parameterisation: str, couplings: dict):
         """Uses arguments to instantiate :py:class:`anvil.distributions.PhiFourScalar`"""
