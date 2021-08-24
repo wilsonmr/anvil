@@ -5,6 +5,7 @@ distributions.py
 
 Module containing classes corresponding to different probability distributions.
 """
+import torch
 import torch.distributions
 
 

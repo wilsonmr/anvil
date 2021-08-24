@@ -32,13 +32,15 @@ class BenchmarkTrainConfig(anvil_train.TrainConfig):
 
 class BenchmarkTrainApp(anvil_train.TrainApp):
     """Subclass the train app to add custom Config class"""
+
     config_class = BenchmarkTrainConfig
 
 
 class BenchmarkSampleApp(anvil_sample.SampleApp):
     """Subclass the sample app to remove re-initialisation of logs."""
+
     def init_logging(self, args):
-        pass # logging already initialised in training.
+        pass  # logging already initialised in training.
 
 
 def main(_sample_runcard_path=None):
@@ -48,11 +50,7 @@ def main(_sample_runcard_path=None):
         "benchmark-sample", providers=anvil_sample.PROVIDERS
     )
     train_app.main(
-        cmdline=[
-            str(benchmark_config.training_path.resolve()),
-            "-o",
-            BENCHMARK_OUTPUT
-        ]
+        cmdline=[str(benchmark_config.training_path.resolve()), "-o", BENCHMARK_OUTPUT]
     )
 
     if _sample_runcard_path is not None:
@@ -60,13 +58,7 @@ def main(_sample_runcard_path=None):
     else:
         sample_rc_path = benchmark_config.sample_path
 
-    sample_app.main(
-        cmdline=[
-            str(sample_rc_path.resolve()),
-            "-o",
-            BENCHMARK_OUTPUT
-        ]
-    )
+    sample_app.main(cmdline=[str(sample_rc_path.resolve()), "-o", BENCHMARK_OUTPUT])
 
 
 if __name__ == "__main__":

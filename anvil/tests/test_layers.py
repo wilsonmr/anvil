@@ -17,7 +17,8 @@ SIZE_HALF = SIZE // 2
 HIDDEN_SHAPE = [36]
 ACTIVATION = "tanh"
 
-@given(integers(min_value=0, max_value=2**16), booleans())
+
+@given(integers(min_value=0, max_value=2 ** 16), booleans())
 def test_coupling_init(size_half, even_sites):
     """Hypothesis test the initialisation of the base class in layers"""
     layers.CouplingLayer(size_half, even_sites)
@@ -29,7 +30,7 @@ def test_additive_layers():
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
         z2_equivar=True,
-        even_sites=True
+        even_sites=True,
     )
     input_tensor = torch.zeros((N_BATCH, SIZE))
     with torch.no_grad():
@@ -51,9 +52,8 @@ def basic_layer_test(layer, input_states, input_log_density, *args):
     """
     output_states, output_log_density = layer(input_states, input_log_density, *args)
     # all numbers
-    any_nan = (
-        torch.any(torch.isnan(output_states)) or
-        torch.any(torch.isnan(output_log_density))
+    any_nan = torch.any(torch.isnan(output_states)) or torch.any(
+        torch.isnan(output_log_density)
     )
     assert not any_nan
     # correct shape
@@ -67,8 +67,9 @@ def basic_layer_test(layer, input_states, input_log_density, *args):
 @torch.no_grad()
 def gaussian_input():
     """Basic input states for testing"""
-    latent_distribution = Gaussian(SIZE) # use default standard normal
+    latent_distribution = Gaussian(SIZE)  # use default standard normal
     return latent_distribution(N_BATCH)
+
 
 @pytest.mark.parametrize("layer_class", [layers.AdditiveLayer, layers.AffineLayer])
 @pytest.mark.parametrize("z2_equivar", [True, False])
@@ -87,6 +88,7 @@ def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, even_sites):
         even_sites=even_sites,
     )
     basic_layer_test(layer, *gaussian_input)
+
 
 @pytest.mark.parametrize("z2_equivar", [True, False])
 @pytest.mark.parametrize("even_sites", [True, False])
@@ -107,9 +109,10 @@ def test_rqs_basic(gaussian_input, z2_equivar, even_sites):
     negative_mag = gaussian_input[0].sum(dim=1) < 0
     basic_layer_test(layer, *gaussian_input, negative_mag)
 
+
 @pytest.mark.parametrize(
     "layer_class",
-    [layers.GlobalRescaling, layers.BatchNormLayer, layers.GlobalAffineLayer]
+    [layers.GlobalRescaling, layers.BatchNormLayer, layers.GlobalAffineLayer],
 )
 @torch.no_grad()
 def test_scaling_layer_basic(gaussian_input, layer_class):
@@ -121,6 +124,7 @@ def test_scaling_layer_basic(gaussian_input, layer_class):
         layer = layer_class()
     basic_layer_test(layer, *gaussian_input)
 
+
 @torch.no_grad()
 def test_sequential_basic(gaussian_input):
     inner_layers = [
@@ -130,7 +134,9 @@ def test_sequential_basic(gaussian_input):
             activation=ACTIVATION,
             z2_equivar=False,
             even_sites=bool(i % 2),
-        ) for i in range(8)]
+        )
+        for i in range(8)
+    ]
     layer = layers.Sequential(*inner_layers)
     basic_layer_test(layer, *gaussian_input)
 
