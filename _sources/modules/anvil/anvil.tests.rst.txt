@@ -20,6 +20,14 @@ anvil.tests.test\_distributions module
    :undoc-members:
    :show-inheritance:
 
+anvil.tests.test\_free\_scalar module
+-------------------------------------
+
+.. automodule:: anvil.tests.test_free_scalar
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 anvil.tests.test\_geometry module
 ---------------------------------
 
@@ -32,6 +40,14 @@ anvil.tests.test\_layers module
 -------------------------------
 
 .. automodule:: anvil.tests.test_layers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.tests.test\_learns\_identity module
+-----------------------------------------
+
+.. automodule:: anvil.tests.test_learns_identity
    :members:
    :undoc-members:
    :show-inheritance:
