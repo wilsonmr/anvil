@@ -238,8 +238,32 @@ def global_rescaling(scale: (int, float), learnable: bool = True) -> layers.Sequ
     return layers.Sequential(layers.GlobalRescaling(scale=scale, learnable=learnable))
 
 
+def gauss_to_free(geometry, m_sq=None):
+    """Action which returns an instance of :py:class:`anvil.layers.GaussToFreeField`.
+
+    Parameters
+    ----------
+    geometry
+        The :py:class:`anvil.geometry.Geometry2D` object representing the lattice
+    m_sq
+        The bare mass squared of the theory
+
+    Returns
+    -------
+    anvil.layers.Sequential
+    """
+    return layers.Sequential(layers.GaussToFreeField(geometry, m_sq))
+
+
 # collect layers from copied runcard
-_normalizing_flow = collect("layer_action", ("training_context", "model",))
+_normalizing_flow = collect(
+    "layer_action",
+    (
+        "training_context",
+        "model",
+    ),
+)
+
 
 def model_to_load(_normalizing_flow) -> layers.Sequential:
     """action which wraps a list of layers in
@@ -258,6 +282,7 @@ def model_to_load(_normalizing_flow) -> layers.Sequential:
         - ``rational_quadratic_spline``
         - ``batch_norm``
         - ``global_rescaling``
+        - ``gauss_to_free``
 
     You can see their dependencies using the ``anvil`` provider help, e.g.
     for ``real_nvp``:
@@ -294,9 +319,11 @@ def model_to_load(_normalizing_flow) -> layers.Sequential:
     flow_flat = [block for layer in _normalizing_flow for block in layer]
     return layers.Sequential(*flow_flat)
 
+
 # annoyingly, the api may not have a training output. In which case
 # load model from explicitly declared params.
 _api_normalizing_flow = collect("layer_action", ("model",))
+
 
 def explicit_model(_api_normalizing_flow):
     """Action to be called from the API. Build model from an explicit
@@ -322,6 +349,7 @@ def explicit_model(_api_normalizing_flow):
     # Note: use same action as train/sample apps, so that tests can cover these.
     return model_to_load(_api_normalizing_flow)
 
+
 # Update docstring above if you add to this!
 LAYER_OPTIONS = {
     "nice": nice,
@@ -329,4 +357,5 @@ LAYER_OPTIONS = {
     "rational_quadratic_spline": rational_quadratic_spline,
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
+    "gauss_to_free": gauss_to_free,
 }

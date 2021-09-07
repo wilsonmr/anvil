@@ -10,6 +10,7 @@ correct configuration is used before executing any actions
 
 from reportengine.checks import make_argcheck, CheckError
 
+
 @make_argcheck
 def check_trained_with_free_theory(training_target_dist):
     """Check that supplied model is a free theory model which in the case of

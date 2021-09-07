@@ -9,7 +9,7 @@ is working correctly.
     
 Notes
 -----
-See the docstring for anvil.free_scalar.FreeScalarEigenmodes for an explanation
+See the docstring for anvil.free_scalar.FreeScalar for an explanation
 of the theoretical predictions and how to match them to quantities derived from
 a sample of generated field configurations.
 """
@@ -29,13 +29,11 @@ from anvil.checks import check_trained_with_free_theory
 @check_trained_with_free_theory
 def free_scalar_theory(
     training_target_dist, training_geometry
-) -> anvil.free_scalar.FreeScalarEigenmodes:
-    """Returns instance of FreeScalarEigenmodes with specific mass and lattice size."""
+) -> anvil.free_scalar.FreeScalar:
+    """Returns instance of FreeScalar with specific mass and lattice size."""
     # load target and extract m_sq from target
     m_sq = training_target_dist.c_quadratic * 2 - 4
-    return anvil.free_scalar.FreeScalarEigenmodes(
-        m_sq=m_sq, lattice_length=training_geometry.length
-    )
+    return anvil.free_scalar.FreeScalar(m_sq=m_sq, geometry=training_geometry)
 
 
 def fourier_transform(configs: torch.Tensor, training_geometry) -> torch.Tensor:
@@ -99,7 +97,7 @@ def eigvals_from_sample(
     """
     variance = fourier_transform.real.var(dim=0) + fourier_transform.imag.var(dim=0)
     eigvals = training_geometry.length ** 2 * torch.reciprocal(variance)
-    return eigvals.numpy()
+    return eigvals
 
 
 @table
@@ -117,7 +115,7 @@ def table_real_space_variance(configs, free_scalar_theory):
     data = [
         [
             float(predic),
-            f"{float(sample_var.mean()):.4g} $\pm$ {float(sample_var.std()):.1g}",
+            rf"{float(sample_var.mean()):.4g} $\pm$ {float(sample_var.std()):.1g}",
             float(pc_diff),
         ]
     ]
@@ -173,15 +171,9 @@ def plot_kinetic_eigenvalues(eigvals_from_sample, free_scalar_theory):
         / free_scalar_theory.eigenvalues
         * 100
     )
-    extent = [
-        free_scalar_theory.momenta[0],
-        free_scalar_theory.momenta[-1],
-        free_scalar_theory.momenta[-1],
-        free_scalar_theory.momenta[0],
-    ]
 
-    im1 = ax1.imshow(eigvals_from_sample, extent=extent)
-    im2 = ax2.imshow(pc_diff, extent=extent)
+    im1 = ax1.imshow(eigvals_from_sample)
+    im2 = ax2.imshow(pc_diff)
 
     fig.colorbar(im1, ax=ax1)
     fig.colorbar(im2, ax=ax2)

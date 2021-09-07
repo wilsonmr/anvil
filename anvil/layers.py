@@ -44,10 +44,14 @@ as a single subclass of :py:class:`torch.nn.Module` which performs the
 full normalising flow transformation :math:`f(z)`.
 
 """
+import itertools
+from functools import cached_property
+
 import torch
 import torch.nn as nn
 
 from anvil.neural_network import DenseNeuralNetwork
+from anvil.free_scalar import FreeScalar
 
 
 class CouplingLayer(nn.Module):
@@ -139,9 +143,7 @@ class AdditiveLayer(CouplingLayer):
             bias=not z2_equivar,
         )
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -200,9 +202,7 @@ class AffineLayer(CouplingLayer):
         )
         self.z2_equivar = z2_equivar
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         r"""Forward pass of affine transformation."""
         v_in_passive = v_in[:, self._passive_ind]
         v_in_active = v_in[:, self._active_ind]
@@ -446,9 +446,7 @@ class GlobalAffineLayer(nn.Module):
         self.scale = scale
         self.shift = shift
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the global affine transformation."""
         return self.scale * v_in + self.shift, log_density
 
@@ -485,9 +483,7 @@ class BatchNormLayer(nn.Module):
         super().__init__()
         self.gamma = scale
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the batch normalisation transformation."""
         mult = self.gamma / torch.sqrt(v_in.var() + 1e-6)  # for stability
         v_out = mult * (v_in - v_in.mean())
@@ -523,9 +519,7 @@ class GlobalRescaling(nn.Module):
         if learnable:
             self.scale = nn.Parameter(self.scale)
 
-    def forward(
-        self, v_in: torch.Tensor, log_density: torch.Tensor, *args
-    ):
+    def forward(self, v_in: torch.Tensor, log_density: torch.Tensor, *args):
         """Forward pass of the global rescaling layer."""
         v_out = self.scale * v_in
         log_density -= v_out.shape[-1] * torch.log(self.scale)
@@ -544,3 +538,175 @@ class Sequential(nn.Sequential):
         for module in self:
             v, log_density = module(v, log_density, *args)
         return v, log_density
+
+
+class GaussToFreeField(nn.Module):
+    r"""Transform Gaussian latent variables into non-interacting field configurations.
+
+    The inputs of the transformation are assumed to be vectors of Gaussian variates,
+    i.e. drawn from a univariate Gaussian distribution with null mean and unit variance.
+    These variates represent the :math:`|\Lambda| = L^2` degrees of freedom in a real
+    scalar field configuration.
+
+    The degrees of freedom are first **assigned** to the real and imaginary parts of
+    a complex, Hermitean field configuration. Since the inputs are all drawn from the
+    same distribution, this assignment is arbitrary. The Hermitean condition is
+
+    .. math:
+
+        \tilde\phi(-k) = \tilde\phi(k)^*
+
+    The degrees of freedom of the Hermitean field configuration are then rescaled such
+    that they correspond to momentum states of a free theory with bare mass
+    :math:`m^2`. Through this rescaling we effectively impose a geometry on the
+    configurations by assigning momenta to the degrees of freedom.
+
+    Finally, the Hermitean configuration is inverse-Fourier transformed to produce a
+    field configuration in real space. This two-dimensional field is flattened and
+    split by the red-black checkerboard partitioning.
+
+    See Also
+    --------
+    :py:mod:`anvil.free_scalar`
+    """
+
+    def __init__(self, geometry, m_sq=None):
+        super().__init__()
+        self.geometry = geometry
+        self.length = geometry.length
+        self.volume = geometry.volume
+
+        self.scale = torch.roll(
+            (FreeScalar(geometry, m_sq).variances.sqrt().unsqueeze(dim=0)),
+            (-geometry.length // 2 + 1, -self.geometry.length // 2 + 1),
+            (-2, -1),
+        )
+
+    @cached_property
+    def _rth_select(self):
+        """Returns two tensors whose role is to select degrees of freedom from the
+        input tensor of univariate Gaussians and assign them to the real and imaginary
+        parts of a two-dimensional Hermitean field configuration.
+
+        Let 0 be the index corresponding to zero momentum, and L/2 label the largest
+        magnitude momentum (Nyquist frequency). Then, a[i, j] = a[-i, -j] implies
+        that the real parts of phi satisfy the Hermitean condition, and b[i, j] =
+        -b[-i, -j], along with b[0, 0] = b[0, L/2] = b[L/2, 0] = b[L/2, L/2] = 0
+        takes care of the imaginary
+        """
+        n = self.length // 2  # nyquist term
+
+        init_val = -1
+        select_real = torch.full(
+            size=(self.length, self.length), fill_value=init_val, dtype=torch.long
+        )
+        select_imag = torch.full(
+            size=(self.length, self.length), fill_value=init_val, dtype=torch.long
+        )
+
+        counter = 0  # counts the input degrees of freedom
+        for i, j in itertools.product(range(self.length), range(self.length)):
+            if select_real[i, j] == init_val:
+                select_real[i, j] = counter
+                select_real[-i, -j] = counter
+                counter += 1
+
+        for i, j in itertools.product(range(self.length), range(self.length)):
+            if select_imag[i, j] == init_val:
+                # Skip 0 and nyquist terms for imag
+                if (i, j) not in ((0, 0), (0, n), (n, 0), (n, n)):
+                    select_imag[i, j] = counter
+                    select_imag[-i, -j] = counter  # must negate these elements!
+                    counter += 1
+
+        assert counter == self.length ** 2
+
+        return select_real, select_imag
+
+    @cached_property
+    def _negate_imag(self):
+        """Completes the mapping of the input Gaussian variates to a Hermitean
+        field configuration by negating the imaginary components with negative
+        momentum, so as to satisfy b[i, j] = -b[-i, -j]."""
+        n = self.length // 2  # nyquist term
+        neg = torch.ones((self.length, self.length)).to(torch.long)
+        neg[n + 1 :, :] = -1
+        neg[0, n + 1 :] = -1
+        neg[n, n + 1 :] = -1
+        return neg.unsqueeze(dim=0)
+
+    @cached_property
+    def _real_mode_mask(self):
+        """Boolean mask that selects the purely real components of the Hermitean
+        field configuration, which are assumed to be indexed by 0 and L/2."""
+        n = self.length // 2  # nyquist term
+        mask = torch.zeros((self.length, self.length)).bool()
+        mask[0, 0] = mask[0, n] = mask[n, 0] = mask[n, n] = True
+        return mask
+
+    def real_to_hermitean(self, v: torch.Tensor):
+        """Takes a sample of Gaussian inputs and maps them to complex-valued Hermitean
+        states representing real scalar field configurations in momentum space.
+
+        Parameters
+        ----------
+        v: torch.Tensor
+            Sample of univariate inputs distributed according to a Gaussian with
+            null mean and unit variance.
+
+        Returns
+        -------
+        torch.Tensor
+            Complex tensor containing the field configurations in momentum space,
+            shape ``(sample_size, L, L)`` where ``L`` is the lattice length.
+        """
+        select_real, select_imag = self._rth_select
+        real_part = v[:, select_real]
+        imag_part = v[:, select_imag] * self._negate_imag
+        imag_part[:, self._real_mode_mask] = 0
+        return torch.complex(real_part, imag_part)
+
+    def forward(self, v: torch.Tensor, log_density: torch.Tensor, *args):
+        """Maps a sample of Gaussian inputs to configurations of real scalar fields
+        in real space.
+
+        The log-density is merely shifted due to the rescaling. The Fourier kernel
+        is unitary and thus volume-preserving.
+
+        Parameters
+        ----------
+        v: torch.Tensor
+            Sample of univariate inputs distributed according to a Gaussian with
+            null mean and unit variance.
+        log_density: torch.Tensor
+            Logarithm of the probability density corresponding to the Gaussian inputs.
+
+        Returns
+        -------
+        tuple
+            Tuple of two tensors. The first is the sample of field configurations in
+            in the flat-split representation, shape ``(sample_size, lattice_size)``.
+            The second is the log-density, which should match the action of the
+            configurations up to a constant shift that is the same for all configs.
+        """
+
+        # Map to Hermitean matrix representing momenta of real scalar field
+        v_herm = self.real_to_hermitean(v)
+
+        # Rescale according to the mass-squared of the theory
+        v_herm *= self.scale
+
+        # NOTE: uncomment this if commenting out the line above to 'turn off' the
+        # rescaling as an experiment. The variance of real/imag components of complex
+        # modes still must be 1/2 that of real to get consistency in tests.
+        # v_herm[:, ~self._real_mode_mask] /= sqrt(2)  # from math import sqrt...
+
+        # Inverse Fourier transform. Result should be real
+        ift = torch.fft.ifft2(v_herm, norm="backward")
+
+        assert torch.all(ift.imag.abs() < 1e-9)
+
+        # Convert to split representation so action makes sense!
+        ift_split = ift.real.view(-1, self.volume)[:, self.geometry.lexisplit]
+
+        return ift_split, log_density

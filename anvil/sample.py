@@ -215,7 +215,9 @@ def metropolis_hastings(
 
     """
     # Draw starting configs
-    phi, log_ratio = gen_candidates(loaded_model, training_base_dist, training_target_dist, num=1)
+    phi, log_ratio = gen_candidates(
+        loaded_model, training_base_dist, training_target_dist, num=1
+    )
     current = phi[0]
     current_log_ratio = log_ratio[0]
 
@@ -258,7 +260,9 @@ def metropolis_hastings(
     log.info(f"Using sampling interval: {sample_interval}")
 
     # Generate representative sample
-    configs_out = torch.empty((sample_size, training_base_dist.size_out), dtype=torch.float32)
+    configs_out = torch.empty(
+        (sample_size, training_base_dist.size_out), dtype=torch.float32
+    )
     history = []
 
     batches = [BATCH_SIZE for _ in range((sample_size * sample_interval) // BATCH_SIZE)]
@@ -297,6 +301,7 @@ def metropolis_hastings(
     log.info(f"Fraction of proposals accepted: {acceptance:.2g}")
 
     return configs_out, tau, acceptance
+
 
 # TODO: remove??
 def configs(metropolis_hastings):
