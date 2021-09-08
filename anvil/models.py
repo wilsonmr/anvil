@@ -8,8 +8,6 @@ Generally this involves piecing together components from :py:mod:`anvil.layers`
 to produce sequences of transformations.
 
 """
-from functools import partial
-
 from reportengine import collect
 
 import anvil.layers as layers
@@ -20,7 +18,9 @@ def real_nvp(
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
+    final_activation: str = "none",
     z2_equivar: bool = True,
+    use_convnet: bool = False,
 ) -> layers.Sequential:
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, wrapped in the module container
@@ -45,12 +45,15 @@ def real_nvp(
         specified by passing a list of length 1, i.e. ``[72]`` would
         be a single hidden layered network with 72 nodes in the hidden layer.
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
     z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
 
     Returns
     -------
@@ -67,7 +70,9 @@ def real_nvp(
             mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
+            final_activation=final_activation,
             z2_equivar=z2_equivar,
+            use_convnet=use_convnet,
         )
         for _ in range(n_blocks)
     ]
@@ -79,7 +84,9 @@ def nice(
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
+    final_activation: str = "none",
     z2_equivar: bool = True,
+    use_convnet: bool = False,
 ) -> layers.Sequential:
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.AdditiveLayer` .
@@ -97,12 +104,15 @@ def nice(
         the shape of the neural networks used in the each layer. The visible
         layers are defined by the ``lattice_size``.
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
     z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
 
     Returns
     -------
@@ -116,7 +126,9 @@ def nice(
             mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
+            final_activation=final_activation,
             z2_equivar=z2_equivar,
+            use_convnet=use_convnet,
         )
         for _ in range(n_blocks)
     ]
@@ -130,7 +142,8 @@ def rational_quadratic_spline(
     n_segments: int,
     interval: (int, float) = 5,
     activation: str = "tanh",
-    z2_equivar: bool = False,
+    final_activation: str = "none",
+    use_convnet: bool = False,
 ) -> layers.Sequential:
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.RationalQuadraticSplineLayer` s.
@@ -155,12 +168,11 @@ def rational_quadratic_spline(
         field variable is outside of this region it is mapped to itself
         (i.e the gradient of the transformation is 1 outside of the interval).
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
-    z2_equivar
-        Whether or not to impose z2 equivariance. This is only done crudely
-        by splitting the sites according to the sign of the sum across lattice
-        sites.
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
     """
 
     blocks = [
@@ -170,7 +182,8 @@ def rational_quadratic_spline(
             n_segments=n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
-            z2_equivar=z2_equivar,
+            final_activation=final_activation,
+            use_convnet=use_convnet,
         )
         for _ in range(n_blocks)
     ]

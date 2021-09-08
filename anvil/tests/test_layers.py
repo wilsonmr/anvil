@@ -2,8 +2,6 @@
 Tests of the base classes in :py:mod:`anvil.layers`
 
 """
-from hypothesis import given
-from hypothesis.strategies import integers, booleans
 import numpy as np
 import pytest
 import torch
@@ -15,17 +13,21 @@ from anvil.distributions import Gaussian
 N_BATCH = 100
 LENGTH = 6
 SIZE = LENGTH ** 2
-HIDDEN_SHAPE = [36]
+HIDDEN_SHAPE = [18]
 ACTIVATION = "tanh"
 
-MASK = Geometry2D(LENGTH).checkerboard.flatten()
+MASK = Geometry2D(LENGTH).checkerboard
 
-def test_additive_layers():
+
+@pytest.mark.parametrize("use_convnet", (True, False))
+def test_additive_layers(use_convnet):
     equivar_additive = layers.AdditiveLayer(
         mask=MASK,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
+        final_activation=ACTIVATION,
         z2_equivar=True,
+        use_convnet=use_convnet,
     )
     input_tensor = torch.zeros((N_BATCH, SIZE))
     with torch.no_grad():
@@ -68,8 +70,9 @@ def gaussian_input():
 
 @pytest.mark.parametrize("layer_class", [layers.AdditiveLayer, layers.AffineLayer])
 @pytest.mark.parametrize("z2_equivar", [True, False])
+@pytest.mark.parametrize("use_convnet", [True, False])
 @torch.no_grad()
-def test_affine_like_basic(gaussian_input, layer_class, z2_equivar):
+def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, use_convnet):
     """Apply :py:func:`basic_layer_test` to layers with same initialisation
     parameters as :py:class:`anvil.layers.AffineLayer`.
 
@@ -78,14 +81,16 @@ def test_affine_like_basic(gaussian_input, layer_class, z2_equivar):
         mask=MASK,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
+        final_activation=ACTIVATION,
         z2_equivar=z2_equivar,
+        use_convnet=use_convnet,
     )
     basic_layer_test(layer, *gaussian_input)
 
 
-@pytest.mark.parametrize("z2_equivar", [True, False])
+@pytest.mark.parametrize("use_convnet", [True, False])
 @torch.no_grad()
-def test_rqs_basic(gaussian_input, z2_equivar):
+def test_rqs_basic(gaussian_input, use_convnet):
     """Apply :py:func:`basic_layer_test` to
     :py:class:`anvil.layers.RationalQuadraticSplineLayer`.
     """
@@ -95,10 +100,10 @@ def test_rqs_basic(gaussian_input, z2_equivar):
         n_segments=4,
         hidden_shape=HIDDEN_SHAPE,
         activation=ACTIVATION,
-        z2_equivar=z2_equivar,
+        final_activation=ACTIVATION,
+        use_convnet=use_convnet,
     )
-    negative_mag = gaussian_input[0].sum(dim=1) < 0
-    basic_layer_test(layer, *gaussian_input, negative_mag)
+    basic_layer_test(layer, *gaussian_input)
 
 
 @pytest.mark.parametrize(
@@ -123,8 +128,12 @@ def test_sequential_basic(gaussian_input):
             mask=MASK,
             hidden_shape=HIDDEN_SHAPE,
             activation=ACTIVATION,
+            final_activation=ACTIVATION,
             z2_equivar=False,
-        ) for i in range(4)]
+            use_convnet=False,
+        )
+        for i in range(4)
+    ]
     layer = layers.Sequential(*inner_layers)
     basic_layer_test(layer, *gaussian_input)
 

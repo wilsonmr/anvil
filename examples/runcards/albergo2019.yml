@@ -10,18 +10,10 @@ couplings:
 
 model:
  - layer: real_nvp
-   n_blocks: 2
-   z2_equivar: true
-   activation: tanh
-   hidden_shape: [72]
- - layer: global_rescaling
-   scale: 1
-   learnable: true
- - layer: rational_quadratic_spline
-   n_blocks: 1
-   n_segments: 8
+   n_blocks: 6
    z2_equivar: false
-   activation: tanh
+   activation: leaky_relu
+   final_activation: tanh
    hidden_shape: [72]
  - layer: global_rescaling
    scale: 1

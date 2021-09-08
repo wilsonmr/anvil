@@ -111,15 +111,9 @@ def training_update(
     # Generate latent variables
     z, base_log_density = base_dist(n_batch)
 
-    # Pick out configs whose d.o.f sum to < 0
-    # TODO: generalise this somehow, e.g. replace with call to function
-    # which returns *extra_args for loaded_model, chosen by user based on
-    # theory being studied.
-    negative_mag = (z.sum(dim=1).sign() < 0).nonzero().squeeze()
-
     # Transform latents -> candidate configurations (gradients tracked)
     # NOTE: base_log_density not strictly necessary - could pass 0
-    phi, model_log_density = loaded_model(z, base_log_density, negative_mag)
+    phi, model_log_density = loaded_model(z, base_log_density)
 
     # Compute objective function (gradients tracked)
     target_log_density = target_dist.log_density(phi)

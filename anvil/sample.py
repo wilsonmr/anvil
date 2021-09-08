@@ -60,9 +60,7 @@ def gen_candidates(model, base, target, num: int) -> tuple:
     """
     z, base_log_density = base(num)
 
-    negative_mag = (z.sum(dim=1).sign() < 0).nonzero().squeeze()
-
-    phi, model_log_density = model(z, base_log_density, negative_mag)
+    phi, model_log_density = model(z, base_log_density)
 
     log_ratio = model_log_density - target.log_density(phi)
 
