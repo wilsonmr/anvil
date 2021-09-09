@@ -19,24 +19,6 @@ ACTIVATION = "tanh"
 MASK = Geometry2D(LENGTH).checkerboard
 
 
-@pytest.mark.parametrize("use_convnet", (True, False))
-def test_additive_layers(use_convnet):
-    equivar_additive = layers.AdditiveLayer(
-        mask=MASK,
-        hidden_shape=HIDDEN_SHAPE,
-        activation=ACTIVATION,
-        final_activation=ACTIVATION,
-        z2_equivar=True,
-        use_convnet=use_convnet,
-    )
-    input_tensor = torch.zeros((N_BATCH, SIZE))
-    with torch.no_grad():
-        output_tensor, output_density = equivar_additive(input_tensor, 0)
-
-    assert output_density == 0
-    np.testing.assert_allclose(input_tensor.numpy(), output_tensor.numpy())
-
-
 def basic_layer_test(layer, input_states, input_log_density, *args):
     """Basic check that layer transforms input states properly.
 
@@ -72,10 +54,10 @@ def gaussian_input():
 @pytest.mark.parametrize("z2_equivar", [True, False])
 @pytest.mark.parametrize("use_convnet", [True, False])
 @torch.no_grad()
-def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, use_convnet):
-    """Apply :py:func:`basic_layer_test` to layers with same initialisation
-    parameters as :py:class:`anvil.layers.AffineLayer`.
-
+def test_basic(gaussian_input, layer_class, z2_equivar, use_convnet):
+    """Apply :py:func:`basic_layer_test` to
+    :py:class:`anvil.layers.AffineLayer` and
+    :py:class:`anvil.layers.AdditiveLayer`.
     """
     layer = layer_class(
         mask=MASK,
@@ -88,8 +70,22 @@ def test_affine_like_basic(gaussian_input, layer_class, z2_equivar, use_convnet)
     basic_layer_test(layer, *gaussian_input)
 
 
+@pytest.mark.parametrize("z2_equivar", [True, False])
+def test_legacy_affine_basic(gaussian_input, z2_equivar):
+    """Apply :py:func:`basic_layer_test` to
+    :py:class:`anvil.layers.LegacyAffineLayer`.
+    """
+    layer = layers.LegacyAffineLayer(
+        mask=MASK,
+        hidden_shape=HIDDEN_SHAPE,
+        activation=ACTIVATION,
+        final_activation=ACTIVATION,
+        z2_equivar=z2_equivar,
+    )
+    basic_layer_test(layer, *gaussian_input)
+
+
 @pytest.mark.parametrize("use_convnet", [True, False])
-@torch.no_grad()
 def test_rqs_basic(gaussian_input, use_convnet):
     """Apply :py:func:`basic_layer_test` to
     :py:class:`anvil.layers.RationalQuadraticSplineLayer`.
@@ -106,12 +102,31 @@ def test_rqs_basic(gaussian_input, use_convnet):
     basic_layer_test(layer, *gaussian_input)
 
 
+def test_legacy_equivariant_rqs_basic(gaussian_input):
+    """Apply :py:func:`basic_layer_test` to
+    :py:class:`anvil.layers.LegacyEquivariantSplineLayer`.
+    """
+    layer = layers.LegacyEquivariantSplineLayer(
+        mask=MASK,
+        interval=5,
+        n_segments=4,
+        hidden_shape=HIDDEN_SHAPE,
+        activation=ACTIVATION,
+        final_activation=ACTIVATION,
+    )
+    basic_layer_test(layer, *gaussian_input)
+
+
 @pytest.mark.parametrize(
     "layer_class",
     [layers.GlobalRescaling, layers.BatchNormLayer, layers.GlobalAffineLayer],
 )
-@torch.no_grad()
 def test_scaling_layer_basic(gaussian_input, layer_class):
+    """Apply :py:func:`basic_layer_test` to
+    :py:class:`anvil.layers.GlobalRescaling`,
+    :py:class:`anvil.layers.BatchNormLayer`,
+    :py:class:`anvil.layers.GlobalAffineLayer`,
+    """
     if layer_class is layers.GlobalAffineLayer:
         layer = layer_class(1, 0)
     elif layer_class is layers.GlobalRescaling:
@@ -123,6 +138,9 @@ def test_scaling_layer_basic(gaussian_input, layer_class):
 
 @torch.no_grad()
 def test_sequential_basic(gaussian_input):
+    """Apply :py:func:`basic_layer_test` to
+    :py:clas:`anvil.layers.Sequential`
+    """
     inner_layers = [
         layers.AffineLayer(
             mask=MASK,
@@ -144,5 +162,27 @@ def test_sequential_basic(gaussian_input):
 
     seq_output_states, seq_output_density = layer(*gaussian_input)
 
-    np.testing.assert_allclose(seq_output_states.numpy(), output_states.numpy())
-    np.testing.assert_allclose(seq_output_density.numpy(), output_density.numpy())
+    assert torch.allclose(seq_output_states, output_states)
+    assert torch.allclose(seq_output_density, output_density)
+
+
+@pytest.mark.parametrize("Layer", (layers.AdditiveLayer, layers.AffineLayer))
+@pytest.mark.parametrize("use_convnet", (True, False))
+def test_equivariant_layers_input_zeros(Layer, use_convnet):
+    """Given zeroes as input to the equivariant affine and additive layers, the
+    output should also be zeroes and the density should be unchanged."""
+    model = Layer(
+        mask=MASK,
+        hidden_shape=HIDDEN_SHAPE,
+        activation=ACTIVATION,
+        final_activation=ACTIVATION,
+        z2_equivar=True,  # no biases implies input == output
+        use_convnet=use_convnet,
+    )
+    input_tensor = torch.zeros((N_BATCH, SIZE))
+    input_density = torch.rand((N_BATCH, 1))
+    with torch.no_grad():
+        output_tensor, output_density = model(input_tensor, input_density)
+
+    assert torch.allclose(input_density, output_density)
+    assert torch.allclose(input_tensor, output_tensor)

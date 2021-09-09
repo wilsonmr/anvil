@@ -210,7 +210,6 @@ def metropolis_hastings(
         on accept-reject statistics.
     float
         Fraction of proposals which were accepted during the simulation.
-
     """
     # Draw starting configs
     phi, log_ratio = gen_candidates(

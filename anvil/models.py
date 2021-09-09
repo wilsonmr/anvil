@@ -18,7 +18,7 @@ def real_nvp(
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
-    final_activation: str = "none",
+    final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
     use_convnet: bool = False,
 ) -> layers.Sequential:
@@ -79,12 +79,39 @@ def real_nvp(
     return layers.Sequential(*blocks)
 
 
-def nice(
+def legacy_real_nvp(
     mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
     final_activation: str = "none",
+    z2_equivar: bool = True,
+    use_convnet: bool = False,
+) -> layers.Sequential:
+    """Legacy version of affine layers, where each coupling layer has two
+    neural networks, rather than one."""
+    assert (
+        use_convnet is False
+    ), "Convolutional networks are not supported by the legacy version of affine coupling layers"
+    blocks = [
+        layers.LegacyAffineLayer(
+            mask=mask,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=final_activation,
+            z2_equivar=z2_equivar,
+        )
+        for _ in range(n_blocks)
+    ]
+    return layers.Sequential(*blocks)
+
+
+def nice(
+    mask,
+    n_blocks: int,
+    hidden_shape: (tuple, list),
+    activation: str = "tanh",
+    final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
     use_convnet: bool = False,
 ) -> layers.Sequential:
@@ -142,7 +169,7 @@ def rational_quadratic_spline(
     n_segments: int,
     interval: (int, float) = 5,
     activation: str = "tanh",
-    final_activation: str = "none",
+    final_activation: (str, type(None)) = None,
     use_convnet: bool = False,
 ) -> layers.Sequential:
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
@@ -184,6 +211,62 @@ def rational_quadratic_spline(
             activation=activation,
             final_activation=final_activation,
             use_convnet=use_convnet,
+        )
+        for _ in range(n_blocks)
+    ]
+    return layers.Sequential(*blocks)
+
+
+def legacy_equivariant_spline(
+    mask,
+    n_blocks: int,
+    hidden_shape: (tuple, list),
+    n_segments: int,
+    interval: (int, float) = 5,
+    activation: str = "tanh",
+    final_activation: (str, type(None)) = None,
+) -> layers.Sequential:
+    """Similar to :py:func:`rational_quadratic_spline`, excepts instead wraps
+    pairs of :py:class:`anvil.layers.LegacyEquivariantSplineLayer` s.
+
+    **HEALTH WARNING:** Unfortunately, this results in transformations that are not
+    necessarily continuous which means density estimation is not guaranteed to be
+    correct. We did find that these layers improved performance in the broken symmetry
+    phase of phi^4 theory, but due to the problem just stated we DO NOT recommend
+    using these layers.
+
+    Parameters
+    ----------
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
+    n_blocks
+        The number of pairs of :py:class:`anvil.layers.AffineLayer`
+        transformations. For RQS this is set to 1.
+    hidden_shape
+        the shape of the neural networks used in the each layer. The visible
+        layers are defined by the ``lattice_size``.
+    n_segments
+        The number of segments to use in the RQS transformation.
+    interval
+        an integer :math:`a` denoting a symmetric interval :math:`[-a, a]`
+        within which the RQS applies the transformation. At present, if a
+        field variable is outside of this region it is mapped to itself
+        (i.e the gradient of the transformation is 1 outside of the interval).
+    activation
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
+    """
+
+    blocks = [
+        layers.LegacyEquivariantSplineLayer(
+            mask=mask,
+            interval=interval,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=final_activation,
         )
         for _ in range(n_blocks)
     ]
@@ -350,4 +433,6 @@ LAYER_OPTIONS = {
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
     "gauss_to_free": gauss_to_free,
+    "legacy_real_nvp": legacy_real_nvp,
+    "legacy_equivariant_spline": legacy_equivariant_spline,
 }
