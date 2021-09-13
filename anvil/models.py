@@ -21,6 +21,7 @@ def real_nvp(
     final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
     use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, wrapped in the module container
@@ -54,6 +55,9 @@ def real_nvp(
         imposes a :math:`\mathbb{Z}_2` symmetry.
     use_convnet
         If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
 
     Returns
     -------
@@ -73,6 +77,7 @@ def real_nvp(
             final_activation=final_activation,
             z2_equivar=z2_equivar,
             use_convnet=use_convnet,
+            kernel_size=kernel_size,
         )
         for _ in range(n_blocks)
     ]
@@ -114,6 +119,7 @@ def nice(
     final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
     use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.AdditiveLayer` .
@@ -140,6 +146,9 @@ def nice(
         imposes a :math:`\mathbb{Z}_2` symmetry.
     use_convnet
         If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
 
     Returns
     -------
@@ -156,6 +165,7 @@ def nice(
             final_activation=final_activation,
             z2_equivar=z2_equivar,
             use_convnet=use_convnet,
+            kernel_size=kernel_size,
         )
         for _ in range(n_blocks)
     ]
@@ -171,6 +181,7 @@ def rational_quadratic_spline(
     activation: str = "tanh",
     final_activation: (str, type(None)) = None,
     use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.RationalQuadraticSplineLayer` s.
@@ -200,6 +211,9 @@ def rational_quadratic_spline(
         The activation function to use for the output layer.
     use_convnet
         If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
     """
 
     blocks = [
@@ -211,6 +225,7 @@ def rational_quadratic_spline(
             activation=activation,
             final_activation=final_activation,
             use_convnet=use_convnet,
+            kernel_size=kernel_size,
         )
         for _ in range(n_blocks)
     ]
@@ -225,6 +240,7 @@ def legacy_equivariant_spline(
     interval: (int, float) = 5,
     activation: str = "tanh",
     final_activation: (str, type(None)) = None,
+    use_convnet: bool = False,
 ) -> layers.Sequential:
     """Similar to :py:func:`rational_quadratic_spline`, excepts instead wraps
     pairs of :py:class:`anvil.layers.LegacyEquivariantSplineLayer` s.
@@ -258,7 +274,9 @@ def legacy_equivariant_spline(
     final_activation
         The activation function to use for the output layer.
     """
-
+    assert (
+        use_convnet is False
+    ), "Convolutional networks are not supported by the legacy version of affine coupling layers"
     blocks = [
         layers.LegacyEquivariantSplineLayer(
             mask=mask,

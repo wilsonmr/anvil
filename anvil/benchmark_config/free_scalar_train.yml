@@ -14,7 +14,7 @@ model:
     hidden_shape: [36]
     activation: tanh
     z2_equivar: True
-    use_conv: False
+    use_convnet: False
   - layer: global_rescaling
     scale: 1
     learnable: True

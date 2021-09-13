@@ -16,6 +16,7 @@ model:
    final_activation: tanh
    hidden_shape: [4, 4]
    use_convnet: true
+   kernel_size: 3
  - layer: global_rescaling
    scale: 1
    learnable: true

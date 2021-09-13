@@ -117,7 +117,6 @@ def test_legacy_equivariant_rqs_basic(gaussian_input):
     basic_layer_test(layer, *gaussian_input)
 
 
-
 @pytest.mark.parametrize(
     "layer_class",
     [layers.GlobalRescaling, layers.BatchNormLayer, layers.GlobalAffineLayer],

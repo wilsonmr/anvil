@@ -197,7 +197,6 @@ class FreeScalar:
         # Reflect row/col with k1 = kmax / k2 = kmax
         eigenmodes[:, :i0, -1] = torch.flip(
             eigenmodes[:, i0 + 1 : -1, -1].conj(), dims=(-1,)
-
         )
         eigenmodes[:, -1, :i0] = torch.flip(
             eigenmodes[:, -1, i0 + 1 : -1].conj(), dims=(-1,)
