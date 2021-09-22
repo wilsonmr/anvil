@@ -3,7 +3,7 @@ import warnings
 import pytest
 import torch
 
-from anvil.checkpoint import loaded_model, loaded_optimizer, loaded_scheduler
+from anvil.checkpoint import loaded_model, loaded_optimizer
 
 
 class SimpleModule(torch.nn.Module):
@@ -19,7 +19,6 @@ def test_model_loads():
     assert new_model.p == model.p
 
 
-@pytest.mark.xfail(reason="See https://github.com/pytorch/pytorch/issues/65342")
 @pytest.mark.parametrize(
     "optimizer,optimizer_params",
     [("Adam", {}), ("Adadelta", {}), ("Adagrad", {}), ("SGD", {"lr": 0.001})],
@@ -48,8 +47,9 @@ def test_optimizer_loads(
         "scheduler_state_dict": sched.state_dict(),
     }
 
-    new_optim = loaded_optimizer(model, checkpoint, optimizer, optimizer_params)
-    new_sched = loaded_scheduler(new_optim, checkpoint, scheduler, scheduler_params)
+    new_optim, new_sched = loaded_optimizer(
+        model, checkpoint, optimizer, optimizer_params, scheduler, scheduler_params
+    )
     # First, check that scheduler wraps optimizer
     assert new_sched.optimizer is new_optim
 
