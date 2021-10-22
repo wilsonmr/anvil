@@ -63,12 +63,14 @@
 <li class="toctree-l1"><a class="reference internal" href="anvil.tests.html">anvil.tests package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#submodules">Submodules</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_benchmark">anvil.tests.test_benchmark module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-checkpoint-module">anvil.tests.test_checkpoint module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_distributions">anvil.tests.test_distributions module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-free-scalar-module">anvil.tests.test_free_scalar module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests.test_geometry">anvil.tests.test_geometry module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-layers-module">anvil.tests.test_layers module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-learns-identity-module">anvil.tests.test_learns_identity module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-models-module">anvil.tests.test_models module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#anvil-tests-test-networks-module">anvil.tests.test_networks module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="anvil.tests.html#module-anvil.tests">Module contents</a></li>
 </ul>
 </li>
@@ -1717,7 +1719,9 @@ then sum over <span class="math notranslate nohighlight">\(x\in\Lambda^A\)</span
 
 <dl class="py class">
 <dt class="sig sig-object py" id="anvil.layers.Sequential">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">Sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.Sequential" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">Sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">torch.nn.modules.module.Module</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#anvil.layers.Sequential" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">anvil.layers.</span></span><span class="sig-name descname"><span class="pre">Sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arg</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.container.Sequential</span></code></p>
 <p>Similar to <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.Sequential</span></code> except conforms to our
 <code class="docutils literal notranslate"><span class="pre">forward</span></code> convention.</p>
@@ -1735,11 +1739,6 @@ conventioned for expected inputs/outputs of <code class="docutils literal notran
 </dd>
 </dl>
 </dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="anvil.layers.Sequential.training">
-<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="pre">:</span> <span class="pre">bool</span></em><a class="headerlink" href="#anvil.layers.Sequential.training" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
 
 </dd></dl>
 
@@ -2913,7 +2912,7 @@ i.e. <span class="math notranslate nohighlight">\(\tilde{p}_\theta(\phi' \mid \p
 
 <dl class="py function">
 <dt class="sig sig-object py" id="anvil.sample.random">
-<span class="sig-prename descclassname"><span class="pre">anvil.sample.</span></span><span class="sig-name descname"><span class="pre">random</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; <span class="pre">x</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">interval</span> <span class="pre">[0,</span> <span class="pre">1).</span><a class="headerlink" href="#anvil.sample.random" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">anvil.sample.</span></span><span class="sig-name descname"><span class="pre">random</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">x</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">interval</span> <span class="pre">[0,</span> <span class="pre">1).</span></span></span><a class="headerlink" href="#anvil.sample.random" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py function">
@@ -3442,7 +3441,7 @@ will be executed.</p>
   <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <input type="submit" value="Go" />
     </form>
     </div>
@@ -3467,7 +3466,7 @@ will be executed.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2021, Michael Wilson, Joe Marsh Rossney and Luigi Del Debbio.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
     </div>
   </body>
 </html>

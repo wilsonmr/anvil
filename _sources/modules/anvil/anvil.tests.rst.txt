@@ -12,6 +12,14 @@ anvil.tests.test\_benchmark module
    :undoc-members:
    :show-inheritance:
 
+anvil.tests.test\_checkpoint module
+-----------------------------------
+
+.. automodule:: anvil.tests.test_checkpoint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 anvil.tests.test\_distributions module
 --------------------------------------
 
@@ -56,6 +64,14 @@ anvil.tests.test\_models module
 -------------------------------
 
 .. automodule:: anvil.tests.test_models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+anvil.tests.test\_networks module
+---------------------------------
+
+.. automodule:: anvil.tests.test_networks
    :members:
    :undoc-members:
    :show-inheritance:
