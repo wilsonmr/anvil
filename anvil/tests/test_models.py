@@ -3,7 +3,7 @@ Test higher level model construction from :py:mod:`anvil.models`.
 
 """
 from hypothesis import given
-from hypothesis.strategies import integers, lists
+from hypothesis.strategies import integers, lists, booleans
 import pytest
 import torch
 from copy import deepcopy
@@ -37,8 +37,11 @@ def test_layer_actions(layer_action):
     integers(min_value=1, max_value=4),
     integers(min_value=1, max_value=8),
     lists(integers(min_value=1, max_value=2 ** 6), min_size=1, max_size=3),
+    booleans(),
 )
-def test_model_construction(layer_idx, n_blocks, lattice_length_half, hidden_shape):
+def test_model_construction(
+    layer_idx, n_blocks, lattice_length_half, hidden_shape, use_conv
+):
     """Hypothesis test the model construction"""
     # require even lattice sites.
     model = [{"layer": LAYERS[idx]} for idx in layer_idx]
@@ -49,9 +52,11 @@ def test_model_construction(layer_idx, n_blocks, lattice_length_half, hidden_sha
         "lattice_length": lattice_length,
         "hidden_shape": hidden_shape,
         "lattice_dimension": 2,
+        "use_conv": use_conv,
         # for some reason the RQS defaults get missed?
         "interval": 5,
         "n_segments": 4,
+        "z2_equivar": False,
     }
     # might help with memory.
     with torch.no_grad():

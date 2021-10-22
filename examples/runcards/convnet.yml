@@ -1,0 +1,37 @@
+# Lattice
+lattice_length: 6
+lattice_dimension: 2
+
+# Target
+parameterisation: bosetti2015
+couplings:
+    beta: 0.537
+    lam: 0.5
+
+model:
+ - layer: real_nvp
+   n_blocks: 2
+   z2_equivar: true
+   activation: tanh
+   final_activation: tanh
+   hidden_shape: [4, 4]
+   use_convnet: true
+   kernel_size: 3
+ - layer: global_rescaling
+   scale: 1
+   learnable: true
+
+# Training
+n_batch: 2000
+epochs: 4000
+save_interval: 1000
+
+# Optimizer
+optimizer: Adam
+optimizer_params:
+    lr: 0.005
+
+# Scheduler
+scheduler: CosineAnnealingLR
+scheduler_params:
+    T_max: 4000

@@ -1,0 +1,35 @@
+# Lattice
+lattice_length: 4
+lattice_dimension: 2
+
+# Target
+parameterisation: standard
+couplings:
+    m_sq: 1
+    g: 0
+
+model:
+ - layer: nice
+   n_blocks: 2
+   z2_equivar: true
+   activation: tanh
+   final_activation: tanh
+   hidden_shape: [32]
+ - layer: global_rescaling
+   scale: 1
+   learnable: true
+
+# Training
+n_batch: 1000
+epochs: 2000
+save_interval: 1000
+
+# Optimizer
+optimizer: Adam
+optimizer_params:
+    lr: 0.005
+
+# Scheduler
+scheduler: CosineAnnealingLR
+scheduler_params:
+    T_max: 2000

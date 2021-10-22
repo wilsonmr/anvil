@@ -6,7 +6,7 @@ benchmarks.py
 Module containing benchmarking functions which compare a NVP trained on free
 theory to theoretical values. Largely used to check that the anvil machinery
 is working correctly.
-    
+
 Notes
 -----
 See the docstring for anvil.free_scalar.FreeScalar for an explanation

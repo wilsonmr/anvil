@@ -77,8 +77,8 @@ def training_update(
     target_dist,
     n_batch: int,
     current_loss: float,
-    loaded_optimizer,
-    loaded_scheduler,
+    optimizer,
+    scheduler,
 ) -> float:
     """A single training update or 'epoch'.
 
@@ -98,9 +98,9 @@ def training_update(
         parameters.
     current_loss
         The current value of the loss or objective function.
-    loaded_optimizer
+    optimizer
         Optimization algorithm which will be used to update the model parameters.
-    loaded_scheduler
+    scheduler
         Learning rate scheduler.
 
     Returns
@@ -111,29 +111,23 @@ def training_update(
     # Generate latent variables
     z, base_log_density = base_dist(n_batch)
 
-    # Pick out configs whose d.o.f sum to < 0
-    # TODO: generalise this somehow, e.g. replace with call to function
-    # which returns *extra_args for loaded_model, chosen by user based on
-    # theory being studied.
-    negative_mag = (z.sum(dim=1).sign() < 0).nonzero().squeeze()
-
     # Transform latents -> candidate configurations (gradients tracked)
     # NOTE: base_log_density not strictly necessary - could pass 0
-    phi, model_log_density = loaded_model(z, base_log_density, negative_mag)
+    phi, model_log_density = loaded_model(z, base_log_density)
 
     # Compute objective function (gradients tracked)
     target_log_density = target_dist.log_density(phi)
     current_loss = reverse_kl(model_log_density, target_log_density)
 
     # Backprop gradients and update model parameters
-    loaded_optimizer.zero_grad()  # zero gradients from prev minibatch
+    optimizer.zero_grad()  # zero gradients from prev minibatch
     current_loss.backward()  # accumulate new gradients
-    loaded_optimizer.step()  # update model parameters
+    optimizer.step()  # update model parameters
 
     # TODO: we have different scheduler updates depending on which we're using,
     # which are not currently accounted for. E.g. would require
-    # loaded_scheduler.step(current_loss) for ReduceLROnPlateau
-    loaded_scheduler.step()  # update learning rate
+    # scheduler.step(current_loss) for ReduceLROnPlateau
+    scheduler.step()  # update learning rate
 
     return current_loss
 
@@ -147,8 +141,7 @@ def train(
     n_batch: int,
     outpath: str,
     current_loss: float,
-    loaded_optimizer,
-    loaded_scheduler,
+    loaded_optimizer: tuple,
     save_interval: int = 1000,
     loss_sample_interval: int = 25,
 ):
@@ -179,9 +172,7 @@ def train(
     current_loss
         The current value of the loss or objective function.
     loaded_optimizer
-        Optimization algorithm which will be used to update the model parameters.
-    loaded_scheduler
-        Learning rate scheduler.
+        Tuple containing loaded optimizer and scheduler.
     save_interval
         Number of training updates between checkpoints.
     loss_sample_interval
@@ -198,6 +189,8 @@ def train(
     # TODO: should have a --verbose option which controls whether we care about stuff like this
     num_parameters = get_num_parameters(loaded_model)
     log.info(f"Model has {num_parameters} trainable parameters.")
+
+    optimizer, scheduler = loaded_optimizer
 
     # TODO: should provide option to not use tqdm progress bar, e.g. when
     # running benchmark test with pytest, github CI
@@ -218,8 +211,8 @@ def train(
                     epoch=current_epoch,
                     loss=current_loss,
                     model=loaded_model,
-                    optimizer=loaded_optimizer,
-                    scheduler=loaded_scheduler,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
                 )
 
             current_loss = training_update(
@@ -228,8 +221,8 @@ def train(
                 target_dist,
                 n_batch,
                 current_loss,
-                loaded_optimizer,
-                loaded_scheduler,
+                optimizer,
+                scheduler,
             )
             # Increment counter immediately after training update
             current_epoch += 1
@@ -247,8 +240,8 @@ def train(
             epoch=current_epoch,
             loss=current_loss,
             model=loaded_model,
-            optimizer=loaded_optimizer,
-            scheduler=loaded_scheduler,
+            optimizer=optimizer,
+            scheduler=scheduler,
         )
         with open(f"{outpath}/loss.txt", "a") as f:
             f.writelines(history)

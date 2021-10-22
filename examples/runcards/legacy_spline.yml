@@ -3,33 +3,25 @@ lattice_length: 6
 lattice_dimension: 2
 
 # Target
-parameterisation: albergo2019
+parameterisation: bosetti2015
 couplings:
-    m_sq: -4
-    lam: 6.975
+    beta: 0.537
+    lam: 0.5
 
 model:
- - layer: real_nvp
-   n_blocks: 2
-   z2_equivar: true
-   activation: tanh
-   hidden_shape: [72]
- - layer: global_rescaling
-   scale: 1
-   learnable: true
- - layer: rational_quadratic_spline
+ - layer: legacy_equivariant_spline
    n_blocks: 1
    n_segments: 8
-   z2_equivar: false
    activation: tanh
-   hidden_shape: [72]
+   final_activation: null
+   hidden_shape: [36]
  - layer: global_rescaling
    scale: 1
    learnable: true
 
 # Training
-n_batch: 1000
-epochs: 2000
+n_batch: 2000
+epochs: 4000
 save_interval: 1000
 
 # Optimizer
@@ -40,4 +32,4 @@ optimizer_params:
 # Scheduler
 scheduler: CosineAnnealingLR
 scheduler_params:
-    T_max: 2000
+    T_max: 4000

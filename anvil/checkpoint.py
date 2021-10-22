@@ -39,27 +39,21 @@ def loaded_optimizer(
     loaded_checkpoint,
     optimizer,
     optimizer_params,
+    scheduler,
+    scheduler_params,
 ):
     """Loads state from checkpoint if provided, returns instantiated optimizer."""
     optim_class = getattr(torch.optim, optimizer)
     optim_instance = optim_class(loaded_model.parameters(), **optimizer_params)
+    sched_class = getattr(torch.optim.lr_scheduler, scheduler)
+    sched_instance = sched_class(optim_instance, **scheduler_params)
+    
+    # Must load optimizer *after* instantiating scheduler!
+    # See https://github.com/pytorch/pytorch/issues/65342
     if loaded_checkpoint is not None:
         optim_instance.load_state_dict(loaded_checkpoint["optimizer_state_dict"])
-    return optim_instance
-
-
-def loaded_scheduler(
-    loaded_optimizer,
-    loaded_checkpoint,
-    scheduler,
-    scheduler_params,
-):
-    """Loads state from checkpoint if provided, returns instantiated scheduler."""
-    sched_class = getattr(torch.optim.lr_scheduler, scheduler)
-    sched_instance = sched_class(loaded_optimizer, **scheduler_params)
-    if loaded_checkpoint is not None:
         sched_instance.load_state_dict(loaded_checkpoint["scheduler_state_dict"])
-    return sched_instance
+    return optim_instance, sched_instance
 
 
 def train_range(loaded_checkpoint, epochs: int) -> tuple:

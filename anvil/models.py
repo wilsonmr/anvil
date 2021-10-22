@@ -8,37 +8,20 @@ Generally this involves piecing together components from :py:mod:`anvil.layers`
 to produce sequences of transformations.
 
 """
-from functools import partial
-
 from reportengine import collect
 
 import anvil.layers as layers
 
 
-def _coupling_block(
-    coupling_layer: layers.CouplingLayer, **kwargs
-) -> layers.Sequential:
-    """Helper function which wraps a pair of coupling layers from
-    :py:mod:`anvil.layers` in the module container
-    :py:class`anvil.layers.Sequential`. The first transformation layer acts on
-    the even sites and the second transformation acts on the odd sites, so one
-    of these blocks ensures all sites are transformed as part of an
-    active partition.
-
-    """
-    coupling_transformation = partial(coupling_layer, **kwargs)
-    return layers.Sequential(
-        coupling_transformation(even_sites=True),
-        coupling_transformation(even_sites=False),
-    )
-
-
 def real_nvp(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
+    final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
+    use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     r"""Action which returns a sequence of ``n_blocks`` pairs of
     :py:class:`anvil.layers.AffineLayer` s, wrapped in the module container
@@ -50,9 +33,9 @@ def real_nvp(
 
     Parameters
     ----------
-    size_half
-        Inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
@@ -63,12 +46,18 @@ def real_nvp(
         specified by passing a list of length 1, i.e. ``[72]`` would
         be a single hidden layered network with 72 nodes in the hidden layer.
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
     z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
 
     Returns
     -------
@@ -81,11 +70,40 @@ def real_nvp(
     :py:mod:`anvil.neural_network`
     """
     blocks = [
-        _coupling_block(
-            layers.AffineLayer,
-            size_half=size_half,
+        layers.AffineLayer(
+            mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
+            final_activation=final_activation,
+            z2_equivar=z2_equivar,
+            use_convnet=use_convnet,
+            kernel_size=kernel_size,
+        )
+        for _ in range(n_blocks)
+    ]
+    return layers.Sequential(*blocks)
+
+
+def legacy_real_nvp(
+    mask,
+    n_blocks: int,
+    hidden_shape: (tuple, list),
+    activation: str = "tanh",
+    final_activation: str = "none",
+    z2_equivar: bool = True,
+    use_convnet: bool = False,
+) -> layers.Sequential:
+    """Legacy version of affine layers, where each coupling layer has two
+    neural networks, rather than one."""
+    assert (
+        use_convnet is False
+    ), "Convolutional networks are not supported by the legacy version of affine coupling layers"
+    blocks = [
+        layers.LegacyAffineLayer(
+            mask=mask,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=final_activation,
             z2_equivar=z2_equivar,
         )
         for _ in range(n_blocks)
@@ -94,11 +112,14 @@ def real_nvp(
 
 
 def nice(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     activation: str = "tanh",
+    final_activation: (str, type(None)) = None,
     z2_equivar: bool = True,
+    use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     r"""Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.AdditiveLayer` .
@@ -106,9 +127,9 @@ def nice(
 
     Parameters
     ----------
-    size_half
-        Inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations.
@@ -116,12 +137,18 @@ def nice(
         the shape of the neural networks used in the each layer. The visible
         layers are defined by the ``lattice_size``.
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
     z2_equivar
         Whether or not to impose z2 equivariance. This changes the transformation
         such that the neural networks have no bias term and s(-v) = s(v) which
         imposes a :math:`\mathbb{Z}_2` symmetry.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
 
     Returns
     -------
@@ -131,12 +158,14 @@ def nice(
 
     """
     blocks = [
-        _coupling_block(
-            layers.AdditiveLayer,
-            size_half=size_half,
+        layers.AdditiveLayer(
+            mask=mask,
             hidden_shape=hidden_shape,
             activation=activation,
+            final_activation=final_activation,
             z2_equivar=z2_equivar,
+            use_convnet=use_convnet,
+            kernel_size=kernel_size,
         )
         for _ in range(n_blocks)
     ]
@@ -144,13 +173,15 @@ def nice(
 
 
 def rational_quadratic_spline(
-    size_half: int,
+    mask,
     n_blocks: int,
     hidden_shape: (tuple, list),
     n_segments: int,
     interval: (int, float) = 5,
     activation: str = "tanh",
-    z2_equivar: bool = False,
+    final_activation: (str, type(None)) = None,
+    use_convnet: bool = False,
+    kernel_size: int = 3,
 ) -> layers.Sequential:
     """Similar to :py:func:`real_nvp`, excepts instead wraps pairs of
     :py:class:`anvil.layers.RationalQuadraticSplineLayer` s.
@@ -158,9 +189,9 @@ def rational_quadratic_spline(
 
     Parameters
     ----------
-    size_half
-        inferred from ``lattice_size``, the size of the active/passive
-        partitions (which are equal size, `lattice_size / 2`).
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
     n_blocks
         The number of pairs of :py:class:`anvil.layers.AffineLayer`
         transformations. For RQS this is set to 1.
@@ -175,23 +206,85 @@ def rational_quadratic_spline(
         field variable is outside of this region it is mapped to itself
         (i.e the gradient of the transformation is 1 outside of the interval).
     activation
-        The activation function to use for each hidden layer. The output layer
-        of the network is linear (has no activation function).
-    z2_equivar
-        Whether or not to impose z2 equivariance. This is only done crudely
-        by splitting the sites according to the sign of the sum across lattice
-        sites.
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
+    use_convnet
+        If true, use convolutional networks. Otherwise, use fully-connected.
+    kernel_size
+        If using convolutional networks, the convolutional kernel will be a square
+        weight matrix with ``kernel_size * kernel_size`` weights.
     """
 
     blocks = [
-        _coupling_block(
-            layers.RationalQuadraticSplineLayer,
-            size_half=size_half,
+        layers.RationalQuadraticSplineLayer(
+            mask=mask,
             interval=interval,
             n_segments=n_segments,
             hidden_shape=hidden_shape,
             activation=activation,
-            z2_equivar=z2_equivar,
+            final_activation=final_activation,
+            use_convnet=use_convnet,
+            kernel_size=kernel_size,
+        )
+        for _ in range(n_blocks)
+    ]
+    return layers.Sequential(*blocks)
+
+
+def legacy_equivariant_spline(
+    mask,
+    n_blocks: int,
+    hidden_shape: (tuple, list),
+    n_segments: int,
+    interval: (int, float) = 5,
+    activation: str = "tanh",
+    final_activation: (str, type(None)) = None,
+    use_convnet: bool = False,
+) -> layers.Sequential:
+    """Similar to :py:func:`rational_quadratic_spline`, excepts instead wraps
+    pairs of :py:class:`anvil.layers.LegacyEquivariantSplineLayer` s.
+
+    **HEALTH WARNING:** Unfortunately, this results in transformations that are not
+    necessarily continuous which means density estimation is not guaranteed to be
+    correct. We did find that these layers improved performance in the broken symmetry
+    phase of phi^4 theory, but due to the problem just stated we DO NOT recommend
+    using these layers.
+
+    Parameters
+    ----------
+    mask
+        Boolean mask which differentiates the two partitions as required by
+        the coupling layers.
+    n_blocks
+        The number of pairs of :py:class:`anvil.layers.AffineLayer`
+        transformations. For RQS this is set to 1.
+    hidden_shape
+        the shape of the neural networks used in the each layer. The visible
+        layers are defined by the ``lattice_size``.
+    n_segments
+        The number of segments to use in the RQS transformation.
+    interval
+        an integer :math:`a` denoting a symmetric interval :math:`[-a, a]`
+        within which the RQS applies the transformation. At present, if a
+        field variable is outside of this region it is mapped to itself
+        (i.e the gradient of the transformation is 1 outside of the interval).
+    activation
+        The activation function to use for each hidden layer.
+    final_activation
+        The activation function to use for the output layer.
+    """
+    assert (
+        use_convnet is False
+    ), "Convolutional networks are not supported by the legacy version of affine coupling layers"
+    blocks = [
+        layers.LegacyEquivariantSplineLayer(
+            mask=mask,
+            interval=interval,
+            n_segments=n_segments,
+            hidden_shape=hidden_shape,
+            activation=activation,
+            final_activation=final_activation,
         )
         for _ in range(n_blocks)
     ]
@@ -358,4 +451,6 @@ LAYER_OPTIONS = {
     "batch_norm": batch_norm,
     "global_rescaling": global_rescaling,
     "gauss_to_free": gauss_to_free,
+    "legacy_real_nvp": legacy_real_nvp,
+    "legacy_equivariant_spline": legacy_equivariant_spline,
 }
